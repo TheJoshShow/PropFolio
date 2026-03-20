@@ -1,0 +1,10 @@
+security_type,holder_name,holder_type,shares_or_amount,vesting_start_date,vested_shares,unvested_shares,exercise_price,notes
+Common,Founder A,Founder,5000000,2025-01-01,,,0.0001,Example; 4yr/1yr cliff; adjust with counsel
+Common,Founder B,Founder,5000000,2025-01-01,,,0.0001,Example; 4yr/1yr cliff; adjust with counsel
+Option Pool,Reserved,Pool,2000000,,,,-,10-20% typical; adjust pre/post money
+Preferred,,[Investor],[0],,,,,[Post-financing: add rows for each round]
+,,,,,,,,
+Total authorized,,,10000000,,,,Adjust to match charter
+Total issued (common),,,10000000,,,,
+Total reserved (options),,,2000000,,,,
+Total available,,,0,,,,

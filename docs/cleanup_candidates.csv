@@ -1,0 +1,61 @@
+path,bucket,reason,verification_notes
+expo-app/expo-app,2,Nested duplicate or copy of expo-app; contains node_modules and RN packages.,Confirm no build script or EAS config references this path; confirm it is not a git submodule.
+_archive_review/web,2,Archived Vite/React web package; not used by expo-app.,Confirm no docs or scripts reference _archive_review; then safe to delete or keep as archive.
+expo-app/app/+html.tsx,2,Web-only root HTML for static web build.,For iOS-only, web build may be disabled; confirm EAS/Expo iOS build does not require +html.tsx.
+expo-app/app.json android block,3,Android config (package, adaptiveIcon, predictiveBackGestureEnabled).,Keep file; remove android key for iOS-only.
+expo-app/app.json web block,3,Web config (bundler, output, favicon).,Keep file; remove web key for iOS-only.
+expo-app/package.json script "android",3,expo start --android.,Remove or keep for dev convenience; not needed for iOS-only release.
+expo-app/package.json script "web",3,expo start --web.,Remove or keep for dev; not needed for iOS-only release.
+expo-app/package.json react-native-web dependency,3,Used for web platform.,After removing web target, can remove dependency; verify no other code imports react-native-web.
+expo-app/assets/images/android-icon-foreground.png,2,Android adaptive icon.,Delete after confirming app.json android block removed and no other reference.
+expo-app/assets/images/android-icon-background.png,2,Android adaptive icon.,Same as above.
+expo-app/assets/images/android-icon-monochrome.png,2,Android adaptive icon.,Same as above.
+expo-app/assets/images/favicon.png,2,Web favicon.,Delete if web is dropped and no other reference.
+expo-app/app/_layout.tsx Platform.OS === 'web' (Sentry),3,Sentry only on native; isWeb check.,Refactor: use Platform.OS === 'ios' for iOS-only or keep check for future Android.
+expo-app/app/(tabs)/_layout.tsx SymbolView ios/android/web,3,Tab bar icons use three platform names.,Refactor to ios-only name or single string per SymbolView.
+expo-app/app/(tabs)/settings.tsx Platform.OS web branches,3,Restore disabled on web; message "iOS or Android app".,Refactor: remove web branches; update copy to "this app" or "iOS app".
+expo-app/app/paywall.tsx Platform.OS web branches,3,Hide purchase UI on web; early return on web.,Refactor: remove web branches for iOS-only.
+expo-app/app/(auth)/sign-up.tsx Platform.OS behavior/padding,3,behavior and Platform.OS === 'web' for input.,Refactor: keep iOS behavior only if iOS-only.
+expo-app/app/(auth)/login.tsx Platform.OS behavior,3,behavior={Platform.OS === 'ios' ? 'padding' : undefined}.,Keep as-is (iOS gets padding) or simplify to always padding.
+expo-app/app/(auth)/forgot-password.tsx Platform.OS behavior,3,Same as login.,Same as login.
+expo-app/app/update-password.tsx Platform.OS behavior,3,Same as login.,Same as login.
+expo-app/src/contexts/AuthContext.tsx Platform.OS web (WebBrowser OAuth),3,maybeCompleteAuthSession and web-only early return.,Refactor: remove web branches; OAuth on iOS does not need web completion.
+expo-app/src/services/supabase.ts Platform.OS web (localStorage detectSessionInUrl),3,Web storage and URL session detection.,Refactor: remove web branches for iOS-only.
+expo-app/src/services/revenueCat.ts Platform.OS ios/android native check,3,isNative = ios || android.,Refactor: for iOS-only can simplify to Platform.OS === 'ios' or keep for future Android.
+expo-app/src/utils/subscriptionManagement.ts Android/iOS/web branches,3,getManagementUrl and openURL per platform.,Refactor: keep iOS path only; remove Android and web fallback copy or update copy.
+expo-app/src/config/billing.ts getRevenueCatApiKey android,3,Returns Android key when Platform.OS === 'android'.,Refactor: return only iOS key for iOS-only; remove ENV_REVENUECAT_API_KEY_ANDROID usage.
+expo-app/src/features/paywall/PaywallContent.tsx Platform.OS !== 'web',3,Conditional native-only UI.,Refactor: remove condition for iOS-only.
+expo-app/src/features/paywall/paywallCopy.ts "iOS and Android",3,User-facing copy.,Refactor: "in the PropFolio app" or "on this device" for iOS-only.
+expo-app/src/utils/authRedirect.ts Platform.OS web,3,getSessionParamsFromUrl for web.,Refactor: remove or no-op for iOS-only.
+expo-app/src/theme/index.ts comment "iOS Android and Web",4,Comment only.,Optional: update comment to "iOS".
+PropFolio/ (entire Swift project),2,Parallel native iOS codebase.,Do not delete until decision: abandon in favor of Expo or replace Expo with native. Review before any deletion.
+expo-app/_quarantine,4,Already quarantined unused modal and components.,Keep unchanged; documented in AUDIT-OBSOLETE-UNUSED.md.
+expo-app/src/store/index.ts,3,Placeholder (export type {}).,Keep if adding global state later; or remove and delete any imports.
+expo-app/src/dev/subscriptionDebugOverrides.ts,4,__DEV__ only; no production impact.,Keep unchanged.
+docs/release/*,4,App Store and release documentation.,Keep unchanged.
+supabase/,4,Backend migrations and Edge Functions.,Keep unchanged.
+expo-app/src/lib/*,4,Scoring confidence underwriting simulation parsers renovation.,Keep unchanged.
+expo-app/assets/images/icon.png,4,iOS app icon.,Keep unchanged.
+expo-app/assets/images/splash-icon.png,4,Splash screen.,Keep unchanged.
+expo-app/assets/fonts/SpaceMono-Regular.ttf,4,Font used in _layout.,Keep unchanged.
+expo-app/package.json script "ios",4,Primary launch script for iOS.,Keep unchanged.
+expo-app/package.json script "start",4,expo start.,Keep unchanged.
+expo-app/tsconfig.json,4,TypeScript config.,Keep unchanged.
+expo-app/.env.example,4,Env documentation.,Keep unchanged; remove Android key line if going iOS-only (optional).
+expo-app/src/config/env.ts,4,Supabase validation.,Keep unchanged.
+expo-app/src/config/legalUrls.ts,4,Privacy/Terms URLs.,Keep unchanged.
+expo-app/src/services/edgeFunctions.ts,4,Edge Function invocations.,Keep unchanged.
+expo-app/src/services/importLimits.ts,4,Free tier and record import.,Keep unchanged.
+expo-app/src/contexts/SubscriptionContext.tsx,4,RevenueCat and entitlement.,Keep unchanged.
+expo-app/src/contexts/AuthContext.tsx,4,Auth and demo mode.,Keep unchanged (refactor only Platform.OS web branches).
+expo-app/app/(tabs)/import.tsx,4,Import screen and flow.,Keep unchanged.
+expo-app/app/(tabs)/index.tsx,4,Home tab.,Keep unchanged.
+expo-app/app/(tabs)/portfolio.tsx,4,Portfolio tab.,Keep unchanged.
+expo-app/app/(auth)/_layout.tsx,4,Auth stack.,Keep unchanged.
+expo-app/app/(auth)/login.tsx,4,Login screen.,Keep unchanged (optional refactor Platform).
+expo-app/app/(auth)/sign-up.tsx,4,Sign-up screen.,Keep unchanged (optional refactor Platform).
+expo-app/app/(auth)/forgot-password.tsx,4,Forgot password.,Keep unchanged.
+expo-app/app/paywall.tsx,4,Paywall screen.,Keep unchanged (refactor Platform branches).
+expo-app/app/update-password.tsx,4,Update password.,Keep unchanged.
+expo-app/app/+not-found.tsx,4,404 screen.,Keep unchanged.
+expo-app/app/_layout.tsx,4,Root layout.,Keep unchanged (refactor Sentry isWeb only).

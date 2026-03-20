@@ -1,0 +1,6 @@
+asset_name,asset_type,description,file_location,usage_rights,trademark_status,jurisdiction,registration_number,registration_date,renewal_date,notes
+PropFolio,Word mark,App and company name,Legal / marketing,Company owned,Pending / Registered,US,,,,
+PropFolio logo,Logo,Primary logo,design/logo.png,Company owned,Pending / Registered,US,,,,
+App icon,Graphic,1024x1024 iOS icon,expo-app/assets/images/icon.png,Company owned,N/A (design),,,,
+Tagline,Word mark,Should I buy this property?,Legal / in-app,Company owned,Optional,,,,
+domain_propfolio.app,Domain,Primary product domain,Registrar,Company owned,N/A,,,,

@@ -1,0 +1,13 @@
+{
+  "name": "propfolio-website",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static legal pages (Privacy, Terms) for propfolio.app — deploy to Vercel, Netlify, or any static host",
+  "scripts": {
+    "build": "node scripts/build-legal.mjs",
+    "preview": "npx --yes serve dist -p 3333"
+  },
+  "devDependencies": {
+    "marked": "^15.0.0"
+  }
+}

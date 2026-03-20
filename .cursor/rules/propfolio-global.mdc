@@ -1,0 +1,43 @@
+---
+description: Universal product and engineering rules for PropFolio
+globs: "**/*"
+alwaysApply: true
+---
+
+# PropFolio Global Standards
+
+## Product Context
+
+PropFolio is a greenfield iOS-first real estate investment intelligence app. The primary user promise is helping buyers feel confident they will make money on a property purchase.
+
+## Platform Priorities
+
+1. iOS-first, SwiftUI-first
+2. Optimize for common iPhone sizes (iPhone 14/15/16 standard and Pro) before iPad or web
+3. Clean, modern, premium but approachable visual language
+4. Every screen must reinforce the core promise: confidence in making money
+
+## Engineering Standards
+
+### Financial Logic
+
+- All financial formulas must be deterministic and fully unit-tested
+- AI must never calculate financial metrics
+- Never hide unsupported assumptions; surface them clearly in the UI
+
+### Data Imports
+
+- All external imports must record source, timestamp, and confidence level
+- Keep expensive external API calls cached where possible
+- Wrap every third-party API with an adapter layer
+- Support partial-result fallback for all API imports
+
+### Architecture
+
+- Prefer modular files and small focused services/view models
+- Every feature must handle all states: loading, empty, success, and error
+- Expose data freshness and confidence visibly to users
+
+### Quality Gates
+
+- A reviewer subagent pass is required before any phase is considered complete

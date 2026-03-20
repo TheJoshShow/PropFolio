@@ -1,0 +1,10 @@
+// PropFolio — Example build configuration
+// Copy to Secrets.xcconfig (or Config-Secrets.xcconfig), fill in real values, and add to .gitignore.
+// In Xcode: Project → Info → Configurations → set your build config to use Secrets.xcconfig, or
+// add these keys to the target's Info tab as "Custom iOS Target Properties" (SUPABASE_URL, SUPABASE_ANON_KEY).
+
+SUPABASE_URL = https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY = your-anon-key-here
+PROPFOLIO_ENV = development
+
+// To expose to Info.plist: add to target → Build Settings → Info.plist Values (e.g. SUPABASE_URL = $(SUPABASE_URL)).

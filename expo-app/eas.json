@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 18.4.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://imdwzvmcwzccikboppdu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltZHd6dm1jd3pjY2lrYm9wcGR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NDU2MjksImV4cCI6MjA4OTAyMTYyOX0.PTO-TZhkKL5uX0DD5JhOPWvAM0sk4TqVT5eb-dGBIB0"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6760779180",
+        "appleTeamId": "C7UKTVM956",
+        "ascApiKeyPath": "C:\\Users\\JoshS\\OneDrive - Winchester Realty & Holdings LLC\\Desktop\\The App\\PropFolio Build\\AuthKey_X7KSRJU37Z.p8",
+        "ascApiKeyIssuerId": "59955ad5-ae42-4790-b99c-e82fdf7d43f1",
+        "ascApiKeyId": "X7KSRJU37Z"
+      }
+    }
+  }
+}

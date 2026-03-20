@@ -1,0 +1,47 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Environment and secrets (never commit)
+.env
+.env.local
+Secrets.xcconfig
+Config-Secrets.xcconfig
+**/Secrets.xcconfig
+
+# macOS
+.DS_Store
+
+# Supabase
+supabase/.branches
+supabase/.temp/
+
+# Cursor / IDE
+.idea/
+
+# Node / Expo / JS (expo-app and tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+.expo/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.orig.*
+
+# EAS local credentials (never commit)
+credentials.json
+*.p8.key
+AuthKey_*.p8
