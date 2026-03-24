@@ -20,6 +20,10 @@ Config-Secrets.xcconfig
 # macOS
 .DS_Store
 
+# Installers / downloads (never commit; GitHub rejects >100MB)
+GitHubDesktopSetup-x64.exe
+GitHubDesktop*.exe
+
 # Supabase
 supabase/.branches
 supabase/.temp/
