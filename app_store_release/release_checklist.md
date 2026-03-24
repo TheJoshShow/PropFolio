@@ -61,10 +61,10 @@ Before submission, confirm these open correctly in **Safari** (not just in-app):
 
 ## Final crash-free verification checklist
 
-- [ ] **Sentry (or your crash tool):** DSN is set for production (`EXPO_PUBLIC_SENTRY_DSN`). No PII in default config.
+- [ ] **Crash reporting:** When Firebase Crashlytics is integrated, confirm production configuration and Privacy Policy disclosure (see repo root migration doc).
 - [ ] **Last internal run:** No crash on cold start, login, import, paywall, restore, settings, account deletion.
 - [ ] **TestFlight:** If a previous build had crashes, confirm the new build has fixes and no new crashes in the first 24 hours.
-- [ ] **Symbols:** If using Sentry, source maps / dSYMs uploaded so crashes are symbolicated.
+- [ ] **Symbols:** If using crash reporting, source maps / dSYMs uploaded so crashes are symbolicated.
 
 ---
 

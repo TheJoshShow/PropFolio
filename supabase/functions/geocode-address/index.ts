@@ -40,8 +40,15 @@ Deno.serve(async (req) => {
 
     const first = data.results?.[0];
     if (!first) {
+      // No `error` key — client treats ZERO_RESULTS as non-fatal (user can still import typed address).
       return new Response(
-        JSON.stringify({ error: "No results", lat: null, lng: null, formatted_address: null, place_id: null }),
+        JSON.stringify({
+          lat: null,
+          lng: null,
+          formatted_address: null,
+          place_id: null,
+          geocode_status: "ZERO_RESULTS",
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

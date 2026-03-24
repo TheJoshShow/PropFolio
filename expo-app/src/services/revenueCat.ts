@@ -6,7 +6,9 @@
  */
 
 import { Platform } from 'react-native';
-import { getRevenueCatApiKey, ENTITLEMENT_PRO } from '../config/billing';
+import { getRevenueCatApiKey, getBillingConfig, ENTITLEMENT_PRO } from '../config';
+import { logStoreStep, reportIntegrationStatus } from './diagnostics';
+import { recordFlowException, recordFlowIssue } from './monitoring/flowInstrumentation';
 
 const isNative = Platform.OS === 'ios';
 
@@ -79,8 +81,36 @@ let configuredUserId: string | null = null;
  */
 export async function configureRevenueCat(appUserId: string): Promise<boolean> {
   if (!isNative || !appUserId) return false;
+  // Same JS session + same user: avoid redundant native configure calls (reduces init churn / edge-case SDK errors).
+  if (configuredUserId === appUserId) {
+    const Purchases = getPurchases();
+    if (Purchases) {
+      logStoreStep('configure_skip_same_user', { userBound: true });
+      return true;
+    }
+  }
+  const billing = getBillingConfig();
   const apiKey = getApiKey();
   if (!apiKey) {
+    reportIntegrationStatus({
+      integration: 'revenuecat',
+      configured: false,
+      requestSuccess: false,
+      lastFailureReason: 'Missing RevenueCat API key',
+      fallbackUsed: true,
+      featureImpact: 'partial',
+    });
+    logStoreStep('configure_skipped_missing_key', {
+      platform: billing.platform,
+      configured: billing.configured,
+      keySource: billing.keySource,
+    });
+    recordFlowIssue('billing_rc_missing_api_key', {
+      platform: billing.platform,
+      keySource: billing.keySource,
+      stage: 'rc_configure',
+      recoverable: false,
+    });
     if (__DEV__) console.warn('[RevenueCat] API key not set for this platform; subscriptions disabled.');
     return false;
   }
@@ -89,8 +119,31 @@ export async function configureRevenueCat(appUserId: string): Promise<boolean> {
     if (!Purchases) return false;
     await Purchases.configure({ apiKey, appUserID: appUserId });
     configuredUserId = appUserId;
+    logStoreStep('configure_success', {
+      platform: billing.platform,
+      keySource: billing.keySource,
+      userBound: Boolean(appUserId),
+    });
+    reportIntegrationStatus({
+      integration: 'revenuecat',
+      configured: true,
+      requestSuccess: true,
+      lastFailureReason: null,
+      fallbackUsed: false,
+      featureImpact: 'none',
+    });
     return true;
   } catch (e) {
+    logStoreStep('configure_error', { platform: billing.platform });
+    reportIntegrationStatus({
+      integration: 'revenuecat',
+      configured: true,
+      requestSuccess: false,
+      lastFailureReason: 'RevenueCat configure failed',
+      fallbackUsed: true,
+      featureImpact: 'partial',
+    });
+    recordFlowException('billing_rc_configure_failed', e, { stage: 'rc_configure', recoverable: false });
     if (__DEV__) console.warn('[RevenueCat] configure failed:', e);
     return false;
   }
@@ -104,7 +157,11 @@ export function logOutRevenueCat(): void {
   if (!isNative) return;
   try {
     const Purchases = getPurchases();
-    if (Purchases) Purchases.logOut();
+    if (!Purchases) return;
+    // react-native-purchases logOut is async; floating promises can trigger unhandled rejections on sign-out.
+    void Promise.resolve(Purchases.logOut() as unknown as Promise<void>).catch(() => {
+      /* ignore */
+    });
   } catch (_) {
     // ignore
   }
@@ -140,27 +197,55 @@ export async function getOfferings(): Promise<{
     const offerings = await Purchases.getOfferings();
     if (!offerings?.current) return { current: null, all: {}, rawCurrentPackages: [] };
 
-    const mapPackage = (pkg: { identifier: string; packageType: string; product: { identifier: string; priceString: string; title?: string; description?: string } }): RevenueCatPackage => ({
-      identifier: pkg.identifier,
-      packageType: pkg.packageType,
-      product: {
-        identifier: pkg.product?.identifier ?? '',
-        priceString: pkg.product?.priceString ?? '',
-        title: pkg.product?.title,
-        description: pkg.product?.description,
-      },
-    });
+    const mapPackage = (pkg: unknown): RevenueCatPackage | null => {
+      try {
+        if (pkg == null || typeof pkg !== 'object') return null;
+        const p = pkg as {
+          identifier?: string;
+          packageType?: string;
+          product?: { identifier?: string; priceString?: string; title?: string; description?: string };
+        };
+        return {
+          identifier: typeof p.identifier === 'string' ? p.identifier : '',
+          packageType: typeof p.packageType === 'string' ? p.packageType : '',
+          product: {
+            identifier: typeof p.product?.identifier === 'string' ? p.product.identifier : '',
+            priceString: typeof p.product?.priceString === 'string' ? p.product.priceString : '',
+            title: p.product?.title,
+            description: p.product?.description,
+          },
+        };
+      } catch {
+        return null;
+      }
+    };
 
     const current = offerings.current as { identifier: string; serverDescription?: string; availablePackages: unknown[] };
     const rawCurrentPackages = (current.availablePackages ?? []) as RawPurchasesPackage[];
+    const mappedCurrentPackages: RevenueCatPackage[] = [];
+    const filteredRaw: RawPurchasesPackage[] = [];
+    const rawList = rawCurrentPackages;
+    for (let i = 0; i < rawList.length; i++) {
+      const mapped = mapPackage(rawList[i]);
+      if (mapped) {
+        mappedCurrentPackages.push(mapped);
+        filteredRaw.push(rawList[i]);
+      }
+    }
+
     const all: Record<string, RevenueCatOffering> = {};
     if (offerings.all) {
       for (const [id, off] of Object.entries(offerings.all)) {
         const o = off as { identifier: string; serverDescription?: string; availablePackages: unknown[] };
+        const pkgs: RevenueCatPackage[] = [];
+        for (const p of o.availablePackages ?? []) {
+          const m = mapPackage(p);
+          if (m) pkgs.push(m);
+        }
         all[id] = {
           identifier: o.identifier,
           serverDescription: o.serverDescription ?? '',
-          availablePackages: (o.availablePackages ?? []).map((p: unknown) => mapPackage(p as RevenueCatPackage)),
+          availablePackages: pkgs,
         };
       }
     }
@@ -169,12 +254,13 @@ export async function getOfferings(): Promise<{
       current: {
         identifier: current.identifier,
         serverDescription: current.serverDescription ?? '',
-        availablePackages: rawCurrentPackages.map((p: unknown) => mapPackage(p as RevenueCatPackage)),
+        availablePackages: mappedCurrentPackages,
       },
       all,
-      rawCurrentPackages,
+      rawCurrentPackages: filteredRaw,
     };
   } catch (e) {
+    recordFlowException('billing_rc_offerings_fetch_failed', e, { stage: 'offerings' });
     if (__DEV__) console.warn('[RevenueCat] getOfferings failed:', e);
     return null;
   }
@@ -216,6 +302,7 @@ export async function getCustomerInfo(): Promise<RevenueCatCustomerInfo | null> 
     const info = await Purchases.getCustomerInfo();
     return info ? mapCustomerInfo(info as Parameters<typeof mapCustomerInfo>[0]) : null;
   } catch (e) {
+    recordFlowException('billing_rc_customer_info_failed', e);
     if (__DEV__) console.warn('[RevenueCat] getCustomerInfo failed:', e);
     return null;
   }
@@ -246,6 +333,9 @@ export async function purchasePackage(
 ): Promise<PurchaseResult> {
   if (!isNative) {
     return { success: false, error: 'Purchases are not available on this platform.' };
+  }
+  if (rawPackage == null || typeof rawPackage !== 'object') {
+    return { success: false, error: 'This plan is not available. Refresh and try again.' };
   }
   try {
     const Purchases = getPurchases();
@@ -284,6 +374,11 @@ export async function purchasePackage(
       return { success: false, pending: true };
     }
     const message = err?.message ?? (err?.code ? String(err.code) : 'Purchase failed.');
+    recordFlowIssue('billing_rc_purchase_failed', {
+      code: String(err?.code ?? 'unknown'),
+      stage: 'purchase',
+      recoverable: true,
+    });
     if (__DEV__) console.warn('[RevenueCat] purchasePackage: error', message);
     return { success: false, error: message };
   }
@@ -306,10 +401,16 @@ export async function restorePurchases(): Promise<RestoreResult> {
       return { success: true, customerInfo: mapCustomerInfo(customerInfo as Parameters<typeof mapCustomerInfo>[0]) };
     }
     if (__DEV__) console.log('[RevenueCat] restorePurchases: no purchases');
+    recordFlowIssue('billing_rc_restore_empty', { stage: 'restore', recoverable: true });
     return { success: false, error: 'No purchases to restore.' };
   } catch (e: unknown) {
     const err = e as { message?: string; code?: string };
     const message = err?.message ?? (err?.code ? String(err.code) : 'Restore failed.');
+    recordFlowIssue('billing_rc_restore_failed', {
+      code: String(err?.code ?? 'unknown'),
+      stage: 'restore',
+      recoverable: true,
+    });
     if (__DEV__) console.warn('[RevenueCat] restorePurchases: error', message);
     return { success: false, error: message };
   }

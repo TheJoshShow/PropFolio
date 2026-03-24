@@ -7,7 +7,7 @@
 ### Internal summary (non-public)
 
 - **What PropFolio does:** Real estate analysis app: accounts, property import (address/URL), stored properties, scores, summaries, and optional paid features.
-- **Sensitive points for review:** Optional phone; property addresses and listing-derived data; geocoding via Google; rent data via RentCast; plain-language summaries via OpenAI (user/property context may be included in prompts—see policy); product events in Supabase; Sentry on iOS; subscriptions via RevenueCat and app stores.
+- **Sensitive points for review:** Optional phone; property addresses and listing-derived data; geocoding via Google; rent data via RentCast; plain-language summaries via OpenAI (user/property context may be included in prompts—see policy); product events in Supabase; crash reporting on iOS; subscriptions via RevenueCat and app stores.
 - **Not in current client paths audited:** Continuous GPS/background location in `expo-app/app` (map uses coordinates from user content/geocoding).
 
 ---
@@ -115,7 +115,7 @@ The Services may rely on subprocessors and APIs, including (as implemented or co
 |----------|------------------------------|
 | **Cloud, auth, and database** | Supabase or similar backend for authentication, storage, and application data |
 | **Subscriptions / IAP** | RevenueCat; Apple App Store; Google Play |
-| **Diagnostics** | Sentry or similar error and performance monitoring |
+| **Diagnostics** | crash reporting or similar error and performance monitoring |
 | **Mapping / geocoding / places** | Google Maps Platform or similar (often via server-side APIs) |
 | **Property / rent estimates** | RentCast or similar data vendors |
 | **Demographic / census-style data** | U.S. Census Bureau or similar public sources (via our backend) |

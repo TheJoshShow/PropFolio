@@ -39,7 +39,7 @@
 |-------|--------|
 | **Tests** | **Pass** (2 suites, 8 tests). |
 | **Lint** | Not run successfully (expo lint attempted to install eslint and failed due to path/postinstall in this environment). |
-| **Typecheck** | **Fails** in this environment: missing `@sentry/react-native` and `react-native-purchases` in node_modules (from prior failed npm install). No code errors introduced. |
+| **Typecheck** | **Fails** in this environment: missing native deps (e.g. `react-native-purchases`) in node_modules (from prior failed npm install). No code errors introduced. |
 | **Launch app** | Not run (same node_modules/path limitations). |
 
 **Recommendation:** Run `npm install` from a path without spaces (e.g. `C:\propfolio`), then run `npm run typecheck`, `npm run lint`, and `npm run ios` to verify and launch.

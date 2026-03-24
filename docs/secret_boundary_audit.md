@@ -2,7 +2,7 @@
 
 **Purpose:** Confirm that only public-safe env values are in the client, no privileged credentials are in app code, and all privileged actions run in Supabase Edge Functions or secure backend.  
 **Scope:** expo-app (client), supabase/functions (backend).  
-**Last updated:** [DATE]
+**Last updated:** 2026-03-22
 
 ---
 
@@ -10,10 +10,10 @@
 
 | Check | Result |
 |-------|--------|
-| Only public-safe EXPO_PUBLIC_ values in client | **Pass** — All client env reads use EXPO_PUBLIC_*; all are URLs or public API keys (Supabase anon, RevenueCat public, Sentry DSN). |
+| Only public-safe EXPO_PUBLIC_ values in client | **Pass** — All client env reads use EXPO_PUBLIC_*; all are URLs or public API keys (Supabase anon, RevenueCat public). |
 | No service role or privileged credentials in app code | **Pass** — No SUPABASE_SERVICE_ROLE_KEY, no server API keys (Google, RentCast, OpenAI, Census), no webhook secrets in expo-app. |
 | Privileged actions only in Edge Functions / backend | **Pass** — Account deletion and webhook handling use service role only in Edge Functions; third-party API calls occur only in Edge Functions. |
-| Production env documented for iOS release | **Pass with gap** — .env.example and this audit document most vars; EXPO_PUBLIC_SUPPORT_URL and EXPO_PUBLIC_BILLING_HELP_URL should be added to .env.example. |
+| Production env documented for iOS release | **Pass** — `expo-app/.env.example` documents Supabase, RevenueCat, legal/support URLs, native Maps key notes, and Firebase/Crashlytics; see `expo-app/docs/ENV_SETUP.md` and `eas.json` for EAS. |
 
 ---
 
@@ -27,7 +27,7 @@
 | **src/config/env.ts** | EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY | Validation; same anon-only rule. |
 | **src/config/legalUrls.ts** | EXPO_PUBLIC_PRIVACY_POLICY_URL, EXPO_PUBLIC_TERMS_URL, EXPO_PUBLIC_BILLING_HELP_URL, EXPO_PUBLIC_SUPPORT_URL | URLs for legal and support links; all public. |
 | **src/config/billing.ts** | EXPO_PUBLIC_REVENUECAT_API_KEY_IOS (and ANDROID name for reference) | RevenueCat **public** app-specific key; designed for client. |
-| **app/_layout.tsx** | EXPO_PUBLIC_SENTRY_DSN | Sentry DSN; public endpoint, no secrets. |
+| **app/_layout.tsx** | (none) | `initMonitoring()` uses no env vars; monitoring stubs only. |
 
 **Conclusion:** Every client env read is EXPO_PUBLIC_* and is either a URL or a public/key client-safe identifier. No service role key, no server API keys, no webhook or auth secrets.
 
@@ -67,7 +67,7 @@
 Client (expo-app)
   ├── EXPO_PUBLIC_SUPABASE_* → Supabase client (anon) → auth, RPC, functions.invoke
   ├── EXPO_PUBLIC_REVENUECAT_* → RevenueCat SDK (public key only)
-  ├── EXPO_PUBLIC_*_URL / EXPO_PUBLIC_SENTRY_DSN → links and error reporting
+  ├── EXPO_PUBLIC_*_URL → legal/support links
   └── supabase.functions.invoke('delete-account', …) → sends session JWT only; server uses service role
 
 Edge Functions (Supabase)
@@ -82,9 +82,8 @@ No server secrets are passed to or embedded in the client.
 
 ## 5. .env.example and repo safety
 
-- **.env.example** states at the top: only EXPO_PUBLIC_* in this file; never server-only secrets; server secrets go in Supabase Dashboard → Edge Functions → Secrets.  
-- **.env** is expected to be gitignored; no check of actual .env content was performed (do not commit .env).  
-- **Recommendation:** Add EXPO_PUBLIC_SUPPORT_URL and EXPO_PUBLIC_BILLING_HELP_URL to .env.example so production env is fully documented.
+- **.env.example** states at the top: only EXPO_PUBLIC_* in this file; never server-only secrets; server secrets go in Supabase Dashboard → Edge Functions → Secrets. It includes commented `EXPO_PUBLIC_SUPPORT_URL` and `EXPO_PUBLIC_BILLING_HELP_URL`.  
+- **.env** is gitignored; do not commit it. For production, mirror required `EXPO_PUBLIC_*` and `IOS_GOOGLE_MAPS_API_KEY` in **EAS environment variables** (see `eas.json`).
 
 ---
 
@@ -95,7 +94,7 @@ No server secrets are passed to or embedded in the client.
 | Client uses only EXPO_PUBLIC_* and public-safe values | — | None; boundary is correct. |
 | No service role or server API keys in client | — | None; boundary is correct. |
 | Privileged actions only in Edge Functions | — | None; design is correct. |
-| EXPO_PUBLIC_SUPPORT_URL / BILLING_HELP_URL not in .env.example | Low | Add to .env.example and production_env_matrix.md (done in matrix). |
+| Prior note: support/billing URL examples in .env.example | — | Closed as of 2026-03-22 (`expo-app/.env.example`). |
 
 ---
 

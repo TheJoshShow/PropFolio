@@ -14,7 +14,7 @@ This document ensures **all app functionality works** after the app is uploaded 
 | **Supabase Edge Functions** | Geocoding, autocomplete, rent estimate, delete account, (optional) summarize, census | **Yes** for: address lookup, rent estimate, account deletion. Optional: summarize, census | `geocodeAddress` / `placesAutocomplete` / `rentEstimate` return error; UI shows alert. **delete-account** must be deployed for App Store account-deletion compliance. |
 | **RevenueCat (iOS API key)** | Subscriptions, offerings, purchase, restore, Pro entitlement | **Yes** for in-app purchases and Pro access | Paywall shows “Loading plans…” then fallback; no purchase; `hasProAccess` stays false. App does not crash. |
 | **Scoring / underwriting / confidence (in-app)** | Deal score, confidence meter, what-if, renovation math | **Yes** (core product) | Pure TypeScript in `src/lib/`; no network. Works as long as property/input data is available. |
-| **Sentry (DSN)** | Crash/error reporting | No | If missing or init fails, app runs without Sentry. No crash. |
+| **Monitoring stub** | `src/services/monitoring` (no third-party SDK yet) | No | No env vars; production no-op until Crashlytics. |
 | **Fonts & assets** | UI (SpaceMono, app icon, splash) | **Yes** | Bundled with app; must be present in build (default Expo setup includes them). |
 
 ---
@@ -32,7 +32,6 @@ These must be set **at build time** for the App Store build (e.g. EAS Build “p
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat iOS public API key | EAS Secrets or `eas.json` env |
 | `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Optional; default `https://propfolio.app/privacy` | EAS Secrets if you override |
 | `EXPO_PUBLIC_TERMS_URL` | Optional; default `https://propfolio.app/terms` | EAS Secrets if you override |
-| `EXPO_PUBLIC_SENTRY_DSN` | Optional; crash reporting | EAS Secrets if you use Sentry |
 
 **Important:** For EAS Build, set these in [EAS Project → Secrets](https://docs.expo.dev/build-reference/variables/#using-secrets) and attach them to the **production** build profile so the production iOS binary has the correct Supabase and RevenueCat keys. Without them, the app will run in demo mode and subscriptions will not work.
 

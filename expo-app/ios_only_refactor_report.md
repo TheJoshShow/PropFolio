@@ -30,7 +30,7 @@
 
 | Location | Refactor |
 |----------|----------|
-| **app/_layout.tsx** | Already `isIOS = Platform.OS === 'ios'` for Sentry. No change. |
+| **app/_layout.tsx** | Already `isIOS = Platform.OS === 'ios'` for crash reporting. No change. |
 | **app/(tabs)/_layout.tsx** | SymbolView already single string (`house.fill`, etc.). No change. |
 | **app/(tabs)/settings.tsx** | Already iOS hint; no web-only copy. No change. |
 | **app/paywall.tsx** | No web early-return. No change. |

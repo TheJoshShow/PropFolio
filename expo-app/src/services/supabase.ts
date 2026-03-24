@@ -1,6 +1,6 @@
 /**
  * Supabase client. Returns null when env vars are missing so app stays runnable.
- * Env validation is available via config/env.ts (validateAuthEnv).
+ * Env validation: `validateAuthEnv()` from `../config`.
  *
  * SECURITY: Only the anon (public) key is used here. Never use the service role
  * key in the client; it bypasses RLS and must only exist in Edge Functions.
@@ -9,11 +9,25 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-
-const url = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
-const anonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+import { getRuntimeConfig, validateAuthEnv } from '../config';
+import { logErrorSafe } from './diagnostics';
 
 let _client: SupabaseClient | null = null;
+let _cachedCredentialsKey: string | null = null;
+
+/** Reject obviously invalid env before createClient (which can throw on bad URLs). */
+function canInitSupabase(urlRaw: string, anonKeyRaw: string): boolean {
+  const url = urlRaw.trim();
+  const anonKey = anonKeyRaw.trim();
+  if (!url || !anonKey) return false;
+  try {
+    const u = new URL(url);
+    if (!u.hostname) return false;
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
 
 function getStorage() {
   // iOS-only: use AsyncStorage. Web branch kept for type safety if Platform is ever web.
@@ -24,19 +38,51 @@ function getStorage() {
 }
 
 export function getSupabase(): SupabaseClient | null {
-  if (!url || !anonKey) return null;
+  if (!validateAuthEnv().isValid) {
+    _client = null;
+    _cachedCredentialsKey = null;
+    return null;
+  }
+  const { supabaseUrl: url, supabaseAnonKey: anonKey } = getRuntimeConfig();
+  if (!canInitSupabase(url, anonKey)) {
+    _client = null;
+    _cachedCredentialsKey = null;
+    return null;
+  }
   if (typeof Platform !== 'undefined' && Platform.OS === 'web' && typeof window === 'undefined') return null;
-  if (_client) return _client;
-  _client = createClient(url, anonKey, {
-    auth: {
-      storage: getStorage(),
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: typeof Platform !== 'undefined' && Platform.OS === 'web',
-    },
-  });
-  return _client;
+  const credKey = `${url.trim()}\0${anonKey.trim()}`;
+  if (_client && _cachedCredentialsKey === credKey) {
+    return _client;
+  }
+  try {
+    _cachedCredentialsKey = credKey;
+    _client = createClient(url.trim(), anonKey.trim(), {
+      auth: {
+        storage: getStorage(),
+        autoRefreshToken: true,
+        persistSession: true,
+        /** PKCE: OAuth, magic link, and recovery redirects return `?code=` — must call `exchangeCodeForSession`. */
+        flowType: 'pkce',
+        detectSessionInUrl: typeof Platform !== 'undefined' && Platform.OS === 'web',
+      },
+    });
+    return _client;
+  } catch (e) {
+    logErrorSafe('getSupabase createClient failed (invalid env or SDK error)', e);
+    _client = null;
+    _cachedCredentialsKey = null;
+    return null;
+  }
 }
 
-/** Cached client or null if not configured. Only use after mount on web (not during SSR). */
-export const supabase = typeof window !== 'undefined' ? getSupabase() : null;
+/**
+ * Cached client snapshot for legacy imports.
+ * - **Native (iOS/Android):** same as `getSupabase()` — do not gate on `window` (RN may not define it).
+ * - **Web:** only after `window` exists (avoids SSR creating a client without storage).
+ */
+export const supabase: SupabaseClient | null =
+  Platform.OS === 'web'
+    ? typeof window !== 'undefined'
+      ? getSupabase()
+      : null
+    : getSupabase();

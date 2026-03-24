@@ -29,3 +29,13 @@ Property import requires a `profiles` row (`portfolios.user_id` → `profiles.id
 
 - RLS must allow authenticated users to `insert`/`update` their own `profiles` row (`auth.uid() = id`).
 - `profiles` must exist with `id` → `auth.users(id)` FK (see Supabase migrations).
+
+## Import orchestration (client)
+
+- **`propertyImportOrchestrator.enrichAddressForImport`** — geocode + rent; **manual** source validates typed lines when geocode cannot verify (see `importAddressValidation`).
+- **`importErrorCodes.userMessageForImportCode`** — normalized codes → user copy.
+- **Edge Functions** must expose `GOOGLE_MAPS_API_KEY` (Supabase secrets) for `places-autocomplete` and `geocode-address`, or suggestions fail and geocode may fail (manual import can still succeed if the typed address passes structural validation).
+
+## Jest
+
+- `src/test/setup.ts` sets `globalThis.__DEV__` for tests that touch `diagnostics` / Expo-style globals.

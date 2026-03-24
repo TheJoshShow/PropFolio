@@ -54,7 +54,7 @@
 |----------|--------|
 | **Settings → Legal** | "PropFolio is for informational use only and does not provide investment, tax, or legal advice. Verify all numbers before making decisions." |
 
-Terms and Privacy Policy documents (at the configured URLs) should state the same and cover data practices (auth, properties, usage events, RevenueCat, Sentry, third-party APIs via Edge Functions).
+Terms and Privacy Policy documents (at the configured URLs) should state the same and cover data practices (auth, properties, usage events, RevenueCat, crash reporting, third-party APIs via Edge Functions).
 
 ---
 
@@ -66,4 +66,4 @@ Terms and Privacy Policy documents (at the configured URLs) should state the sam
 
 ---
 
-*See app_store_hardening_changes.md, sentry_privacy_decision.md, and final_metadata_requirements.md.*
+*See app_store_hardening_changes.md, `../expo-app/docs/MONITORING_SETUP.md`, and final_metadata_requirements.md.*

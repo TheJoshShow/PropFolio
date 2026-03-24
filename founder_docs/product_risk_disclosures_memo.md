@@ -52,7 +52,7 @@
 - **Collection:** We collect account data, property data entered or imported by the user, and usage/analytics as described in the Privacy Policy.
 - **No sale of personal data:** We do not sell user personal information. Data is used to operate the app, improve the product, and comply with law.
 - **Security:** We use industry-standard practices (e.g., auth, encryption, secure backends); specific measures should be summarized in the Privacy Policy and, if needed, in security documentation for enterprise or investors.
-- **Crash/error reporting:** If Sentry (or similar) is used, disclose in Privacy Policy; see [sentry_privacy_decision.md](../docs/sentry_privacy_decision.md).
+- **Crash/error reporting:** Firebase Crashlytics — disclose in Privacy Policy (Google/Firebase); engineering reference [MONITORING_SETUP.md](../expo-app/docs/MONITORING_SETUP.md).
 
 ---
 

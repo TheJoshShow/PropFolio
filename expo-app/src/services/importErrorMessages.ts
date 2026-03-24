@@ -20,11 +20,29 @@ export const IMPORT_USER_MESSAGES = {
   invalidAddress: 'Enter a valid property address to continue.',
   /** Recoverable transient / unknown backend while we retry or after retries exhausted */
   importTemporaryFailure: "We couldn't import this property right now. Please try again in a moment.",
+  /** Link import: unexpected exception after parse (network, etc.) — prefer mapImportException detail when possible */
+  linkImportProcessingFailed:
+    "We couldn't finish this import. Check your connection, try again, or enter the address manually with Use address.",
+  /** Geocode / Places edge function unavailable or misconfigured (not a user typo). */
+  addressLookupUnavailable:
+    'Address lookup is temporarily unavailable. Check your connection, or try again later. You can still type a full street address and tap Use address.',
+  networkUnavailable: "You're offline or the connection failed. Check your network and try again.",
+  /** Backend insert/RPC failed after account checks; not a generic catch-all. */
+  importBackendUnavailable:
+    "We couldn't save this property. Please try again in a moment. If it keeps happening, sign out and sign back in.",
+  importPermissionDenied:
+    "We couldn't save this property due to an account permission issue. Sign out, sign back in, and try again.",
+  importAccountOrPortfolio:
+    "Your account setup couldn't complete for this import. Sign out, sign back in, and try again.",
+  duplicateProperty: 'This property may already be in your portfolio. Check your list or try a slightly different address.',
   /** Only when profile/portfolio setup truly cannot complete after repair attempts */
   accountSetupUnrecoverable:
     "We couldn't finish setting up your account. Please sign out and sign back in.",
   portfolioCreateFailed: "We couldn't set up your portfolio. Please try again in a moment.",
   portfolioLoadFailed: "We couldn't load your portfolio. Please try again in a moment.",
+  /** PostgREST / schema: migration not applied (e.g. missing column on properties) */
+  importDatabaseSchemaMismatch:
+    "This build expects an updated server database. Ask your admin to apply the latest database migrations, then try again.",
 } as const;
 
 export type ImportFailureKind =
@@ -34,6 +52,16 @@ export type ImportFailureKind =
   | 'network'
   | 'validation'
   | 'unknown';
+
+/**
+ * Use for `recordPropertyImportEnforced` / execute() failures.
+ * Server already returns user-safe copy from `mapPropertyImportDbError` — do not replace with a generic message.
+ */
+export function resolveImportFailureMessage(error: string | null | undefined): string {
+  const t = (error ?? '').trim();
+  if (t.length > 0) return t;
+  return IMPORT_USER_MESSAGES.importTemporaryFailure;
+}
 
 /**
  * Map account-readiness / Supabase-style errors to a clean message + kind for logging/analytics.
@@ -63,7 +91,7 @@ export function messageForAccountSetupFailure(params: {
     m.includes('permission denied') ||
     code === '42501'
   ) {
-    return { userMessage: IMPORT_USER_MESSAGES.importTemporaryFailure, kind: 'account' };
+    return { userMessage: IMPORT_USER_MESSAGES.importPermissionDenied, kind: 'account' };
   }
 
   if (m.includes('network') || m.includes('fetch') || m.includes('timeout')) {

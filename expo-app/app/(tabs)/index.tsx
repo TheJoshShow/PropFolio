@@ -3,8 +3,8 @@
  */
 
 import React from 'react';
-import { Text, StyleSheet, ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, StyleSheet, ScrollView, View, RefreshControl } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   FreeImportsIndicator,
   PropFolioBrandHeader,
@@ -24,6 +24,7 @@ import { IMPORT_FAB_SCROLL_INSET } from '../../src/constants/fabLayout';
 
 export default function HomeScreen() {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { freeRemaining, isLoading: limitLoading } = useImportLimit();
   const { hasProAccess } = useSubscription();
@@ -37,8 +38,21 @@ export default function HomeScreen() {
       <View style={styles.body}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.content, responsiveContentContainer]}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: styles.content.paddingBottom + insets.bottom },
+            responsiveContentContainer,
+          ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={portfolioLoading && portfolioList.length > 0}
+              onRefresh={() => {
+                void refreshPortfolio();
+              }}
+              tintColor={colors.primary}
+            />
+          }
         >
           <PropFolioBrandHeader marginBottom={spacing.s} />
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -51,7 +65,13 @@ export default function HomeScreen() {
             isLoading={limitLoading}
             variant="compact"
           />
-          <PortfolioPropertyMap properties={portfolioList} loading={portfolioLoading} />
+          <PortfolioPropertyMap
+            properties={portfolioList}
+            loading={portfolioLoading}
+            onRetry={() => {
+              void refreshPortfolio();
+            }}
+          />
         </ScrollView>
         <ImportFab />
       </View>

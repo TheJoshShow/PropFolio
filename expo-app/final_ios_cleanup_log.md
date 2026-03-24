@@ -12,7 +12,7 @@
 |-------|--------|
 | **expo-app/expo-app** referenced by build/EAS/CI? | No. No eas.json; package.json scripts do not reference nested path. **Decision:** Remove if possible; confirmed unreferenced. |
 | **_archive_review / _archive_review/web** | _archive_review exists at repo root; _archive_review/web **does not exist**. No app or build references. **Decision:** Keep _archive_review as archive; nothing to remove for web. |
-| **Baseline validate** | `npm run test` passes (2 suites, 8 tests). `npm run typecheck` reports missing @sentry/react-native and react-native-purchases (optional native deps) and one code fix (openUrl → openUrlSafe in PaywallContent); fix applied. |
+| **Baseline validate** | `npm run test` passes (2 suites, 8 tests). `npm run typecheck` may report missing native deps (e.g. react-native-purchases) if node_modules is incomplete (optional native deps) and one code fix (openUrl → openUrlSafe in PaywallContent); fix applied. |
 | **Backup branch** | Operator to create (e.g. `pre-ios-only-cleanup`). |
 
 ---
@@ -40,7 +40,7 @@
 
 | File | Action |
 |------|--------|
-| **app/_layout.tsx** | Already uses `Platform.OS === 'ios'` for Sentry. No change. |
+| **app/_layout.tsx** | Already uses `Platform.OS === 'ios'` for crash reporting. No change. |
 | **app/(tabs)/_layout.tsx** | SymbolView already uses single string names (e.g. `house.fill`). No change. |
 | **app/(tabs)/settings.tsx** | Already iOS subscription hint; no web branch. No change. |
 | **app/paywall.tsx** | No web early-return. No change. |
@@ -77,7 +77,7 @@
 
 | Item | Action |
 |------|--------|
-| **npm run validate** | `npm run test` passes. `npm run typecheck` has known issues (Sentry/Purchases modules); PaywallContent fix applied. |
+| **npm run validate** | `npm run test` passes. `npm run typecheck` has known issues (crash reporting/Purchases modules); PaywallContent fix applied. |
 | **iOS smoke test** | Operator to run on simulator/device (auth, import, paywall, restore, delete account, links). |
 | **docs/release/APP-STORE-PRODUCTION-READINESS.md** | Added "iOS only" target statement at top. |
 

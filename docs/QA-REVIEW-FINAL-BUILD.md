@@ -16,7 +16,7 @@ Assessment of run instructions, demo coverage, manual test path, and critical fl
   - Option B doesn’t say *where* to create the project (e.g. “in the repo root so `PropFolio.xcodeproj` sits next to the `PropFolio` source folder”). The phrase “same folder that contains the existing PropFolio” is correct but could be one sentence clearer: e.g. “Create the new project in the **repo root** so the project file and the PropFolio source folder are side by side.”
 - **No .xcodeproj in repo:** First-time runners **must** do Option B. That’s documented; no change required for pass.
 
-**Recommendation:** Add to README a line: *“For detailed run steps, simulator choice, and a full test checklist, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).”* Optionally add the one-sentence “repo root” clarification to Option B.
+**Recommendation:** Add to README a line: *“For detailed run steps, simulator choice, and a full test checklist, see [DEVELOPMENT.md](./DEVELOPMENT.md).”* Optionally add the one-sentence “repo root” clarification to Option B.
 
 ---
 
@@ -103,6 +103,6 @@ No other launch blockers identified for the final runnable build and test flow (
 
 ## 7. Recommended small improvements (non-blocking)
 
-- **README:** Add: *“For detailed run steps, simulator choice, and a full test checklist, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).”*
+- **README:** Add: *“For detailed run steps, simulator choice, and a full test checklist, see [DEVELOPMENT.md](./DEVELOPMENT.md).”*
 - **DEVELOPMENT.md Option B:** Add one sentence: *“Create the new project in the **repo root** so `PropFolio.xcodeproj` and the `PropFolio` source folder are side by side.”*
 - **Test path / docs:** When “Save to portfolio” is implemented (or scoped out), add a dedicated step: *“Import → Demo → Result → **Save to portfolio** → confirm deal appears in Portfolio (or remove/relabel button and update this step).”*

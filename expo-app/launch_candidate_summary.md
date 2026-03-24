@@ -18,7 +18,7 @@ PropFolio is **launch-ready from a release-blocker perspective** after addressin
 - **Property import:** Address entry with geocode + rent estimate; link paste (Zillow/Redfin) with actionable copy; free-tier limit and paywall gating; loading and error handling; API timeout and retry.
 - **Subscription:** RevenueCat; purchase flow; restore purchases; paywall when at import limit; Manage subscription; loading, error, and offline handling.
 - **Support and legal:** Privacy Policy, Terms, Contact support, Billing help (optional); safe URL opening with user feedback on failure (Settings and Paywall).
-- **Crash and analytics:** Sentry (iOS, when DSN set); analytics events (auth, import, paywall, purchase) with no PII in logs.
+- **Crash and analytics:** crash reporting (iOS, when DSN set); analytics events (auth, import, paywall, purchase) with no PII in logs.
 - **States:** Loading and empty states on auth, import, paywall, portfolio; error and retry where appropriate.
 - **Offline / API failure:** Edge function timeout and retry; restore-offline message; paywall fallback when offerings unavailable.
 - **Input and session:** Auth validation (email, password); invalid import input; session expiry handled via Supabase auth state and redirect to login.
@@ -46,7 +46,7 @@ PropFolio is **launch-ready from a release-blocker perspective** after addressin
 
 ## Pre-launch checklist (concise)
 
-- [ ] Production env set: Supabase, RevenueCat (iOS), Sentry, Privacy Policy URL, Terms URL, Support URL.
+- [ ] Production env set: Supabase, RevenueCat (iOS), crash reporting, Privacy Policy URL, Terms URL, Support URL.
 - [ ] Privacy Policy and Terms pages live and match in-app links.
 - [ ] App Store Connect: Support URL, subscription metadata, and pricing aligned with app.
 - [ ] End-to-end test: account deletion, restore purchases, and at least one full import + paywall path.

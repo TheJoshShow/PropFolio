@@ -46,14 +46,14 @@ This inventory is organized by **SDK/service** and **PropFolio endpoint**. It is
   - Determine active subscriptions (`pro_access` entitlement).
   - Provide “Manage subscription” deep links and restore purchases.
 
-### 4. Sentry (`@sentry/react-native`) – optional
+### 4. Third-party crash reporting — not integrated (planned: Firebase Crashlytics; see repo root migration doc)
 
 - Data sent (when DSN is configured):
   - Crash reports and error events with stack traces, device model, OS version, anonymized user/session identifiers.
   - Custom breadcrumbs for navigation or key actions (if configured).
 - Personal data:
   - No email or address is intentionally logged; app code should avoid passing PII in error messages.
-  - Sentry may infer coarse location from IP at ingestion time unless disabled in Sentry settings.
+  - crash reporting may infer coarse location from IP at ingestion time unless disabled in crash reporting settings.
 - Use:
   - Monitor crashes and serious errors; prioritize fixes.
 

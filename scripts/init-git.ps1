@@ -1,5 +1,6 @@
-# Initialize a Git repository at the PropFolio project root (run from repo root or any path).
-# Requires Git for Windows: https://git-scm.com/download/win
+# Initialize a Git repository at the PropFolio project root.
+# Optional Windows helper — on macOS/Linux run `git init` from the repo root instead.
+# Requires Git on PATH (Git for Windows: https://git-scm.com/download/win).
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot

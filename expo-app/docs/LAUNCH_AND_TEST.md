@@ -239,7 +239,7 @@ That covers: **launch**, **auth**, **tabs**, **Home CTA**, **Import (link + addr
   `npm run lint` runs the local Expo CLI lint. First run may auto-install ESLint and eslint-config-expo. On Windows, if your project path contains `&`, the script uses `node node_modules/expo/bin/cli lint` to avoid shell parsing issues.
 
 - **Path with special characters**  
-  If your project path contains `&` (e.g. “Winchester Realty & Holdings”), some terminal tools (e.g. `&&`) can break. Use `;` in PowerShell or run commands from `expo-app` without `cd` from a path that has `&`.
+  If your project path contains `&` (e.g. “Example & Holdings”), some terminal tools (e.g. `&&`) can break. Use `;` in PowerShell or run commands from `expo-app` without `cd` from a path that has `&`.
 
 ---
 

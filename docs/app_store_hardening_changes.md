@@ -2,7 +2,7 @@
 
 **Source of truth:** app_store_compliance_audit.md, release_blocker_report.md  
 **Date:** 2025-03-12  
-**Scope:** Contact/support, Privacy/Terms, Restore, Manage subscription, Account deletion, safe links, paywall billing copy, Sentry privacy, demo/dev messaging, release env.
+**Scope:** Contact/support, Privacy/Terms, Restore, Manage subscription, Account deletion, safe links, paywall billing copy, crash reporting privacy, demo/dev messaging, release env.
 
 ---
 
@@ -41,15 +41,11 @@
 
 ---
 
-## 4. Sentry privacy posture
+## 4. Crash / error monitoring posture
 
-| Setting | Value | Purpose |
-|---------|--------|--------|
-| **sendDefaultPii** | `false` | Do not attach user identifiers or PII by default. |
-| **Replay** | `maskAllText: true`, `maskAllImages: true` | Session replay does not capture visible text or images. |
-| **Environment** | `__DEV__ ? 'development' : 'production'` | Correct environment tag for filtering. |
+The legacy third-party crash SDK has been removed. The app uses `src/services/monitoring` (dev-only console stubs; production no-op until Firebase Crashlytics or similar is integrated).
 
-**Documentation:** See `docs/sentry_privacy_decision.md`. In-app comment added in `app/_layout.tsx` pointing to that doc.
+**Documentation:** See **`expo-app/docs/MONITORING_SETUP.md`** for Crashlytics setup; repo root **`MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`** for historical migration context only.
 
 ---
 
@@ -81,9 +77,9 @@ Release environment requirements are documented in:
 
 ## 7. Changes made in this pass
 
-1. **app/_layout.tsx:** Added comment above Sentry.init referencing `docs/sentry_privacy_decision.md` for production-safe config.
+1. **Monitoring:** `app/_layout.tsx` calls `initMonitoring()` from `src/services/monitoring` (stubs until Crashlytics).
 2. **No code changes** to links, paywall copy, or auth flows — all already compliant; verification only.
 
 ---
 
-*See final_legal_and_support_matrix.md, sentry_privacy_decision.md, and final_metadata_requirements.md.*
+*See final_legal_and_support_matrix.md, `../expo-app/docs/MONITORING_SETUP.md`, and final_metadata_requirements.md.*

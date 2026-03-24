@@ -29,8 +29,14 @@ export interface PropertyDetailAnalysisInput {
   /** Expense overrides */
   vacancyRatePercent?: number | null;
   operatingExpensesAnnual?: number | null;
+  operatingExpenseRatioPercent?: number | null;
+  taxesAnnual?: number | null;
+  insuranceAnnual?: number | null;
   /** Count of user-overridden fields for confidence */
   manualOverrideCount?: number | null;
+  /** Optional import diagnostics passed from persisted property row. */
+  geocodeStatus?: 'pending' | 'in_progress' | 'resolved' | 'failed' | null;
+  geocodeError?: string | null;
 }
 
 // ----- Result -----
@@ -39,6 +45,42 @@ export interface PropertyDetailAnalysisResult {
   dealScore: DealScoreBreakdown;
   confidence: ConfidenceScoreBreakdown;
   keyMetrics: KeyMetricsSummary;
+  /** Normalized inputs actually used by simulation/scoring after deterministic inference. */
+  normalizedInputs: {
+    listPrice: number | null;
+    rent: number | null;
+  };
+  /** Raw-ish input snapshot used to debug missing values and confidence. */
+  inputSnapshot: {
+    listPrice: number | null;
+    rent: number | null;
+    unitCount: number | null;
+    sqft: number | null;
+    downPaymentPercent: number | null;
+    interestRateAnnual: number | null;
+    vacancyRatePercent: number | null;
+    operatingExpensesAnnual: number | null;
+    operatingExpenseRatioPercent: number | null;
+    taxesAnnual: number | null;
+    insuranceAnnual: number | null;
+  };
+  /** Derived intermediate values used for metrics and factor scoring. */
+  derivedValues: {
+    vacancyLossAnnual: number | null;
+    effectiveGrossIncomeAnnual: number | null;
+    operatingExpensesAnnual: number | null;
+    loanAmount: number | null;
+    monthlyDebtService: number | null;
+  };
+  /** Exact blockers when score is unavailable. */
+  missingRequirements: string[];
+  /** Non-fatal warnings for partial analysis. */
+  warnings: string[];
+  /**
+   * When set, the deterministic pipeline threw; callers should show error UI instead of scores.
+   * Omitted on success.
+   */
+  pipelineError?: string;
   riskFlags: RiskFlag[];
   strengthFlags: StrengthFlag[];
   assumptions: AssumptionItem[];

@@ -73,11 +73,11 @@
 ### 9. Analytics / crash logging
 
 - **Analytics:** usage_events table (Supabase); trackEvent() in analytics.ts (signup, login, import, paywall, purchase, restore, etc.). __DEV__ logs sanitized metadata only.
-- **Sentry:** Optional; initialized in app/_layout.tsx only when EXPO_PUBLIC_SENTRY_DSN is set and **not web** (Platform.OS !== 'web') to avoid web init issues. Wraps root component when enabled.
+- **Crash reporting:** `initMonitoring()` in `app/_layout.tsx` (stubs in `src/services/monitoring`; production no-op until Firebase Crashlytics is added).
 
 ### 10. Environment variable usage
 
-- **Client (EXPO_PUBLIC_*):** EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY; EXPO_PUBLIC_REVENUECAT_API_KEY_IOS, EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID; EXPO_PUBLIC_PRIVACY_POLICY_URL, EXPO_PUBLIC_TERMS_URL, EXPO_PUBLIC_BILLING_HELP_URL; EXPO_PUBLIC_SENTRY_DSN. Read at build time (e.g. EAS).
+- **Client (EXPO_PUBLIC_*):** EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY; EXPO_PUBLIC_REVENUECAT_API_KEY_IOS; EXPO_PUBLIC_PRIVACY_POLICY_URL, EXPO_PUBLIC_TERMS_URL, EXPO_PUBLIC_BILLING_HELP_URL. Read at build time (e.g. EAS). No third-party crash DSN env vars are used today.
 - **Backend (Edge Functions):** SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY; GOOGLE_MAPS_API_KEY, RENTCAST_API_KEY, OPENAI_API_KEY, CENSUS_API_KEY, REVENUECAT_WEBHOOK_AUTHORIZATION (per function).
 
 ### 11. App entry points
@@ -119,7 +119,7 @@
 ### Performance risks
 
 - **Web/Android code in bundle:** react-native-web and Platform.OS branches remain in the client bundle for iOS; tree-shaking may not remove all web paths. Could marginally increase bundle size and surface area for bugs.
-- **Sentry + Reanimated:** Native-only Sentry and Reanimated are appropriate; no specific performance risk identified for iOS-only if other platforms are dropped.
+- **crash reporting + Reanimated:** Native-only crash reporting and Reanimated are appropriate; no specific performance risk identified for iOS-only if other platforms are dropped.
 
 ### App Store rejection risks
 
@@ -172,7 +172,7 @@
 | **1. Safe to delete immediately** | After one final verification pass | None until verification step is done; then e.g. expo-app/expo-app if confirmed unused. |
 | **2. Delete after verification** | Confirm no imports, routes, or build references | _archive_review/web; app/+html.tsx for iOS-only; Android-specific assets (android-icon-*, favicon if web dropped). |
 | **3. Keep but refactor** | Keep file/module; simplify for iOS-only | Platform.OS branches (reduce to ios-only or remove web/android paths); billing.ts (drop Android key handling); paywallCopy and subscriptionManagement copy; tab bar SymbolView (ios-only keys); app.json (remove android and web blocks). |
-| **4. Keep unchanged** | No change for iOS-only | supabase/; docs/release; src/lib (scoring, confidence, underwriting, simulation, parsers, renovation); AuthContext, SubscriptionContext; Edge Function calls; RevenueCat flow; Sentry init; assets for iOS (icon, splash, SpaceMono). |
+| **4. Keep unchanged** | No change for iOS-only | supabase/; docs/release; src/lib (scoring, confidence, underwriting, simulation, parsers, renovation); AuthContext, SubscriptionContext; Edge Function calls; RevenueCat flow; crash reporting init; assets for iOS (icon, splash, SpaceMono). |
 
 ---
 

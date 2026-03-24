@@ -13,6 +13,7 @@ import {
   Pressable,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card } from '../../components';
 import { useThemeColors } from '../../components/useThemeColors';
 import { spacing, fontSizes, fontWeights, lineHeights, radius } from '../../theme';
@@ -62,6 +63,15 @@ export interface PaywallContentProps {
   onPurchase: (plan: SubscriptionPlan) => void;
   onRestore: () => void;
   onDismiss: () => void;
+  diagnostics?: {
+    initialized: boolean;
+    platform: 'ios' | 'android' | 'web';
+    billingConfigured: boolean;
+    billingKeySource: string;
+    offeringsLoaded: boolean;
+    entitlementActive: boolean;
+    lastError: string | null;
+  };
 }
 
 export function PaywallContent({
@@ -81,8 +91,10 @@ export function PaywallContent({
   onPurchase,
   onRestore,
   onDismiss,
+  diagnostics,
 }: PaywallContentProps) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const planButtonsDisabled = restoring || !!purchasingId || entitlementVerifying;
 
   useEffect(() => {
@@ -102,7 +114,11 @@ export function PaywallContent({
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, responsiveContentContainer]}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: styles.content.paddingBottom + insets.bottom },
+        responsiveContentContainer,
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={isLoading && !purchasingId && !restoring && !entitlementVerifying}
@@ -330,6 +346,23 @@ export function PaywallContent({
         fullWidth
         style={styles.doneButton}
       />
+      {__DEV__ && diagnostics ? (
+        <Card style={styles.debugCard}>
+          <Text style={[styles.debugTitle, { color: colors.text }]}>Subscription diagnostics</Text>
+          <Text style={[styles.debugLine, { color: colors.textSecondary }]}>
+            init={String(diagnostics.initialized)} platform={diagnostics.platform}
+          </Text>
+          <Text style={[styles.debugLine, { color: colors.textSecondary }]}>
+            billingConfigured={String(diagnostics.billingConfigured)} keySource={diagnostics.billingKeySource}
+          </Text>
+          <Text style={[styles.debugLine, { color: colors.textSecondary }]}>
+            offeringsLoaded={String(diagnostics.offeringsLoaded)} entitlementActive={String(diagnostics.entitlementActive)}
+          </Text>
+          <Text style={[styles.debugLine, { color: colors.textSecondary }]}>
+            lastError={diagnostics.lastError ?? 'none'}
+          </Text>
+        </Card>
+      ) : null}
     </ScrollView>
   );
 }
@@ -345,6 +378,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
     marginBottom: spacing.xs,
     lineHeight: lineHeights.title,
+    flexShrink: 1,
   },
   subheadline: {
     fontSize: fontSizes.base,
@@ -470,4 +504,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.medium,
   },
   doneButton: { marginTop: spacing.xs },
+  debugCard: { marginTop: spacing.l, padding: spacing.m },
+  debugTitle: { fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, marginBottom: spacing.xs },
+  debugLine: { fontSize: fontSizes.xs, marginBottom: spacing.xxs },
 });

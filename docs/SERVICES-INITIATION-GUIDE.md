@@ -12,7 +12,7 @@ Step-by-step setup for each third-party service: links, APIs/keys, PropFolio usa
 | **Google Maps Platform** | Address autocomplete, geocoding, validation | API key(s) with restrictions | Backend/Edge Function or restricted client key |
 | **RentCast** | Rent estimates, comps for underwriting | API key | Backend/Edge Function only |
 | **Expo EAS** | Build & release (iOS, Android) | EAS account; credentials via EAS | CI / your machine |
-| **Sentry** | Crash & error monitoring | DSN (client); auth token (upload) | Client + build |
+| **Firebase Crashlytics** | Native/JS crash reporting (iOS) | `GoogleService-Info.plist`; Firebase console | Client + build — **`expo-app/docs/MONITORING_SETUP.md`** |
 | **OpenAI API** | Summaries, explanations, AI cleanup | API key | Backend/Edge Function only |
 | **Census API** | Future Value Predictor inputs | API key | Backend/Edge Function only |
 
@@ -171,40 +171,13 @@ Step-by-step setup for each third-party service: links, APIs/keys, PropFolio usa
 
 ---
 
-## 5. Sentry — Crash and error monitoring
+## 5. Crash reporting — Firebase Crashlytics
 
-### Links & signup
+**PropFolio** uses **`expo-app/src/services/monitoring`** as the only entry point; the native SDK is **`@react-native-firebase/crashlytics`** on iOS.
 
-- **Signup:** https://sentry.io/signup/  
-- **Docs (React Native):** https://docs.sentry.io/platforms/react-native/  
-- **Docs (Expo):** https://docs.sentry.io/platforms/javascript/guides/expo/  
-- **Pricing:** https://sentry.io/pricing/ (free tier: errors/month limit)
+**Operational guide:** **`expo-app/docs/MONITORING_SETUP.md`** (initialization, plist, EAS, troubleshooting). **Manual plist / EAS file env:** repo root **`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**. **Historical migration audit:** **`MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`** (repo root).
 
-### Initiation steps
-
-1. Create a **Sentry account** and a **project** (e.g. “PropFolio” — choose React Native or Expo).
-2. Note the **DSN** (client key) in Project Settings → Client Keys (DSN). You’ll use this in the app (safe to expose).
-3. **Expo:** Install Sentry Expo SDK:  
-   `npx expo install @sentry/react-native`  
-   (or follow latest Expo-specific guide in Sentry docs.)
-4. **Initialize** Sentry early in your app entry (e.g. `app/_layout.tsx` or before) with the DSN. Use env var e.g. `EXPO_PUBLIC_SENTRY_DSN` so you can turn it off in dev.
-5. **Source maps (optional):** Configure EAS Build or your build pipeline to upload source maps to Sentry so stack traces are readable.
-6. **Auth token:** Create an auth token in Sentry (Settings → Auth Tokens) for uploads; store in EAS secrets or CI only.
-
-### APIs / keys
-
-| Item | Where | Use in PropFolio |
-|------|--------|-------------------|
-| DSN | Sentry project → Settings → Client Keys (DSN) | Client: `EXPO_PUBLIC_SENTRY_DSN` (optional; empty = disabled) |
-| Auth token | Sentry → Settings → Auth Tokens | Build/CI only: upload source maps |
-
-### PropFolio functions (and more)
-
-- **Crashes:** Native and JS crashes reported with device/app context.
-- **Errors:** Caught exceptions and manual `Sentry.captureException()` for critical paths (e.g. after failed API call).
-- **Performance (optional):** Transaction tracing for slow screens or API calls.
-
-**App wiring:** Add `EXPO_PUBLIC_SENTRY_DSN` to `.env.example` (optional); init Sentry only when DSN is set.
+**Do not** add paid API keys for crash reporting to the client beyond what Firebase documents for your integration pattern. The **`GoogleService-Info.plist`** identifies the Firebase app — it is not a secret server key, but treat repo policy as for any client config file.
 
 ---
 
@@ -337,7 +310,8 @@ Add to `expo-app/.env` (and document in `.env.example` without real values). **N
 |----------|---------|----------|
 | `EXPO_PUBLIC_SUPABASE_URL` | Supabase | Yes, for auth/DB |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase | Yes, for auth/DB |
-| `EXPO_PUBLIC_SENTRY_DSN` | Sentry | No; omit or empty to disable |
+
+*Crash reporting uses **`GoogleService-Info.plist`** (or EAS `GOOGLE_SERVICES_INFO_PLIST`), not `EXPO_PUBLIC_*` — see **`expo-app/docs/MONITORING_SETUP.md`**.*
 
 ### Server / Edge Function only (never in client)
 
@@ -361,7 +335,7 @@ Set server keys in Supabase: **Project Settings → Edge Functions → Secrets**
 
 1. **Supabase** — Foundation for auth, DB, storage, and all server-side proxies.
 2. **Expo EAS** — So you can build and ship iOS/Android.
-3. **Sentry** — So you see crashes and errors as soon as real users hit the app.
+3. **Firebase Crashlytics** (when integrated) — So you see crashes and errors in production.
 4. **Google Maps Platform** — High impact on Import UX (autocomplete, validation).
 5. **RentCast** — When you’re ready to enrich underwriting with rent data.
 6. **OpenAI** — When you add summaries/explanations.

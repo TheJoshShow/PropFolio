@@ -99,6 +99,14 @@ describe('parseZillowUrl', () => {
     const r = parseZillowUrl(url);
     expect(r.ok).toBe(true);
   });
+
+  it('extracts zpid from slug_zpid segment (street number must not become zpid)', () => {
+    const url =
+      'https://www.zillow.com/homedetails/8216-S-Maryland-Ave-Chicago-IL-60619_9876543210_zpid/';
+    const r = parseZillowUrl(url);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.listingID).toBe('9876543210');
+  });
 });
 
 describe('parseRedfinUrl', () => {

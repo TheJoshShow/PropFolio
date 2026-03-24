@@ -41,7 +41,7 @@ This guide describes **exactly** how the current PropFolio codebase implements a
 | **Import flow** | `expo-app/src/hooks/useExecutePropertyImport.ts` | Central gating: `execute(data, source)` + isSubmitting; callbacks for success/blocked/retry/error; refresh usage on success. |
 | | `expo-app/app/(tabs)/import.tsx` | Import UI; uses useImportLimit, useExecutePropertyImport, useImportResume; shows paywall when blocked. |
 | **Settings** | `expo-app/app/(tabs)/settings.tsx` | Account, subscription status, Manage Subscription, Restore, Billing Help, Update Password, Sign out; FreeImportsIndicator; dev “Simulate at limit” toggle. |
-| **Navigation** | `expo-app/app/_layout.tsx` | Root layout: AuthProvider → SubscriptionProvider → ImportResumeProvider; Sentry (native only). |
+| **Navigation** | `expo-app/app/_layout.tsx` | Root layout: `initMonitoring()` then AuthProvider → SubscriptionProvider → ImportResumeProvider. |
 | | `expo-app/app/(tabs)/_layout.tsx` | Tabs; redirect to `/(auth)/login` when !session; auth loading state. |
 | **Supporting** | `expo-app/src/utils/subscriptionManagement.ts` | openSubscriptionManagement (RevenueCat URL or App Store / Play fallback). |
 | | `expo-app/src/services/subscriptionCache.ts` | Persist/restore subscription snapshot for offline and error resilience. |
@@ -61,11 +61,9 @@ All client-side variables must be prefixed with `EXPO_PUBLIC_`. Set in `expo-app
 | `EXPO_PUBLIC_SUPABASE_URL` | Real auth and DB | Supabase Dashboard → Project Settings → API → Project URL |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Real auth and DB | Supabase Dashboard → Project Settings → API → anon public key |
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | iOS subscriptions | RevenueCat Dashboard → Project → API Keys → Public (iOS) |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID` | Android subscriptions | RevenueCat Dashboard → Project → API Keys → Public (Android) |
 | `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Optional (Settings link) | Default: https://propfolio.app/privacy |
 | `EXPO_PUBLIC_TERMS_URL` | Optional (Settings link) | Default: https://propfolio.app/terms |
 | `EXPO_PUBLIC_BILLING_HELP_URL` | Optional (Settings Billing Help) | Your FAQ or support URL |
-| `EXPO_PUBLIC_SENTRY_DSN` | Optional (native error reporting) | Sentry project → Client Keys (DSN) |
 
 If both Supabase vars are missing, the app uses a demo user and no real auth. RevenueCat keys are platform-specific; on web, subscriptions are not configured (app still runs).
 
@@ -93,7 +91,7 @@ If both Supabase vars are missing, the app uses a demo user and no real auth. Re
 2. **Entitlement:** In RevenueCat Dashboard → Entitlements, create an entitlement. The app uses the identifier **`pro_access`** (see `expo-app/src/config/billing.ts`: `ENTITLEMENT_PRO_ACCESS`). Use the same identifier in the dashboard.
 3. **Offering:** In Offerings, create an offering (e.g. identifier **`default`**). This must match `OFFERING_IDENTIFIER_DEFAULT` in `billing.ts`.
 4. **Products:** In RevenueCat → Products, add your subscription product IDs (from App Store Connect and Google Play Console). Attach them to the default offering (e.g. monthly and annual packages). Package identifiers (e.g. `$rc_monthly`, `$rc_annual`) are configured in the dashboard and returned at runtime via `getOfferings()`.
-5. **API keys:** In RevenueCat → Project → API Keys, copy the **public** app-specific API keys for iOS and Android into `.env` as `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` and `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`.
+5. **API key:** In RevenueCat → Project → API Keys, copy the **public** app-specific iOS API key into `.env` as `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`.
 6. **App User ID:** The app sets RevenueCat’s app user ID to the Supabase user ID (`session.id`) on sign-in and clears it on sign-out. No extra configuration needed.
 
 ---
@@ -183,7 +181,7 @@ This section lists files that are **part of** the auth, free-tier, paywall, and 
 | `expo-app/src/hooks/usePaywallState.ts` | Paywall UI state: plans, purchase, restore, entitlement verification. |
 | `expo-app/src/hooks/useExecutePropertyImport.ts` | Central import gating: execute(data, source), isSubmitting, callbacks. |
 | **Screens / app** | |
-| `expo-app/app/_layout.tsx` | AuthProvider → SubscriptionProvider → ImportResumeProvider; Sentry (native). |
+| `expo-app/app/_layout.tsx` | `initMonitoring()`; AuthProvider → SubscriptionProvider → ImportResumeProvider. |
 | `expo-app/app/(tabs)/_layout.tsx` | Tabs; redirect to login when !session; auth loading. |
 | `expo-app/app/(auth)/login.tsx` | Login; forgot password link. |
 | `expo-app/app/(auth)/sign-up.tsx` | Sign up; profile created via ensureProfile. |
@@ -232,5 +230,5 @@ This section lists files that are **part of** the auth, free-tier, paywall, and 
 - [ ] **Resume:** After upgrading from blocked state, pending import runs once and is cleared.
 - [ ] **Manage Subscription:** Opens RevenueCat or platform subscription screen (or shows fallback).
 - [ ] **Dev override:** “Simulate at limit” (Settings, __DEV__ only) forces paywall/blocked UI; toggling off restores normal behavior.
-- [ ] **Typecheck:** `npm run typecheck` in expo-app passes when `@sentry/react-native` and `react-native-purchases` are installed.
+- [ ] **Typecheck:** `npm run typecheck` in expo-app passes when dependencies such as `react-native-purchases` are installed.
 - [ ] **Build:** iOS and Android builds (dev or EAS) complete; IAP works in dev build, not in Expo Go.

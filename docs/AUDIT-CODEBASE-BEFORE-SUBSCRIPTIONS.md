@@ -77,7 +77,7 @@
 
 | File | Purpose |
 |------|--------|
-| `expo-app/app/_layout.tsx` | Root layout: fonts, Sentry, AuthProvider, Stack (tabs/auth/paywall/update-password/modal). **SubscriptionProvider is imported but not used.** |
+| `expo-app/app/_layout.tsx` | Root layout: fonts, crash reporting, AuthProvider, Stack (tabs/auth/paywall/update-password/modal). **SubscriptionProvider is imported but not used.** |
 | `expo-app/app/(tabs)/_layout.tsx` | Tab layout: auth gate (redirect to login if no session), tabs Home/Import/Portfolio/Settings. |
 | `expo-app/app/(auth)/_layout.tsx` | Auth stack: login, sign-up, forgot-password. |
 | `expo-app/app/(tabs)/index.tsx` | Home screen. |
@@ -225,7 +225,7 @@ Order below is for **minimal, safe integration** (fix the provider and any follo
    - **`expo-app/app/(tabs)/_layout.tsx`:** If you prefer SubscriptionProvider to wrap only authenticated routes, you could render `SubscriptionProvider` only around the tab content when `session != null` (and still allow paywall to be reachable from auth flow if needed). Same net effect: paywall, import, settings must be under SubscriptionProvider.
 
 3. **Manual / config (no code list):**
-   - Ensure `.env` (or Expo env) has `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and for native builds `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` and `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`.
+   - Ensure `.env` (or Expo env) has `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and for native builds `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`.
    - RevenueCat dashboard: products/entitlements (e.g. `pro`), webhook URL pointing to `revenuecat-webhook` Edge Function, `app_user_id` = Supabase user id when identifying users.
    - Supabase: run migrations so `subscription_status`, `property_imports`, and trigger exist; deploy `revenuecat-webhook` and set `REVENUECAT_WEBHOOK_AUTHORIZATION` if used.
 
@@ -240,7 +240,7 @@ Order below is for **minimal, safe integration** (fix the provider and any follo
 
 ## 8. Manual Configuration Steps (Outside Codebase)
 
-1. **Environment:** Set `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`; for native: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`, `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`. Optional: `EXPO_PUBLIC_SENTRY_DSN`.
+1. **Environment:** Set `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`; for native: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`.
 2. **Supabase:** Apply all migrations; deploy Edge Functions (including `revenuecat-webhook`); set Edge Function secrets (`REVENUECAT_WEBHOOK_AUTHORIZATION`, etc.).
 3. **RevenueCat:** Create project, configure iOS/Android apps and products, entitlement id `pro`; set webhook to your `revenuecat-webhook` URL; use Supabase user id as `app_user_id` when logging in users.
 4. **Build:** For real IAP, use a development build (`expo prebuild` + `expo run:ios` / `run:android`), not Expo Go.

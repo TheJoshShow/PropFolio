@@ -25,7 +25,7 @@
 |--------|--------|
 | **app.json** | Removed `android` and `web` keys (iOS-only target). |
 | **package.json** | Removed scripts `"android"` and `"web"`. |
-| **app/_layout.tsx** | Sentry init: `isWeb` → `isIOS`; init only when `Platform.OS === 'ios'`. |
+| **app/_layout.tsx** | crash reporting init: `isWeb` → `isIOS`; init only when `Platform.OS === 'ios'`. |
 | **app/(tabs)/_layout.tsx** | SymbolView: use string name (e.g. `"house.fill"`) for iOS instead of `{ ios, android, web }`. |
 | **app/(tabs)/settings.tsx** | Removed `Platform.OS === 'web'` branches (manage subscription, restore disabled, web hint); removed unused `Platform` import. |
 | **app/paywall.tsx** | Removed web early-return and `Platform.OS !== 'web'` conditionals; removed unused `Platform` import. |

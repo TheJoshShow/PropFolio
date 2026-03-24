@@ -57,7 +57,6 @@
 | EXPO_PUBLIC_TERMS_URL | Recommended | Must resolve. |
 | EXPO_PUBLIC_SUPPORT_URL | Recommended (App Store) | Must resolve; match App Store Connect. |
 | EXPO_PUBLIC_BILLING_HELP_URL | Optional | If set, used for Billing help link. |
-| EXPO_PUBLIC_SENTRY_DSN | Optional | If set, Sentry enabled (production-safe config; see sentry_privacy_decision.md). |
 
 **Full detail:** See `docs/production_env_matrix.md` and `docs/app_store_release_env_checklist.md`.
 
@@ -74,8 +73,8 @@
 - [ ] Subscription products created and linked; purchase and restore tested.
 - [ ] Build uploaded and selected; version and build number match app.json / EAS.
 - [ ] No demo or dev-only UI in release build; production env set so demo mode is never active.
-- [ ] Sentry (if used) configured with sendDefaultPii: false and replay masking; documented in Privacy Policy and sentry_privacy_decision.md.
+- [ ] Crash reporting (Firebase Crashlytics) is documented for engineering in `expo-app/docs/MONITORING_SETUP.md`; ensure Privacy Policy reflects Google/Firebase data processing as required.
 
 ---
 
-*See app_store_hardening_changes.md, final_legal_and_support_matrix.md, and sentry_privacy_decision.md.*
+*See app_store_hardening_changes.md, final_legal_and_support_matrix.md, and `../expo-app/docs/MONITORING_SETUP.md`.*

@@ -47,7 +47,7 @@ The codebase is in good shape for an iOS App Store candidate: auth flows are imp
 - **Paywall:** Terms and Privacy now use the same safe-open pattern (fix applied).
 
 ### Crash reporting and analytics
-- **Sentry:** Initialized only when `EXPO_PUBLIC_SENTRY_DSN` is set and platform is iOS; `__DEV__` vs production environment set; no PII in default config.
+- **Monitoring:** `initMonitoring()` in root layout; Firebase Crashlytics on iOS (`GoogleService-Info.plist` / EAS — not `EXPO_PUBLIC_*`). See `docs/MONITORING_SETUP.md`.
 - **Analytics:** Funnel events (signup, login, import, paywall, purchase, restore) via `trackEvent`; Supabase `usage_events` when authenticated; `__DEV__` logs sanitized (no PII).
 
 ### Loading, empty, and error states
@@ -100,7 +100,7 @@ The codebase is in good shape for an iOS App Store candidate: auth flows are imp
 
 ## Recommended pre-submission checks
 
-- [ ] Set production env: `EXPO_PUBLIC_SUPABASE_*`, `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_PRIVACY_POLICY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL`.
+- [ ] Set production env: `EXPO_PUBLIC_SUPABASE_*`, `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`, `EXPO_PUBLIC_PRIVACY_POLICY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL`.
 - [ ] Confirm Privacy Policy and Terms URLs load in Safari.
 - [ ] Confirm Support URL matches App Store Connect.
 - [ ] Test account deletion end-to-end (auth user and any profile data removed).

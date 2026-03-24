@@ -7,7 +7,7 @@
 
 ## Executive summary
 
-- **Client (expo-app):** Uses only **public-safe** values: Supabase URL + anon key, RevenueCat public API key, Sentry DSN, and optional legal/support URLs. No service role, no backend API keys, no test credentials in production paths.
+- **Client (expo-app):** Uses only **public-safe** values: Supabase URL + anon key, RevenueCat public API key, and optional legal/support URLs. No service role, no backend API keys, no test credentials in production paths.
 - **Server (Supabase Edge Functions):** All privileged keys (service role, Google, RentCast, OpenAI, Census, RevenueCat webhook secret) are read via `Deno.env.get()` in functions only. Never exposed to the client.
 - **Boundary:** Client calls backend only via `supabase.functions.invoke(name, { body })`; no secrets are passed in request body. Session JWT is sent in `Authorization` by Supabase client (by design).
 - **Actions taken:** `.env.example` clarified; comments added in client code to enforce “anon only” and “demo user only when unconfigured.”
@@ -22,7 +22,7 @@
 |----------|------|----------|--------|
 | `src/services/supabase.ts` | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Create Supabase client (anon only) | ✅ Yes. Anon key is designed for client; RLS and auth enforce security. |
 | `src/config/billing.ts` | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` (and Android) | RevenueCat SDK `configure({ apiKey })` | ✅ Yes. Public app-specific key from RevenueCat; safe for client. |
-| `app/_layout.tsx` | `EXPO_PUBLIC_SENTRY_DSN` | Sentry.init() | ✅ Yes. DSN is public; only allows sending events. |
+| `app/_layout.tsx` | `initMonitoring()` (stubs) | No third-party crash SDK keys in client env. | ✅ Yes. |
 | `src/config/legalUrls.ts` | `EXPO_PUBLIC_PRIVACY_POLICY_URL`, `TERMS_URL`, `BILLING_HELP_URL`, `SUPPORT_URL` | In-app links | ✅ Yes. URLs only; no secrets. |
 | `src/contexts/AuthContext.tsx` | `access_token`, `refresh_token` from OAuth callback URL | Parsed from URL fragment; passed to `setSession()` | ✅ Yes. User’s own session tokens; not hardcoded. |
 | `src/contexts/AuthContext.tsx` | `DEMO_USER` (`id: 'demo', email: 'demo@propfolio.app'`) | Used only when `getSupabase() === null` (no env) | ✅ Yes. Demo mode only; never used when Supabase env is set. |

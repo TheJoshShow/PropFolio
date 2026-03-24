@@ -9,7 +9,7 @@
 import { Linking, Alert, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { logErrorSafe } from '../services/diagnostics';
-import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../config/legalUrls';
+import { getPrivacyPolicyUrl, getTermsUrl } from '../config/legalUrls';
 
 const DEFAULT_FAILURE_TITLE = 'Cannot open link';
 const DEFAULT_FAILURE_MESSAGE = 'The link could not be opened.';
@@ -93,7 +93,7 @@ async function tryOpenInAppBrowser(url: string, logCtx: string): Promise<boolean
  * Uses centralized URLs from `legalUrls` only.
  */
 export async function openLegalDocument(kind: 'privacy' | 'terms'): Promise<void> {
-  const url = kind === 'privacy' ? PRIVACY_POLICY_URL : TERMS_OF_SERVICE_URL;
+  const url = kind === 'privacy' ? getPrivacyPolicyUrl() : getTermsUrl();
   const logCtx = kind === 'privacy' ? 'openLegalDocument:privacy' : 'openLegalDocument:terms';
 
   if (!isValidExternalUrl(url)) {

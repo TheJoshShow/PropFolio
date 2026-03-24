@@ -9,8 +9,15 @@ import { run as runSimulation } from '../../lib/simulation/simulationEngine';
 import type { SimulationInputs } from '../../lib/simulation/types';
 import { evaluate as evaluateConfidence } from '../../lib/confidence/confidenceMeterEngine';
 import type { ConfidenceMeterInputs } from '../../lib/confidence/types';
-import { score as scoreDeal } from '../../lib/scoring/dealScoringEngine';
+import { score as scoreDeal, listMissingDealScoreRequirements } from '../../lib/scoring/dealScoringEngine';
 import { fromSimulationResult as dealScoreInputsFromSimulation } from '../../lib/scoring/dealScoreInputsFromSimulation';
+import { insufficientDataReasonFromMissing } from '../../lib/scoring/dealScoreExplanations';
+import {
+  estimateListPriceFromMonthlyRent,
+  estimateMonthlyRentFromListPrice,
+} from '../../services/importLimits';
+import { logAnalysisStep } from '../../services/diagnostics';
+import { recordFlowException } from '../../services/monitoring/flowInstrumentation';
 import type {
   PropertyDetailAnalysisInput,
   PropertyDetailAnalysisResult,
@@ -37,6 +44,11 @@ function sanitizeNum(v: number | null | undefined): number | null {
   return v;
 }
 
+function round2(v: number | null): number | null {
+  if (v == null || !Number.isFinite(v)) return null;
+  return Math.round(v * 100) / 100;
+}
+
 /**
  * Build SimulationInputs from property detail input with sensible defaults.
  */
@@ -48,6 +60,7 @@ function toSimulationInputs(input: PropertyDetailAnalysisInput): SimulationInput
   const rate = sanitizeNum(input.interestRateAnnual) ?? DEFAULT_INTEREST_RATE_ANNUAL;
   const termYears = sanitizeNum(input.amortizationTermYears) ?? DEFAULT_AMORTIZATION_YEARS;
   const vacancyPct = sanitizeNum(input.vacancyRatePercent) ?? DEFAULT_VACANCY_RATE_PERCENT;
+  const expenseRatioPct = sanitizeNum(input.operatingExpenseRatioPercent);
 
   let closingCosts: number | null = sanitizeNum(input.closingCosts);
   if (closingCosts == null && price != null && price > 0) {
@@ -60,8 +73,8 @@ function toSimulationInputs(input: PropertyDetailAnalysisInput): SimulationInput
     rent != null && units >= 1 ? (units === 1 ? rent : rent / units) : null;
 
   // Operating expenses: if provided use it; else estimate as % of EGI.
-  let taxesAnnual: number | null = null;
-  let insuranceAnnual: number | null = null;
+  let taxesAnnual: number | null = sanitizeNum(input.taxesAnnual);
+  let insuranceAnnual: number | null = sanitizeNum(input.insuranceAnnual);
   let propertyManagementAnnual: number | null = null;
   let repairsAndMaintenanceAnnual: number | null = null;
   let utilitiesAnnual: number | null = null;
@@ -72,7 +85,8 @@ function toSimulationInputs(input: PropertyDetailAnalysisInput): SimulationInput
     repairsAndMaintenanceAnnual = operatingExpensesOverride;
   } else if (rent != null && rent > 0) {
     const egiApprox = rent * 12 * (1 - vacancyPct / 100);
-    const oe = egiApprox * DEFAULT_EXPENSE_RATIO_EGI;
+    const ratio = expenseRatioPct != null && expenseRatioPct >= 0 ? expenseRatioPct / 100 : DEFAULT_EXPENSE_RATIO_EGI;
+    const oe = egiApprox * ratio;
     repairsAndMaintenanceAnnual = oe;
   }
 
@@ -188,9 +202,45 @@ function buildFlags(
 }
 
 /**
+ * Derive missing purchase price or rent using the same cap/expense/vacancy ladder as import,
+ * so simulation can produce debt service, DSCR, and cap rate for scoring.
+ */
+function resolvePriceAndRentForAnalysis(input: PropertyDetailAnalysisInput): {
+  listPrice: number | null;
+  rent: number | null;
+  inferredPrice: boolean;
+  inferredRent: boolean;
+} {
+  let listPrice = sanitizeNum(input.listPrice);
+  let rent = sanitizeNum(input.rent);
+  let inferredPrice = false;
+  let inferredRent = false;
+
+  if (listPrice == null && rent != null && rent > 0) {
+    const p = estimateListPriceFromMonthlyRent(rent);
+    if (p != null) {
+      listPrice = p;
+      inferredPrice = true;
+    }
+  }
+  if (rent == null && listPrice != null && listPrice > 0) {
+    const r = estimateMonthlyRentFromListPrice(listPrice);
+    if (r != null) {
+      rent = r;
+      inferredRent = true;
+    }
+  }
+
+  return { listPrice, rent, inferredPrice, inferredRent };
+}
+
+/**
  * Build assumptions list from what we defaulted or inferred.
  */
-function buildAssumptions(input: PropertyDetailAnalysisInput): AssumptionItem[] {
+function buildAssumptions(
+  input: PropertyDetailAnalysisInput,
+  inference?: { inferredPrice: boolean; inferredRent: boolean }
+): AssumptionItem[] {
   const list: AssumptionItem[] = [];
   const downPct = sanitizeNum(input.downPaymentPercent) ?? DEFAULT_DOWN_PAYMENT_PERCENT;
   const rate = sanitizeNum(input.interestRateAnnual) ?? DEFAULT_INTEREST_RATE_ANNUAL;
@@ -224,32 +274,150 @@ function buildAssumptions(input: PropertyDetailAnalysisInput): AssumptionItem[] 
   list.push({
     id: 'expense_ratio',
     label: 'Operating expenses',
-    value: `${(DEFAULT_EXPENSE_RATIO_EGI * 100).toFixed(0)}% of gross income`,
-    source: input.operatingExpensesAnnual != null ? 'user' : 'inferred',
+    value:
+      input.operatingExpensesAnnual != null
+        ? 'Manual annual expense override'
+        : `${(
+            input.operatingExpenseRatioPercent != null
+              ? input.operatingExpenseRatioPercent
+              : DEFAULT_EXPENSE_RATIO_EGI * 100
+          ).toFixed(0)}% of gross income`,
+    source:
+      input.operatingExpensesAnnual != null || input.operatingExpenseRatioPercent != null
+        ? 'user'
+        : 'inferred',
   });
+  if (inference?.inferredPrice) {
+    list.push({
+      id: 'inferred_list_price',
+      label: 'List / purchase price',
+      value: 'Estimated from monthly rent using fixed cap-rate and expense assumptions',
+      source: 'inferred',
+    });
+  }
+  if (inference?.inferredRent) {
+    list.push({
+      id: 'inferred_rent',
+      label: 'Monthly rent',
+      value: 'Estimated from list price using fixed cap-rate and expense assumptions',
+      source: 'inferred',
+    });
+  }
   return list;
+}
+
+function pipelineFailureResult(input: PropertyDetailAnalysisInput, message: string): PropertyDetailAnalysisResult {
+  const listPrice = input.listPrice ?? null;
+  const rent = input.rent ?? null;
+  const unitCount = input.unitCount != null && input.unitCount > 0 ? input.unitCount : 1;
+  return {
+    dealScore: {
+      totalScore: null,
+      band: 'insufficientData',
+      wasCappedByConfidence: false,
+      explanationSummary: message,
+      components: [],
+    },
+    confidence: {
+      score: 0,
+      band: 'veryLow',
+      explanation: {
+        supportingFactors: [],
+        limitingFactors: [message],
+        summary: message,
+      },
+      recommendedActions: [],
+    },
+    keyMetrics: {
+      capRate: null,
+      monthlyCashFlow: null,
+      annualCashFlow: null,
+      dscr: null,
+      cashOnCashReturn: null,
+      expenseRatio: null,
+      breakevenOccupancy: null,
+      noi: null,
+      totalCashToClose: null,
+    },
+    normalizedInputs: { listPrice, rent },
+    inputSnapshot: {
+      listPrice,
+      rent,
+      unitCount,
+      sqft: input.sqft ?? null,
+      downPaymentPercent: input.downPaymentPercent ?? DEFAULT_DOWN_PAYMENT_PERCENT,
+      interestRateAnnual: input.interestRateAnnual ?? DEFAULT_INTEREST_RATE_ANNUAL,
+      vacancyRatePercent: input.vacancyRatePercent ?? DEFAULT_VACANCY_RATE_PERCENT,
+      operatingExpensesAnnual: input.operatingExpensesAnnual ?? null,
+      operatingExpenseRatioPercent: input.operatingExpenseRatioPercent ?? null,
+      taxesAnnual: input.taxesAnnual ?? null,
+      insuranceAnnual: input.insuranceAnnual ?? null,
+    },
+    derivedValues: {
+      vacancyLossAnnual: null,
+      effectiveGrossIncomeAnnual: null,
+      operatingExpensesAnnual: null,
+      loanAmount: null,
+      monthlyDebtService: null,
+    },
+    missingRequirements: ['analysis_pipeline_failed'],
+    warnings: [],
+    pipelineError: message,
+    riskFlags: [],
+    strengthFlags: [],
+    assumptions: [],
+  };
 }
 
 /**
  * Single entry point: run full analysis and return result for property detail UI.
- * Deterministic; safe for tests.
+ * Deterministic; does not throw — failures set `pipelineError` for caller-owned error UI.
  */
 export function runPropertyDetailAnalysis(
   input: PropertyDetailAnalysisInput
 ): PropertyDetailAnalysisResult {
-  const simInputs = toSimulationInputs(input);
+  try {
+    return runPropertyDetailAnalysisCore(input);
+  } catch (e) {
+    recordFlowException('analysis_pipeline_failed', e, { stage: 'analysis_build', recoverable: false });
+    const msg = e instanceof Error ? e.message : 'Could not analyze this property.';
+    return pipelineFailureResult(input, msg);
+  }
+}
+
+function runPropertyDetailAnalysisCore(
+  input: PropertyDetailAnalysisInput
+): PropertyDetailAnalysisResult {
+  const resolved = resolvePriceAndRentForAnalysis(input);
+  const mergedInput: PropertyDetailAnalysisInput = {
+    ...input,
+    listPrice: resolved.listPrice,
+    rent: resolved.rent,
+  };
+
+  logAnalysisStep('resolved_inputs', {
+    inferredPrice: resolved.inferredPrice,
+    inferredRent: resolved.inferredRent,
+    hasPrice: mergedInput.listPrice != null,
+    hasRent: mergedInput.rent != null,
+  });
+
+  const simInputs = toSimulationInputs(mergedInput);
   const simResult = runSimulation(simInputs);
   const underwriting = simResult.underwriting;
 
-  const hasRent = input.rent != null && input.rent > 0;
+  const hasRent = mergedInput.rent != null && mergedInput.rent > 0;
   const hasExpenses =
-    input.operatingExpensesAnnual != null && input.operatingExpensesAnnual >= 0;
-  const confidenceInputs = toConfidenceInputs(input, hasRent, hasExpenses);
+    (mergedInput.operatingExpensesAnnual != null && mergedInput.operatingExpensesAnnual >= 0) ||
+    (mergedInput.operatingExpenseRatioPercent != null && mergedInput.operatingExpenseRatioPercent >= 0) ||
+    (mergedInput.taxesAnnual != null && mergedInput.taxesAnnual >= 0) ||
+    (mergedInput.insuranceAnnual != null && mergedInput.insuranceAnnual >= 0);
+  const confidenceInputs = toConfidenceInputs(mergedInput, hasRent, hasExpenses);
   const confidenceResult = evaluateConfidence(confidenceInputs);
 
   const dataConfidence = confidenceResult.score / 100;
   const dealInputs = dealScoreInputsFromSimulation(simResult, {
-    purchasePrice: input.listPrice ?? undefined,
+    purchasePrice: mergedInput.listPrice ?? undefined,
     dataConfidence,
     marketTailwinds: null,
     stressDSCR: null,
@@ -257,11 +425,22 @@ export function runPropertyDetailAnalysis(
   });
   const dealResult = scoreDeal(dealInputs);
 
+  let explanationSummary = dealResult.explanationSummary;
+  if (dealResult.band === 'insufficientData') {
+    const missing = listMissingDealScoreRequirements(dealInputs);
+    explanationSummary = insufficientDataReasonFromMissing(missing);
+    logAnalysisStep('score_insufficient', {
+      missing,
+      hasNoi: underwriting.noi != null,
+      hasAds: underwriting.annualDebtService != null,
+    });
+  }
+
   const dealScore: DealScoreBreakdown = {
     totalScore: dealResult.totalScore,
     band: dealResult.band,
     wasCappedByConfidence: dealResult.wasCappedByConfidence,
-    explanationSummary: dealResult.explanationSummary,
+    explanationSummary,
     components: dealResult.components,
   };
 
@@ -284,13 +463,69 @@ export function runPropertyDetailAnalysis(
     totalCashToClose: simResult.totalCashToClose ?? null,
   };
 
+  const inputSnapshot = {
+    listPrice: mergedInput.listPrice ?? null,
+    rent: mergedInput.rent ?? null,
+    unitCount: mergedInput.unitCount ?? 1,
+    sqft: mergedInput.sqft ?? null,
+    downPaymentPercent: mergedInput.downPaymentPercent ?? DEFAULT_DOWN_PAYMENT_PERCENT,
+    interestRateAnnual: mergedInput.interestRateAnnual ?? DEFAULT_INTEREST_RATE_ANNUAL,
+    vacancyRatePercent: mergedInput.vacancyRatePercent ?? DEFAULT_VACANCY_RATE_PERCENT,
+    operatingExpensesAnnual: mergedInput.operatingExpensesAnnual ?? null,
+    operatingExpenseRatioPercent: mergedInput.operatingExpenseRatioPercent ?? null,
+    taxesAnnual: mergedInput.taxesAnnual ?? null,
+    insuranceAnnual: mergedInput.insuranceAnnual ?? null,
+  };
+
+  const derivedValues = {
+    vacancyLossAnnual:
+      underwriting.grossScheduledRentAnnual != null &&
+      underwriting.vacancyAdjustedGrossIncome != null
+        ? round2(underwriting.grossScheduledRentAnnual - underwriting.vacancyAdjustedGrossIncome)
+        : null,
+    effectiveGrossIncomeAnnual: round2(underwriting.effectiveGrossIncome ?? null),
+    operatingExpensesAnnual: round2(underwriting.operatingExpensesAnnual ?? null),
+    loanAmount:
+      mergedInput.listPrice != null && (mergedInput.downPaymentPercent ?? DEFAULT_DOWN_PAYMENT_PERCENT) >= 0
+        ? round2(
+            mergedInput.listPrice *
+              (1 - (mergedInput.downPaymentPercent ?? DEFAULT_DOWN_PAYMENT_PERCENT) / 100)
+          )
+        : null,
+    monthlyDebtService:
+      underwriting.annualDebtService != null ? round2(underwriting.annualDebtService / 12) : null,
+  };
+
+  const missingRequirements = listMissingDealScoreRequirements(dealInputs);
+  const warnings: string[] = [];
+  if (mergedInput.listPrice == null) warnings.push('Listing price missing; inferred from rent when possible.');
+  if (mergedInput.rent == null) warnings.push('Rent estimate missing; inferred from price when possible.');
+  if (input.geocodeStatus === 'failed') {
+    warnings.push(`Geocoding failed${input.geocodeError ? `: ${input.geocodeError}` : ''}.`);
+  } else if (input.geocodeStatus === 'pending' || input.geocodeStatus === 'in_progress') {
+    warnings.push('Address geocoding still in progress.');
+  }
+  if (underwriting.noi == null) warnings.push('NOI unavailable due to missing income/expense inputs.');
+  if (underwriting.annualDebtService == null) warnings.push('Debt service unavailable; verify financing assumptions.');
+
   const { risks, strengths } = buildFlags(dealScore, confidence);
-  const assumptions = buildAssumptions(input);
+  const assumptions = buildAssumptions(mergedInput, {
+    inferredPrice: resolved.inferredPrice,
+    inferredRent: resolved.inferredRent,
+  });
 
   return {
     dealScore,
     confidence,
     keyMetrics,
+    normalizedInputs: {
+      listPrice: mergedInput.listPrice ?? null,
+      rent: mergedInput.rent ?? null,
+    },
+    inputSnapshot,
+    derivedValues,
+    missingRequirements,
+    warnings,
     riskFlags: risks,
     strengthFlags: strengths,
     assumptions,

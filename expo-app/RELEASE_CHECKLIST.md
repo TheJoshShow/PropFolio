@@ -7,8 +7,8 @@ Use this checklist before each TestFlight upload and App Store submission.
 ## 1. Final release checklist (pre-build verification)
 
 ### Version and build number
-- [ ] **app.json** — `expo.version` is set (e.g. `1.0.0`). Bump when you ship a new marketing version.
-- [ ] **app.json** — `expo.ios.buildNumber` is an integer string (e.g. `"1"`). With `eas.json` `appVersionSource: "remote"` and `autoIncrement: true`, EAS manages the build number on the server; local value is fallback.
+- [ ] **app.config.ts** — `version` is set (e.g. `1.0.0`). Bump when you ship a new marketing version.
+- [ ] **app.config.ts** — `ios.buildNumber` is an integer string (e.g. `"1"`). With `eas.json` `appVersionSource: "remote"` and `autoIncrement: true`, EAS manages the build number on the server; local value is fallback.
 - [ ] **eas.json** — `build.production.autoIncrement: true` and `cli.appVersionSource: "remote"` are set.
 
 ### Release configuration
@@ -25,13 +25,13 @@ Use this checklist before each TestFlight upload and App Store submission.
 ### Production environment variables
 - [ ] **Supabase** — Injected via `eas.json` `build.production.env` or EAS Secrets: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
 - [ ] **RevenueCat** — `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` set for production builds (EAS Secrets or build env). Not in repo.
-- [ ] **Sentry** (optional) — `EXPO_PUBLIC_SENTRY_DSN` for crash reporting; can be in EAS env or .env at build time.
+- [ ] **Crash reporting:** Not applicable until Firebase Crashlytics is integrated (`src/services/monitoring` is stub-only today).
 - [ ] Server-only keys (e.g. Google Maps, RentCast, OpenAI) are **not** in client env; they live in Supabase Edge Function Secrets.
 
 ### iOS-specific release settings
-- [ ] **app.json** — `expo.ios.bundleIdentifier`: `com.propfolio.mobile`.
-- [ ] **app.json** — `expo.ios.infoPlist.ITSAppUsesNonExemptEncryption: false` (if app uses only standard HTTPS; avoids export compliance prompts).
-- [ ] **app.json** — `expo.ios.privacyManifests` present if using required APIs.
+- [ ] **app.config.ts** — `ios.bundleIdentifier`: `com.propfolio.mobile`.
+- [ ] **app.config.ts** — `ios.infoPlist.ITSAppUsesNonExemptEncryption: false` (if app uses only standard HTTPS; avoids export compliance prompts).
+- [ ] **app.config.ts** — `ios.privacyManifests` present if using required APIs.
 
 ### Paywall and subscription IDs (production-safe)
 - [ ] **billing.ts** — `ENTITLEMENT_PRO_ACCESS` / `pro_access` matches RevenueCat Dashboard → Entitlements.

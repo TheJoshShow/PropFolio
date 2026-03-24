@@ -13,7 +13,7 @@ Audit date: March 2025. Scope: obsolete files, duplicate components, test-only p
 | **Duplicate components** | None found. Single `Button`, `Card`, `TextInput`, etc. in `src/components`. | — |
 | **Test-only code paths** | `src/lib/scoring/__tests__/`, `src/lib/underwriting/__tests__/`; `src/test/setup.ts`. No test-only code in production entry points. | **Kept** – tests are appropriate; no removal. |
 | **Unused assets** | `app.json` and `_layout.tsx` reference `assets/images/*` and `assets/fonts/SpaceMono-Regular.ttf`. All referenced. | — |
-| **Unused environment variables** | `.env.example` documents Stripe vars; app uses RevenueCat only. Stripe is documented for future use. All `EXPO_PUBLIC_*` used in code are read (Supabase, RevenueCat, legal URLs, Sentry). | **No change** – .env.example is documentation; no dead env reads in code. |
+| **Unused environment variables** | `.env.example` documents Stripe vars; app uses RevenueCat only. Stripe is documented for future use. All `EXPO_PUBLIC_*` used in code are read (Supabase, RevenueCat, legal URLs, crash reporting). | **No change** – .env.example is documentation; no dead env reads in code. |
 | **Stale migrations** | `00002_create_subscriptions.sql` creates `subscriptions` (Stripe-oriented). App uses `subscription_status` (RevenueCat) from 00016+. No app code references `subscriptions` table. | **Not removed** – migrations are append-only; existing DBs may have the table. Documented as legacy. |
 | **Dead navigation branches** | Modal route removed (see above). All other `router.push` targets exist: `/(tabs)/import`, `/(auth)/login`, `/paywall`, etc. | — |
 

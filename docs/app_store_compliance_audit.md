@@ -25,10 +25,10 @@
 
 ## 2. Privacy disclosures and data collection transparency
 
-- **Privacy Policy URL:** Configurable; must resolve and describe data practices (auth, properties, usage events, RevenueCat, Sentry, third-party APIs via Edge Functions). See **privacy_data_map.md**.
+- **Privacy Policy URL:** Configurable; must resolve and describe data practices (auth, properties, usage events, RevenueCat, crash reporting, third-party APIs via Edge Functions). See **privacy_data_map.md**.
 - **In-app:** Privacy Policy linked from Settings and Paywall; no in-app full policy text required if URL is accessible.
-- **Data use:** Analytics (`usage_events`) and Sentry should be disclosed in Privacy Policy; avoid collecting PII in event metadata (current design uses allowlisted non-PII keys).
-- **Sentry:** Currently `sendDefaultPii: true`; consider `false` for App Store and document in privacy policy what is sent (crashes, breadcrumbs, device/OS). See **app_review_risk_register.md**.
+- **Data use:** Analytics (`usage_events`) and crash reporting should be disclosed in Privacy Policy; avoid collecting PII in event metadata (current design uses allowlisted non-PII keys).
+- **crash reporting:** Currently `sendDefaultPii: true`; consider `false` for App Store and document in privacy policy what is sent (crashes, breadcrumbs, device/OS). See **app_review_risk_register.md**.
 
 ---
 
@@ -78,7 +78,7 @@
 ## 8. Crash risk and stability
 
 - **Error boundary:** expo-router `ErrorBoundary` in use.
-- **Sentry:** Optional (when DSN set); captures crashes and errors; replay masks text/images.
+- **crash reporting:** Optional (when DSN set); captures crashes and errors; replay masks text/images.
 - **Guards:** Null Supabase, missing session, and failed API calls handled with fallbacks and user messages.
 
 ---
@@ -95,7 +95,7 @@
 ## 10. Required code/copy updates (from this audit)
 
 1. **Contact / Support:** Add `getSupportUrl()` and a "Contact support" or "Help & support" row in Settings that opens support URL or mailto.
-2. **Sentry PII:** Set `sendDefaultPii: false` unless product explicitly requires it; document in Privacy Policy.
+2. **crash reporting PII:** Set `sendDefaultPii: false` unless product explicitly requires it; document in Privacy Policy.
 3. **Metadata:** Ensure App Store Connect has Support URL, Privacy Policy URL, and optional Terms/EULA link (see **required_metadata_checklist.md**).
 
 All other in-app paths (Terms, Privacy, Restore, Manage subscription, Account deletion) are present and implemented.

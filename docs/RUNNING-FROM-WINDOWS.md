@@ -24,9 +24,9 @@ This is the only way to run the **actual** iOS build from Windows.
 
 ---
 
-## Option 2: Run the web app in your browser (recommended on Windows)
+## Option 2: Run the Expo web target in your browser (recommended on Windows)
 
-A **web version** of the PropFolio shell lives in the `web/` folder. It mirrors the Home dashboard (hero, import CTA, confidence teaser, featured metrics, recent analyses, portfolio snapshot) so you can “launch” PropFolio in Chrome or Cursor’s Simple Browser from your Windows machine.
+The cross-platform app lives in **`expo-app/`** (React Native Web). There is **no** separate root `web/` folder in this repo.
 
 ### Prerequisites
 
@@ -34,36 +34,37 @@ A **web version** of the PropFolio shell lives in the `web/` folder. It mirrors 
   Download: [https://nodejs.org/](https://nodejs.org/) (LTS).  
   Check: `node -v` and `npm -v` in a terminal.
 
-### Run the web app
+### Run the web dev server
 
-1. Open a terminal in the project root (where `web/` is).
-2. Go into the web app and install dependencies (once):
+1. Open a terminal and go to **`expo-app`** (folder that contains `package.json` for the Expo app).
+2. Install dependencies (once):
 
    ```bash
-   cd web
+   cd expo-app
    npm install
    ```
 
-3. Start the dev server:
+3. Start Expo and open **web**:
 
    ```bash
-   npm run dev
+   npm run start
    ```
 
-4. Open the URL shown (e.g. **http://localhost:5173**) in:
-   - **Chrome / Edge**, or  
-   - **Cursor:** *View → Simple Browser* (or Command/Ctrl+Shift+P → “Simple Browser: Show”), then paste the URL.
+   Then press **`w`** in the terminal to open in the browser, **or** run:
 
-You should see the PropFolio home shell: tabs (Home, Import, Portfolio, Settings), hero line, import CTA, confidence teaser, metrics, recent analyses, and portfolio card. This uses the same mock data concept as the iOS app; it is not connected to the iOS binary or Simulator.
+   ```bash
+   npm run expo-cli -- start --web
+   ```
 
-### Build for production (optional)
+   (On Windows paths with `&`, prefer **`npm run expo-cli -- …`** over `npx expo …`—see `expo-app/README.md`.)
 
-```bash
-cd web
-npm run build
-```
+4. Open the URL shown (often **http://localhost:8081** or similar) in Chrome / Edge or Cursor’s Simple Browser.
 
-Then serve the `web/dist` folder with any static host (e.g. `npx serve dist` or your hosting provider).
+This is the same **expo-app** codebase as iOS/Android; it is not the legacy Swift iOS binary.
+
+### Production web build
+
+Use Expo / EAS web export when you add a web production pipeline, or follow `expo-app/docs/LAUNCH_AND_TEST.md`. Do not expect a root-level `web/dist` from an old Vite app—this repo uses Expo for web.
 
 ---
 
@@ -74,4 +75,4 @@ Then serve the `web/dist` folder with any static host (e.g. `npx serve dist` or 
 | Run the **real iOS app** from Windows | Use a cloud Mac (Option 1) and run Xcode + Simulator there. |
 | See the **PropFolio UI** on your Windows PC quickly | Use the **web app** (Option 2): `cd web && npm install && npm run dev`, then open the URL in your browser. |
 
-The iOS app remains the primary product; the web app is a way to develop and preview the experience when you don’t have a Mac.
+The iOS app remains the primary product; **expo-app** web is a way to develop and preview the experience when you don’t have a Mac.

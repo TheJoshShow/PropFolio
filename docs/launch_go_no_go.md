@@ -58,7 +58,7 @@ List any known minor issues that are **accepted for launch** (e.g. S3 / nice-to-
 ## 5. Post-launch
 
 - [ ] Monitor App Review feedback and first user reports.
-- [ ] Track crash-free rate (e.g. Sentry) and subscription/restore support tickets.
+- [ ] Track crash-free rate (e.g. crash reporting) and subscription/restore support tickets.
 - [ ] Plan 1.0.1 for any deferred items or quick fixes.
 
 ---

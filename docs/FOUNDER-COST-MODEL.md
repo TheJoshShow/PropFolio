@@ -119,7 +119,7 @@ At some point you may add:
 - A small backend service (e.g. Node, Deno, or Go) to:
   - Proxy calls to vendors (hide keys from clients).
   - Run periodic jobs (pull market data, refresh snapshots).
-- Logging/monitoring (e.g. Sentry, Logtail, Datadog).
+- Logging/monitoring (e.g. crash reporting, Logtail, Datadog).
 
 These bring:
 

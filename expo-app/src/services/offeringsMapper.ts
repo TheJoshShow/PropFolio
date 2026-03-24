@@ -4,8 +4,7 @@
  * Do not hardcode store prices here; use live data from RevenueCat. Fallback copy when load fails.
  */
 
-import { PRODUCT_IDS, PACKAGE_IDENTIFIERS } from '../config/billing';
-import type { PlanType } from '../config/billing';
+import { PRODUCT_IDS, PACKAGE_IDENTIFIERS, type PlanType } from '../config';
 import type { RevenueCatPackage } from './revenueCat';
 import type { RawPurchasesPackage } from './revenueCat';
 
@@ -63,13 +62,46 @@ export const OFFERINGS_FALLBACK_COPY = {
 } as const;
 
 /** Returns a fallback result for missing offerings, store errors, or empty list. */
-export function getFallbackOfferingsResult(reason?: 'unavailable' | 'empty' | 'error'): OfferingsLoadResultFallback {
+export function getFallbackOfferingsResult(
+  reason?: 'unavailable' | 'empty' | 'error' | 'missing_api_key' | 'sdk_not_configured' | 'web_not_supported'
+): OfferingsLoadResultFallback {
   if (reason === 'empty') {
     return {
       kind: 'fallback',
       // This usually indicates an offering/package mismatch in RevenueCat (or no packages attached to the offering).
       message: 'No subscription plans found. Check RevenueCat offering configuration and try again.',
       retryLabel: 'Retry',
+      plans: [],
+      recommendedPlan: null,
+    };
+  }
+  if (reason === 'missing_api_key') {
+    return {
+      kind: 'fallback',
+      message:
+        __DEV__
+          ? 'Subscriptions are not configured in this build (missing RevenueCat key). Add EXPO_PUBLIC_REVENUECAT_API_KEY_IOS to your environment for production.'
+          : 'Subscriptions are temporarily unavailable. Please try again later.',
+      retryLabel: 'OK',
+      plans: [],
+      recommendedPlan: null,
+    };
+  }
+  if (reason === 'sdk_not_configured') {
+    return {
+      kind: 'fallback',
+      message:
+        'Could not open the in-app store. Sign out and back in, update the app, or try again. If this persists, RevenueCat or the App Store may be unreachable.',
+      retryLabel: 'Try again',
+      plans: [],
+      recommendedPlan: null,
+    };
+  }
+  if (reason === 'web_not_supported') {
+    return {
+      kind: 'fallback',
+      message: 'In-app subscriptions are available on the iOS app only.',
+      retryLabel: 'OK',
       plans: [],
       recommendedPlan: null,
     };

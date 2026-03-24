@@ -13,12 +13,17 @@ import {
   ActivityIndicator,
   Pressable,
   ViewStyle,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../../src/contexts/AuthContext';
+import { useSubscription } from '../../../src/contexts/SubscriptionContext';
 import { getPropertyById, type PropertyRow } from '../../../src/services/portfolio';
 import { getSupabase } from '../../../src/services/supabase';
+import { logErrorSafe } from '../../../src/services/diagnostics';
+import { recordFlowIssue } from '../../../src/services/monitoring/flowInstrumentation';
 import { SCORE_SURFACE_DISCLAIMER, DISCLAIMER_COPY } from '../../../src/lib/propertyAnalysis';
 import {
   DEAL_BREAKDOWN_INTRO,
@@ -29,17 +34,30 @@ import {
   ACCORDION_WHY_CAPPED,
 } from '../../../src/lib/propertyAnalysis';
 import { runPropertyDetailAnalysis } from '../../../src/features/property-analysis';
+import { resolveFactorBreakdownState } from '../../../src/features/property-analysis/factorBreakdownState';
+import {
+  buildAnalysisInputWithWhatIf,
+  createInitialWhatIfDraft,
+  sanitizeWhatIfDraft,
+  type PropertyWhatIfDraft,
+} from '../../../src/features/property-analysis/whatIfAssumptions';
 import type { PropertyDetailAnalysisResult } from '../../../src/features/property-analysis';
 import type { DealScoreBand, DealScoreFactor } from '../../../src/lib/scoring/types';
 import type { ConfidenceMeterBand } from '../../../src/lib/confidence/types';
-import { Button, Card } from '../../../src/components';
+import { Button, Card, TextInput } from '../../../src/components';
 import { useThemeColors } from '../../../src/components/useThemeColors';
 import { spacing, fontSizes, lineHeights, radius, fontWeights } from '../../../src/theme';
 import { responsiveContentContainer } from '../../../src/utils/responsive';
-import { useSubscription } from '../../../src/contexts/SubscriptionContext';
+import { parsePortfolioPropertyIdParam } from '../../../src/utils/appNavigation';
 import { trackEvent } from '../../../src/services/analytics';
+import {
+  getPropertyWhatIfOverrides,
+  setPropertyWhatIfOverrides,
+  clearPropertyWhatIfOverrides,
+} from '../../../src/services/propertyWhatIfOverrides';
 
 const MIN_TAP_TARGET = 44;
+const FACTOR_BREAKDOWN_PREMIUM_ONLY = false;
 
 function dealBandLabel(band: DealScoreBand): string {
   switch (band) {
@@ -62,6 +80,18 @@ function confidenceBandLabel(band: ConfidenceMeterBand): string {
     case 'veryLow': return 'Very low';
     default: return 'Very low';
   }
+}
+
+function safeStringList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((item): item is string => typeof item === 'string');
+}
+
+function safeDealScoreComponents(
+  dealScore: PropertyDetailAnalysisResult['dealScore']
+): PropertyDetailAnalysisResult['dealScore']['components'] {
+  const raw = dealScore?.components;
+  return Array.isArray(raw) ? raw : [];
 }
 
 function dealScoreFactorLabel(factor: DealScoreFactor): string {
@@ -103,6 +133,14 @@ function formatDate(iso: string): string {
   }
 }
 
+function parseOptionalNumber(raw: string): number | null | undefined {
+  const t = raw.trim();
+  if (!t) return undefined;
+  const n = Number(t.replace(/[,$\s]/g, ''));
+  if (!Number.isFinite(n)) return null;
+  return n;
+}
+
 function fullAddress(row: PropertyRow): string {
   const street = [row.street_address, row.unit].filter(Boolean).join(', ');
   const loc = [row.city, row.state, row.postal_code].filter(Boolean).join(', ');
@@ -121,6 +159,8 @@ function buildAnalysisFromRow(row: PropertyRow): PropertyDetailAnalysisResult {
     bedrooms: row.bedrooms ?? null,
     bathrooms: row.bathrooms ?? null,
     sqft: row.sqft ?? null,
+    geocodeStatus: row.geocode_status ?? null,
+    geocodeError: row.geocode_error ?? null,
   });
 }
 
@@ -150,11 +190,17 @@ function DetailSkeleton() {
   const colors = useThemeColors();
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, responsiveContentContainer]}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.content, responsiveContentContainer]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <SkeletonBlock height={MIN_TAP_TARGET} width={60} style={{ marginBottom: spacing.l }} />
         <SkeletonBlock height={28} width="90%" style={{ marginBottom: spacing.xs }} />
         <SkeletonBlock height={18} width="70%" style={{ marginBottom: spacing.m }} />
@@ -171,7 +217,8 @@ function DetailSkeleton() {
             <SkeletonBlock key={i} height={40} style={{ marginBottom: spacing.xs }} />
           ))}
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -180,10 +227,12 @@ function DetailSkeleton() {
 
 export default function PropertyDetailScreen() {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const rawParams = useLocalSearchParams<{ id?: string | string[] }>();
+  const id = parsePortfolioPropertyIdParam(rawParams.id);
   const { session, isLoading: authLoading } = useAuth();
-  const { hasProAccess } = useSubscription();
+  const { hasProAccess: subscriptionPro, entitlementBootstrapPending } = useSubscription();
   const userId = session?.id ?? null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -192,6 +241,10 @@ export default function PropertyDetailScreen() {
   const [expandedDealBreakdown, setExpandedDealBreakdown] = useState(false);
   const [expandedConfidenceExplanation, setExpandedConfidenceExplanation] = useState(false);
   const [expandedAccordionId, setExpandedAccordionId] = useState<'how' | 'estimated' | 'capped' | null>(null);
+  const [showWhatIf, setShowWhatIf] = useState(false);
+  const [whatIfDraft, setWhatIfDraft] = useState<PropertyWhatIfDraft | null>(null);
+  const [debouncedDraft, setDebouncedDraft] = useState<PropertyWhatIfDraft | null>(null);
+  const [whatIfSaveMessage, setWhatIfSaveMessage] = useState<string | null>(null);
 
   const fetchProperty = useCallback(async () => {
     if (!id) {
@@ -217,11 +270,30 @@ export default function PropertyDetailScreen() {
       const row = await getPropertyById(getSupabase(), userId, id);
       if (!row) {
         setError('Property not found');
+        recordFlowIssue('nav_property_not_found', { screen: 'portfolio_detail' });
       } else {
         setPropertyRow(row);
-        setAnalysisResult(buildAnalysisFromRow(row));
+        try {
+          const analysis = buildAnalysisFromRow(row);
+          if (analysis.pipelineError) {
+            recordFlowIssue('analysis_detail_pipeline_failed', {
+              screen: 'portfolio_detail',
+              recoverable: true,
+            });
+            setError('Could not analyze this property.');
+            setAnalysisResult(null);
+          } else {
+            setAnalysisResult(analysis);
+          }
+        } catch (e) {
+          logErrorSafe('PropertyDetail buildAnalysisFromRow', e);
+          recordFlowIssue('analysis_detail_build_threw', { screen: 'portfolio_detail', recoverable: true });
+          setError('Could not analyze this property.');
+          setAnalysisResult(null);
+        }
       }
     } catch (e) {
+      logErrorSafe('PropertyDetail fetchProperty', e);
       setError(e instanceof Error ? e.message : 'Failed to load property');
     } finally {
       setLoading(false);
@@ -231,6 +303,63 @@ export default function PropertyDetailScreen() {
   useEffect(() => {
     fetchProperty();
   }, [fetchProperty]);
+
+  useEffect(() => {
+    if (!propertyRow || !userId) return;
+    let cancelled = false;
+    (async () => {
+      const saved = await getPropertyWhatIfOverrides(
+        userId,
+        propertyRow.id,
+        propertyRow.updated_at ?? propertyRow.fetched_at ?? null
+      );
+      if (cancelled) return;
+      const initial = saved ?? createInitialWhatIfDraft(propertyRow);
+      const sanitized = sanitizeWhatIfDraft(initial);
+      setWhatIfDraft(sanitized);
+      setDebouncedDraft(sanitized);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [propertyRow?.id, userId]);
+
+  useEffect(() => {
+    if (!whatIfDraft) return;
+    const t = setTimeout(() => setDebouncedDraft(sanitizeWhatIfDraft(whatIfDraft)), 220);
+    return () => clearTimeout(t);
+  }, [whatIfDraft]);
+
+  const whatIfAnalysis = useMemo(() => {
+    if (!propertyRow || !analysisResult || !debouncedDraft) return analysisResult;
+    if (!showWhatIf) return analysisResult;
+    const baseInput = {
+      listPrice: propertyRow.list_price ?? null,
+      rent: propertyRow.rent ?? null,
+      streetAddress: propertyRow.street_address ?? '',
+      city: propertyRow.city ?? '',
+      state: propertyRow.state ?? '',
+      postalCode: propertyRow.postal_code ?? '',
+      unitCount: 1,
+      bedrooms: propertyRow.bedrooms ?? null,
+      bathrooms: propertyRow.bathrooms ?? null,
+      sqft: propertyRow.sqft ?? null,
+      geocodeStatus: propertyRow.geocode_status ?? null,
+      geocodeError: propertyRow.geocode_error ?? null,
+    };
+
+    const whatIf = runPropertyDetailAnalysis(buildAnalysisInputWithWhatIf(baseInput, debouncedDraft));
+    if (whatIf.pipelineError) {
+      recordFlowIssue('analysis_whatif_pipeline_failed', { screen: 'portfolio_detail', recoverable: true });
+      return analysisResult;
+    }
+    return whatIf;
+  }, [
+    analysisResult,
+    showWhatIf,
+    propertyRow,
+    debouncedDraft,
+  ]);
 
   const lastUpdated = useMemo(() => {
     if (!propertyRow) return '';
@@ -252,19 +381,65 @@ export default function PropertyDetailScreen() {
   }, [id, analysisResult]);
 
   const topStrengths = useMemo(
-    () => (analysisResult?.strengthFlags ?? []).slice(0, 3),
-    [analysisResult?.strengthFlags]
+    () => (whatIfAnalysis?.strengthFlags ?? []).slice(0, 3),
+    [whatIfAnalysis?.strengthFlags]
   );
   const topRisks = useMemo(
-    () => (analysisResult?.riskFlags ?? []).slice(0, 3),
-    [analysisResult?.riskFlags]
+    () => (whatIfAnalysis?.riskFlags ?? []).slice(0, 3),
+    [whatIfAnalysis?.riskFlags]
   );
+  const updateWhatIfField = useCallback(
+    (key: keyof PropertyWhatIfDraft, raw: string) => {
+      const parsed = parseOptionalNumber(raw);
+      setWhatIfSaveMessage(null);
+      setWhatIfDraft((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev };
+        if (parsed === undefined) {
+          delete (next as Partial<PropertyWhatIfDraft>)[key];
+        } else if (parsed !== null) {
+          (next as Record<string, unknown>)[key] = parsed;
+        }
+        return next;
+      });
+    },
+    []
+  );
+  const resetWhatIfField = useCallback((key: keyof PropertyWhatIfDraft) => {
+    setWhatIfSaveMessage(null);
+    setWhatIfDraft((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      delete (next as Partial<PropertyWhatIfDraft>)[key];
+      return next;
+    });
+  }, []);
+
+  const saveWhatIfScenario = useCallback(async () => {
+    if (!userId || !propertyRow || !whatIfDraft) return;
+    await setPropertyWhatIfOverrides(
+      userId,
+      propertyRow.id,
+      sanitizeWhatIfDraft(whatIfDraft),
+      propertyRow.updated_at ?? propertyRow.fetched_at ?? null
+    );
+    setWhatIfSaveMessage('Scenario saved');
+  }, [userId, propertyRow?.id, whatIfDraft]);
+
+  const resetWhatIfAll = useCallback(async () => {
+    if (!propertyRow) return;
+    const reset = createInitialWhatIfDraft(propertyRow);
+    setWhatIfDraft(reset);
+    setDebouncedDraft(reset);
+    if (userId) await clearPropertyWhatIfOverrides(userId, propertyRow.id);
+    setWhatIfSaveMessage('Assumptions reset');
+  }, [propertyRow?.id, userId]);
 
   if (loading) {
     return <DetailSkeleton />;
   }
 
-  if (error && !analysisResult) {
+  if (error && !whatIfAnalysis) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
         <View style={styles.errorWrap}>
@@ -284,7 +459,7 @@ export default function PropertyDetailScreen() {
     );
   }
 
-  if (!analysisResult || !propertyRow) {
+  if (!whatIfAnalysis || !propertyRow) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
         <View style={styles.errorWrap}>
@@ -306,22 +481,50 @@ export default function PropertyDetailScreen() {
     );
   }
 
-  const a = analysisResult;
+  const a = whatIfAnalysis;
   const m = a.keyMetrics;
   const row = propertyRow;
   const address = fullAddress(row);
-  const purchasePrice = row.list_price ?? null;
-  const estimatedRent = row.rent ?? null;
+  const purchasePrice = a.normalizedInputs.listPrice ?? null;
+  const estimatedRent = a.normalizedInputs.rent ?? null;
   const dealScore = a.dealScore;
   const confidence = a.confidence;
+  const dealComponents = safeDealScoreComponents(dealScore);
+  const missingRequirements = safeStringList(a.missingRequirements);
+  const analysisWarnings = safeStringList(a.warnings);
+  const recommendedActions = safeStringList(confidence.recommendedActions);
+  const confidenceScoreDisplay = Number.isFinite(confidence.score) ? Math.round(confidence.score) : null;
+  const subscriptionEntitlementLoading =
+    FACTOR_BREAKDOWN_PREMIUM_ONLY && !!session?.id && entitlementBootstrapPending;
+  const factorBreakdownState = resolveFactorBreakdownState({
+    isLoading: loading,
+    isPremiumOnly: FACTOR_BREAKDOWN_PREMIUM_ONLY,
+    componentCount: dealComponents.length,
+    subscriptionEntitlementLoading,
+    hasProAccess: subscriptionPro,
+  });
+  const unavailableBreakdownReason =
+    missingRequirements.length > 0
+      ? `Not enough data yet: ${missingRequirements.join(', ')}`
+      : 'Factor details are not available yet. Analysis may still be processing.';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, responsiveContentContainer]}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: styles.content.paddingBottom + insets.bottom },
+            responsiveContentContainer,
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <Pressable
           onPress={() => router.back()}
           style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.8 }]}
@@ -363,7 +566,7 @@ export default function PropertyDetailScreen() {
           </Card>
           <Card style={[styles.scoreCard, { backgroundColor: colors.surface }]}>
             <Text style={[styles.scoreValue, { color: colors.text }]} allowFontScaling>
-              {Math.round(confidence.score)}
+              {confidenceScoreDisplay != null ? confidenceScoreDisplay : '—'}
             </Text>
             <Text style={[styles.scoreLabel, { color: colors.textSecondary }]} allowFontScaling>
               {confidenceBandLabel(confidence.band)}
@@ -383,28 +586,32 @@ export default function PropertyDetailScreen() {
         <Text style={[styles.dealSummaryLine, { color: colors.textSecondary }]} allowFontScaling>
           {dealScore.explanationSummary || 'Insufficient data'}
         </Text>
+        {missingRequirements.length > 0 && (
+          <Text style={[styles.dealSummaryLine, { color: colors.warning }]} allowFontScaling>
+            Missing to score: {missingRequirements.join(', ')}
+          </Text>
+        )}
+        {analysisWarnings.length > 0 && (
+          <Card style={styles.card}>
+            {analysisWarnings.slice(0, 3).map((w, i) => (
+              <Text key={`${i}-${w}`} style={[styles.factorDesc, { color: colors.textSecondary }]} allowFontScaling>
+                • {w}
+              </Text>
+            ))}
+          </Card>
+        )}
 
-        {/* Expandable factor breakdown (Pro); free users see paywall on tap */}
+        {/* Expandable factor breakdown (available to all users). */}
         <Pressable
           onPress={() => {
-            if (hasProAccess) {
-              setExpandedDealBreakdown((v) => {
-                if (!v) trackEvent('score_explanation_opened', {});
-                return !v;
-              });
-            } else {
-              trackEvent('premium_lock_viewed', { metadata: { section: 'factor_breakdown' } });
-              router.push('/paywall');
-            }
+            if (factorBreakdownState === 'loading') return;
+            setExpandedDealBreakdown((v) => {
+              if (!v) trackEvent('score_explanation_opened', {});
+              return !v;
+            });
           }}
           style={({ pressed }) => [styles.factorBreakdownHeader, pressed && { opacity: 0.8 }]}
-          accessibilityLabel={
-            hasProAccess
-              ? expandedDealBreakdown
-                ? 'Collapse factor breakdown'
-                : 'Expand factor breakdown'
-              : 'Factor breakdown — Pro feature'
-          }
+          accessibilityLabel={expandedDealBreakdown ? 'Collapse factor breakdown' : 'Expand factor breakdown'}
           accessibilityRole="button"
         >
           <Text style={[styles.factorBreakdownTitle, { color: colors.text }]} allowFontScaling>
@@ -414,24 +621,43 @@ export default function PropertyDetailScreen() {
             {expandedDealBreakdown ? '▲' : '▼'}
           </Text>
         </Pressable>
-        {expandedDealBreakdown && hasProAccess && (
+        {expandedDealBreakdown && (
           <View style={styles.factorBreakdownContent}>
-            <Text style={[styles.factorBreakdownIntro, { color: colors.textMuted }]} allowFontScaling>
-              {DEAL_BREAKDOWN_INTRO}
-            </Text>
-            {dealScore.components.map((c) => {
-              const label = dealScoreFactorLabel(c.id);
-              return (
-                <View key={c.id} style={styles.factorBreakdownItem}>
-                  <Text style={[styles.factorBreakdownItemLabel, { color: colors.text }]} allowFontScaling>
-                    {label}{c.rawValue ? ` — ${c.rawValue}` : ''}
-                  </Text>
-                  <Text style={[styles.factorBreakdownItemText, { color: colors.textSecondary }]} allowFontScaling>
-                    Sub-score {Math.round(c.subScore)}/100 • Weight {(c.weight * 100).toFixed(0)}%
-                  </Text>
-                </View>
-              );
-            })}
+            {factorBreakdownState === 'available' ? (
+              <>
+                <Text style={[styles.factorBreakdownIntro, { color: colors.textMuted }]} allowFontScaling>
+                  {DEAL_BREAKDOWN_INTRO}
+                </Text>
+                {dealComponents.map((c, idx) => {
+                  if (!c || typeof c.id !== 'string') return null;
+                  const label = dealScoreFactorLabel(c.id as DealScoreFactor);
+                  const subLabel = Number.isFinite(c.subScore) ? Math.round(c.subScore) : '—';
+                  const weightLabel = Number.isFinite(c.weight) ? `${(c.weight * 100).toFixed(0)}%` : '—';
+                  return (
+                    <View key={c.id || `deal-factor-${idx}`} style={styles.factorBreakdownItem}>
+                      <Text style={[styles.factorBreakdownItemLabel, { color: colors.text }]} allowFontScaling>
+                        {label}{c.rawValue ? ` — ${c.rawValue}` : ''}
+                      </Text>
+                      <Text style={[styles.factorBreakdownItemText, { color: colors.textSecondary }]} allowFontScaling>
+                        Sub-score {subLabel}/100 • Weight {weightLabel}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </>
+            ) : factorBreakdownState === 'premium_only' ? (
+              <Text style={[styles.factorBreakdownIntro, { color: colors.textSecondary }]} allowFontScaling>
+                Factor breakdown is currently a Pro-only feature.
+              </Text>
+            ) : factorBreakdownState === 'loading' ? (
+              <Text style={[styles.factorBreakdownIntro, { color: colors.textSecondary }]} allowFontScaling>
+                Factor breakdown is loading...
+              </Text>
+            ) : (
+              <Text style={[styles.factorBreakdownIntro, { color: colors.textSecondary }]} allowFontScaling>
+                {unavailableBreakdownReason}
+              </Text>
+            )}
           </View>
         )}
 
@@ -468,7 +694,7 @@ export default function PropertyDetailScreen() {
                   <Text style={[styles.recommendedTitle, { color: colors.text }]} allowFontScaling>
                     Recommended next steps
                   </Text>
-                  {confidence.recommendedActions.map((step, i) => (
+                  {recommendedActions.map((step, i) => (
                     <View key={i} style={styles.recommendedItem}>
                       <Text style={[styles.recommendedBullet, { color: colors.primary }]}>•</Text>
                       <Text style={[styles.recommendedText, { color: colors.textSecondary }]} allowFontScaling>
@@ -484,6 +710,127 @@ export default function PropertyDetailScreen() {
             </>
           )}
         </View>
+
+        {/* What If assumptions: editable inputs with live recalculation */}
+        <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>What If</Text>
+        <Card style={styles.card}>
+          <Pressable
+            onPress={() => setShowWhatIf((v) => !v)}
+            style={({ pressed }) => [styles.factorBreakdownHeader, pressed && { opacity: 0.8 }]}
+            accessibilityRole="button"
+            accessibilityLabel={showWhatIf ? 'Collapse What If assumptions' : 'Expand What If assumptions'}
+          >
+            <Text style={[styles.factorBreakdownTitle, { color: colors.text }]} allowFontScaling>
+              Edit assumptions and recalculate
+            </Text>
+            <Text style={[styles.chevron, { color: colors.textSecondary }]} allowFontScaling>
+              {showWhatIf ? '▲' : '▼'}
+            </Text>
+          </Pressable>
+          {showWhatIf && (
+            <View style={styles.whatIfGrid}>
+              <Text style={[styles.factorDesc, { color: colors.textMuted }]} allowFontScaling>
+                Imported values are prefilled. Edited fields become user overrides.
+              </Text>
+              <TextInput
+                label="Purchase price (USD)"
+                keyboardType="numeric"
+                value={whatIfDraft?.listPrice != null ? String(Math.round(whatIfDraft.listPrice)) : ''}
+                onChangeText={(v) => updateWhatIfField('listPrice', v)}
+              />
+              <Button title="Reset purchase price" onPress={() => resetWhatIfField('listPrice')} variant="secondary" fullWidth pill={false} />
+              <TextInput
+                label="Monthly rent (USD)"
+                keyboardType="numeric"
+                value={whatIfDraft?.rent != null ? String(Math.round(whatIfDraft.rent)) : ''}
+                onChangeText={(v) => updateWhatIfField('rent', v)}
+              />
+              <Button title="Reset rent" onPress={() => resetWhatIfField('rent')} variant="secondary" fullWidth pill={false} />
+              <TextInput
+                label="Down payment (%)"
+                keyboardType="numeric"
+                value={whatIfDraft?.downPaymentPercent != null ? String(whatIfDraft.downPaymentPercent) : ''}
+                onChangeText={(v) => updateWhatIfField('downPaymentPercent', v)}
+              />
+              <TextInput
+                label="Interest rate (%)"
+                keyboardType="numeric"
+                value={whatIfDraft?.interestRatePercent != null ? String(whatIfDraft.interestRatePercent) : ''}
+                onChangeText={(v) => updateWhatIfField('interestRatePercent', v)}
+              />
+              <TextInput
+                label="Loan term (years)"
+                keyboardType="numeric"
+                value={whatIfDraft?.amortizationTermYears != null ? String(whatIfDraft.amortizationTermYears) : ''}
+                onChangeText={(v) => updateWhatIfField('amortizationTermYears', v)}
+              />
+              <TextInput
+                label="Vacancy (%)"
+                keyboardType="numeric"
+                value={whatIfDraft?.vacancyRatePercent != null ? String(whatIfDraft.vacancyRatePercent) : ''}
+                onChangeText={(v) => updateWhatIfField('vacancyRatePercent', v)}
+              />
+              <TextInput
+                label="Operating expense ratio (%)"
+                keyboardType="numeric"
+                value={
+                  whatIfDraft?.operatingExpenseRatioPercent != null
+                    ? String(whatIfDraft.operatingExpenseRatioPercent)
+                    : ''
+                }
+                onChangeText={(v) => updateWhatIfField('operatingExpenseRatioPercent', v)}
+              />
+              <TextInput
+                label="Operating expenses (annual USD)"
+                keyboardType="numeric"
+                value={
+                  whatIfDraft?.operatingExpensesAnnual != null
+                    ? String(Math.round(whatIfDraft.operatingExpensesAnnual))
+                    : ''
+                }
+                onChangeText={(v) => updateWhatIfField('operatingExpensesAnnual', v)}
+              />
+              <TextInput
+                label="Taxes (annual USD)"
+                keyboardType="numeric"
+                value={whatIfDraft?.taxesAnnual != null ? String(Math.round(whatIfDraft.taxesAnnual)) : ''}
+                onChangeText={(v) => updateWhatIfField('taxesAnnual', v)}
+              />
+              <TextInput
+                label="Insurance (annual USD)"
+                keyboardType="numeric"
+                value={whatIfDraft?.insuranceAnnual != null ? String(Math.round(whatIfDraft.insuranceAnnual)) : ''}
+                onChangeText={(v) => updateWhatIfField('insuranceAnnual', v)}
+              />
+              <TextInput
+                label="Closing costs (USD)"
+                keyboardType="numeric"
+                value={whatIfDraft?.closingCosts != null ? String(Math.round(whatIfDraft.closingCosts)) : ''}
+                onChangeText={(v) => updateWhatIfField('closingCosts', v)}
+              />
+              <Button
+                title={whatIfDraft?.useOverrides ? 'Use imported defaults' : 'Use What If overrides'}
+                onPress={() => setWhatIfDraft((prev) => (prev ? { ...prev, useOverrides: !prev.useOverrides } : prev))}
+                variant="secondary"
+                fullWidth
+                pill={false}
+              />
+              <Button title="Save scenario" onPress={() => void saveWhatIfScenario()} fullWidth pill={false} />
+              <Button
+                title="Reset assumptions"
+                onPress={() => void resetWhatIfAll()}
+                variant="secondary"
+                fullWidth
+                pill={false}
+              />
+              {whatIfSaveMessage ? (
+                <Text style={[styles.factorDesc, { color: colors.success }]} allowFontScaling>
+                  {whatIfSaveMessage}
+                </Text>
+              ) : null}
+            </View>
+          )}
+        </Card>
 
         {/* Key metrics grid */}
         <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>Key metrics</Text>
@@ -578,27 +925,14 @@ export default function PropertyDetailScreen() {
           </>
         )}
 
-        {/* Explanation accordion (Pro); free users see paywall on tap */}
+        {/* Explanation accordion */}
         <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>About these scores</Text>
         <View style={styles.accordion}>
           <View style={styles.accordionItem}>
             <Pressable
-              onPress={() => {
-                if (hasProAccess) {
-                  setExpandedAccordionId((prev) => (prev === 'how' ? null : 'how'));
-                } else {
-                  trackEvent('premium_lock_viewed', { metadata: { section: 'about_scores_accordion' } });
-                  router.push('/paywall');
-                }
-              }}
+              onPress={() => setExpandedAccordionId((prev) => (prev === 'how' ? null : 'how'))}
               style={({ pressed }) => [styles.accordionHeader, pressed && { opacity: 0.8 }]}
-              accessibilityLabel={
-                hasProAccess
-                  ? expandedAccordionId === 'how'
-                    ? 'Collapse how the score is calculated'
-                    : 'Expand how the score is calculated'
-                  : 'About these scores — Pro feature'
-              }
+              accessibilityLabel={expandedAccordionId === 'how' ? 'Collapse how the score is calculated' : 'Expand how the score is calculated'}
               accessibilityRole="button"
             >
               <Text style={[styles.accordionHeaderText, { color: colors.text }]} allowFontScaling>
@@ -608,7 +942,7 @@ export default function PropertyDetailScreen() {
                 {expandedAccordionId === 'how' ? '▲' : '▼'}
               </Text>
             </Pressable>
-            {hasProAccess && expandedAccordionId === 'how' && (
+            {expandedAccordionId === 'how' && (
               <Text style={[styles.accordionBody, { color: colors.textSecondary }]} allowFontScaling>
                 {ACCORDION_HOW_CALCULATED}
               </Text>
@@ -616,22 +950,9 @@ export default function PropertyDetailScreen() {
           </View>
           <View style={styles.accordionItem}>
             <Pressable
-              onPress={() => {
-                if (hasProAccess) {
-                  setExpandedAccordionId((prev) => (prev === 'estimated' ? null : 'estimated'));
-                } else {
-                  trackEvent('premium_lock_viewed', { metadata: { section: 'about_scores_accordion' } });
-                  router.push('/paywall');
-                }
-              }}
+              onPress={() => setExpandedAccordionId((prev) => (prev === 'estimated' ? null : 'estimated'))}
               style={({ pressed }) => [styles.accordionHeader, pressed && { opacity: 0.8 }]}
-              accessibilityLabel={
-                hasProAccess
-                  ? expandedAccordionId === 'estimated'
-                    ? 'Collapse which fields are estimated'
-                    : 'Expand which fields are estimated'
-                  : 'About these scores — Pro feature'
-              }
+              accessibilityLabel={expandedAccordionId === 'estimated' ? 'Collapse which fields are estimated' : 'Expand which fields are estimated'}
               accessibilityRole="button"
             >
               <Text style={[styles.accordionHeaderText, { color: colors.text }]} allowFontScaling>
@@ -641,7 +962,7 @@ export default function PropertyDetailScreen() {
                 {expandedAccordionId === 'estimated' ? '▲' : '▼'}
               </Text>
             </Pressable>
-            {hasProAccess && expandedAccordionId === 'estimated' && (
+            {expandedAccordionId === 'estimated' && (
               <Text style={[styles.accordionBody, { color: colors.textSecondary }]} allowFontScaling>
                 {ACCORDION_ESTIMATED_FIELDS}
               </Text>
@@ -649,22 +970,9 @@ export default function PropertyDetailScreen() {
           </View>
           <View style={styles.accordionItem}>
             <Pressable
-              onPress={() => {
-                if (hasProAccess) {
-                  setExpandedAccordionId((prev) => (prev === 'capped' ? null : 'capped'));
-                } else {
-                  trackEvent('premium_lock_viewed', { metadata: { section: 'about_scores_accordion' } });
-                  router.push('/paywall');
-                }
-              }}
+              onPress={() => setExpandedAccordionId((prev) => (prev === 'capped' ? null : 'capped'))}
               style={({ pressed }) => [styles.accordionHeader, pressed && { opacity: 0.8 }]}
-              accessibilityLabel={
-                hasProAccess
-                  ? expandedAccordionId === 'capped'
-                    ? 'Collapse why the score may be capped'
-                    : 'Expand why the score may be capped'
-                  : 'About these scores — Pro feature'
-              }
+              accessibilityLabel={expandedAccordionId === 'capped' ? 'Collapse why the score may be capped' : 'Expand why the score may be capped'}
               accessibilityRole="button"
             >
               <Text style={[styles.accordionHeaderText, { color: colors.text }]} allowFontScaling>
@@ -674,7 +982,7 @@ export default function PropertyDetailScreen() {
                 {expandedAccordionId === 'capped' ? '▲' : '▼'}
               </Text>
             </Pressable>
-            {hasProAccess && expandedAccordionId === 'capped' && (
+            {expandedAccordionId === 'capped' && (
               <Text style={[styles.accordionBody, { color: colors.textSecondary }]} allowFontScaling>
                 {ACCORDION_WHY_CAPPED}
               </Text>
@@ -693,7 +1001,8 @@ export default function PropertyDetailScreen() {
             </Text>
           ) : null}
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -716,6 +1025,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
     lineHeight: lineHeights.title,
     marginBottom: spacing.xs,
+    flexShrink: 1,
   },
   heroSummary: {
     fontSize: fontSizes.base,
@@ -775,6 +1085,7 @@ const styles = StyleSheet.create({
   factorBreakdownItem: { marginBottom: spacing.m },
   factorBreakdownItemLabel: { fontSize: fontSizes.base, fontWeight: fontWeights.medium, marginBottom: spacing.xxs },
   factorBreakdownItemText: { fontSize: fontSizes.sm, lineHeight: lineHeights.sm },
+  whatIfGrid: { marginTop: spacing.xs },
   confidenceBlock: { marginBottom: spacing.xl },
   confidenceBlockTitle: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, marginBottom: spacing.xs },
   confidenceParagraph: {
@@ -826,7 +1137,7 @@ const styles = StyleSheet.create({
     paddingRight: spacing.m,
   },
   metricLabel: { fontSize: fontSizes.xs, marginBottom: spacing.xxs },
-  metricValue: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold },
+  metricValue: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, flexShrink: 1 },
   card: { marginBottom: spacing.l },
   factorRow: { flexDirection: 'row', marginBottom: spacing.s },
   factorBullet: { marginRight: spacing.xs, fontSize: fontSizes.lg },
@@ -839,7 +1150,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.s,
   },
-  assumptionLabel: { fontSize: fontSizes.base, flex: 1 },
+  assumptionLabel: { fontSize: fontSizes.base, flex: 1, paddingRight: spacing.s },
   assumptionRight: { flex: 1, alignItems: 'flex-end' },
   assumptionValue: { fontSize: fontSizes.base },
   assumptionSource: { fontSize: fontSizes.xs, fontStyle: 'italic', marginTop: spacing.xxs },

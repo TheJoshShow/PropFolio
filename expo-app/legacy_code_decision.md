@@ -39,7 +39,7 @@
 
 | Area | Reason |
 |------|--------|
-| **expo-app/_quarantine/** | Quarantined unused components; not in production path. Left as-is. |
+| **expo-app/_quarantine/** | *(Removed.)* Was unused Expo template files; restore from git history if needed. |
 | **expo-app/src/dev/** | __DEV__-only overrides. Removed for production readiness. |
 | **supabase/** | Backend; unchanged. |
 | **docs/** | Documentation; updated only where noted (e.g. APP-STORE-PRODUCTION-READINESS iOS-only). |

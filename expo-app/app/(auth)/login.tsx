@@ -15,7 +15,15 @@ import { getAuthErrorMessage, isValidEmail } from '../../src/utils/authErrors';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { session, signIn, signInWithOAuth, signInWithMagicLink, isLoading } = useAuth();
+  const {
+    session,
+    signIn,
+    signInWithOAuth,
+    signInWithMagicLink,
+    isLoading,
+    lastAuthError,
+    clearLastAuthError,
+  } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +39,22 @@ export default function LoginScreen() {
     }
   }, [session, isLoading, router]);
 
+  useEffect(() => {
+    if (lastAuthError) {
+      setError(lastAuthError);
+      clearLastAuthError();
+    }
+  }, [lastAuthError, clearLastAuthError]);
+
   const handleSignIn = async () => {
     setError(null);
     if (!email.trim()) {
       setError('Enter your email');
+      return;
+    }
+    const emailNorm = email.trim().toLowerCase();
+    if (!isValidEmail(emailNorm)) {
+      setError('Enter a valid email address');
       return;
     }
     if (!password) {
@@ -42,7 +62,7 @@ export default function LoginScreen() {
       return;
     }
     try {
-      await signIn(email.trim().toLowerCase(), password);
+      await signIn(emailNorm, password);
     } catch (e) {
       setError(getAuthErrorMessage(e, 'signIn'));
     }

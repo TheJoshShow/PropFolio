@@ -4,10 +4,12 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components';
+import { useAuth } from '../src/contexts/AuthContext';
+import { dismissOrReplaceTabs } from '../src/utils/appNavigation';
 import {
   openSubscriptionManagement,
   getManageSubscriptionFallbackMessage,
@@ -24,12 +26,20 @@ import type { SubscriptionPlan } from '../src/services/offeringsMapper';
 export default function PaywallScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { session, isLoading: authLoading } = useAuth();
   const autoRefreshDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!session) {
+      router.replace('/(auth)/login');
+    }
+  }, [session, authLoading, router]);
 
   const state = usePaywallState({
     onPurchaseSuccess: () => {
       trackEvent('purchase_succeeded', { metadata: {} });
-      router.back();
+      dismissOrReplaceTabs(router);
     },
     onPurchaseCancelled: () => {
       // Analytics: purchase_cancelled is sent from usePaywallState
@@ -38,11 +48,14 @@ export default function PaywallScreen() {
   });
 
   useEffect(() => {
-    trackEvent('paywall_viewed', {});
-  }, []);
+    if (session) {
+      trackEvent('paywall_viewed', {});
+    }
+  }, [session]);
 
   // Auto-refresh once when offerings are unavailable (e.g. offline); avoid loop when refresh keeps returning fallback.
   useEffect(() => {
+    if (!session) return;
     if (
       autoRefreshDoneRef.current ||
       state.isLoading ||
@@ -53,13 +66,29 @@ export default function PaywallScreen() {
     }
     autoRefreshDoneRef.current = true;
     state.onRefresh();
-  }, [state.isLoading, state.plansForDisplay.length, state.offeringsResult.kind, state.onRefresh]);
+  }, [session, state.isLoading, state.plansForDisplay.length, state.offeringsResult.kind, state.onRefresh]);
 
   const handlePurchase = (plan: SubscriptionPlan) => {
     trackEvent('paywall_plan_selected', { metadata: { planId: plan.id } });
     trackEvent('purchase_started', { metadata: { packageIdentifier: plan.id } });
     state.handlePurchase(plan);
   };
+
+  if (authLoading || session === null) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        edges={['top', 'bottom']}
+      >
+        <View style={[styles.centered, responsiveContentContainer]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.subtitle, { color: colors.textSecondary, marginTop: spacing.m }]}>
+            {authLoading ? 'Loading…' : 'Redirecting…'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (state.hasProAccess) {
     const handleManageSubscription = async () => {
@@ -90,7 +119,13 @@ export default function PaywallScreen() {
             fullWidth
             style={styles.manageButton}
           />
-          <Button title={PAYWALL_COPY.doneLabel} onPress={() => router.back()} fullWidth variant="secondary" pill={false} />
+          <Button
+            title={PAYWALL_COPY.doneLabel}
+            onPress={() => dismissOrReplaceTabs(router)}
+            fullWidth
+            variant="secondary"
+            pill={false}
+          />
         </View>
       </SafeAreaView>
     );
@@ -117,7 +152,8 @@ export default function PaywallScreen() {
         onRefresh={state.onRefresh}
         onPurchase={handlePurchase}
         onRestore={state.handleRestore}
-        onDismiss={() => router.back()}
+        onDismiss={() => dismissOrReplaceTabs(router)}
+        diagnostics={state.diagnostics}
       />
     </SafeAreaView>
   );

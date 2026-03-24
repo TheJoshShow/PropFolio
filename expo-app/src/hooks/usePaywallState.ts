@@ -5,7 +5,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { isBillingConfigured } from '../config';
 import {
   buildMapOfferingsInput,
   mapOfferingsToPlans,
@@ -18,6 +20,7 @@ import type { RevenueCatCustomerInfo } from '../services/revenueCat';
 import { getRestoreOutcome, type RestoreOutcome } from '../services/restorePurchases';
 import { trackEvent } from '../services/analytics';
 import { logPurchaseOutcome, logRestoreOutcome } from '../services/diagnostics';
+import { recordFlowException } from '../services/monitoring/flowInstrumentation';
 
 const LOG_TAG = '[Paywall]';
 
@@ -67,6 +70,15 @@ export interface UsePaywallStateReturn {
   clearError: () => void;
   /** Set pending message (e.g. from purchase flow). */
   setPendingMessage: (msg: string | null) => void;
+  diagnostics: {
+    initialized: boolean;
+    platform: 'ios' | 'android' | 'web';
+    billingConfigured: boolean;
+    billingKeySource: string;
+    offeringsLoaded: boolean;
+    entitlementActive: boolean;
+    lastError: string | null;
+  };
 }
 
 export function usePaywallState(
@@ -84,10 +96,12 @@ export function usePaywallState(
     isLoading,
     error,
     isAvailable,
+    revenueCatSdkReady,
     refresh,
     purchase,
     restore,
     clearError: clearSubscriptionError,
+    diagnostics,
   } = useSubscription();
 
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
@@ -101,12 +115,19 @@ export function usePaywallState(
 
   const offeringsResult: OfferingsLoadResult = useMemo(() => {
     if (error && !offerings?.current) return getFallbackOfferingsResult('error');
-    if (!isLoading && !offerings?.current && isAvailable)
+    if (Platform.OS === 'web' && isAvailable && !isLoading) {
+      return getFallbackOfferingsResult('web_not_supported');
+    }
+    if (!isLoading && isAvailable && !revenueCatSdkReady && Platform.OS === 'ios') {
+      return getFallbackOfferingsResult(isBillingConfigured() ? 'sdk_not_configured' : 'missing_api_key');
+    }
+    if (!isLoading && revenueCatSdkReady && !offerings?.current && isAvailable) {
       return getFallbackOfferingsResult('unavailable');
+    }
     const input = buildMapOfferingsInput(offerings ?? null);
     if (!input) return getFallbackOfferingsResult(isLoading ? 'unavailable' : 'empty');
     return mapOfferingsToPlans(input);
-  }, [offerings, isLoading, error, isAvailable]);
+  }, [offerings, isLoading, error, isAvailable, revenueCatSdkReady]);
 
   const plansForDisplay: SubscriptionPlan[] = useMemo(() => {
     if (offeringsResult.kind !== 'success') return [];
@@ -137,6 +158,13 @@ export function usePaywallState(
       clearSubscriptionError();
       setPendingMessage(null);
       if (__DEV__) console.log(LOG_TAG, 'Purchase start', { planId: plan.id, planType: plan.type });
+      if (plan.rawPackage == null || typeof plan.rawPackage !== 'object') {
+        if (__DEV__) console.warn(LOG_TAG, 'Purchase blocked: missing raw package');
+        setPendingMessage('This plan is not available right now. Pull down to refresh.');
+        purchaseInProgressRef.current = false;
+        setPurchasingId(null);
+        return;
+      }
       try {
         const result = await purchase(plan.rawPackage, plan.displayPackage);
 
@@ -228,15 +256,25 @@ export function usePaywallState(
         trackEvent('restore_succeeded', { metadata: {} });
         logRestoreOutcome('success');
         if (__DEV__) console.log(LOG_TAG, 'Restore success, entitlement active');
+        onRestoreSuccess?.();
       } else {
         trackEvent('restore_failed', { metadata: {} });
         logRestoreOutcome(outcome.status);
         if (__DEV__) console.log(LOG_TAG, 'Restore outcome', outcome.status, outcome.message);
       }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Restore failed unexpectedly.';
+      setRestoreOutcome({
+        status: 'failed',
+        title: 'Restore failed',
+        message,
+      });
+      recordFlowException('paywall_restore_throw', e, { stage: 'restore' });
+      if (__DEV__) console.warn(LOG_TAG, 'Restore threw', e);
     } finally {
       setRestoring(false);
     }
-  }, [restore, clearSubscriptionError]);
+  }, [restore, clearSubscriptionError, onRestoreSuccess]);
 
   const clearError = useCallback(() => {
     clearSubscriptionError();
@@ -261,5 +299,6 @@ export function usePaywallState(
     handleRestore,
     onRefresh,
     clearError,
+    diagnostics,
   };
 }

@@ -63,6 +63,6 @@ Full checklist: **docs/TESTING_CHECKLIST.md**. Exact commands and troubleshootin
 - Analysis / What-If / Renovation screens not in UI (logic in `src/lib`).
 - No RevenueCat/Stripe; no deep-link testing.
 - Supabase optional; without it, demo mode (any email/password).
-- Path with `&` (e.g. “Winchester Realty & Holdings”): use `;` in PowerShell instead of `&&`; run from `expo-app` to avoid issues.
+- Path with `&` (e.g. “Example & Holdings”): use `;` in PowerShell instead of `&&`; run from `expo-app` to avoid issues.
 
 No data was lost; all 10 tasks are complete and documented.

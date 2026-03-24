@@ -30,8 +30,8 @@ export function ImportFab() {
     }, DEBOUNCE_MS);
   }, [router]);
 
-  // Tab screens use SafeAreaView(edges bottom); avoid adding full insets.bottom here or the FAB sits too high.
-  const bottom = IMPORT_FAB_BOTTOM_GAP;
+  // Keep FAB tappable above the home indicator across iPhone sizes.
+  const bottom = IMPORT_FAB_BOTTOM_GAP + Math.max(insets.bottom * 0.5, 0);
   const right = spacing.xl + Math.max(insets.right, 0);
 
   return (

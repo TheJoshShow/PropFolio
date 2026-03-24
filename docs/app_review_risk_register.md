@@ -10,7 +10,7 @@
 | Risk | Description | Mitigation | Status |
 |------|-------------|------------|--------|
 | **No in-app Contact/Support** | Reviewer or user cannot find how to contact support. | Added Settings → Help & support → "Contact support" (getSupportUrl()). | ✅ Done |
-| **Sentry sendDefaultPii: true** | Sending default PII to Sentry may conflict with Privacy Policy or trigger review questions. | Set `sendDefaultPii: false` in Sentry.init. | ✅ Done |
+| **crash reporting sendDefaultPii: true** | Sending default PII to crash reporting may conflict with Privacy Policy or trigger review questions. | Set `sendDefaultPii: false` in crash reporting.init. | ✅ Done |
 | **Legal URLs not set in production** | Default propfolio.app URLs may 404 if site not live. | Set EXPO_PUBLIC_PRIVACY_POLICY_URL and EXPO_PUBLIC_TERMS_URL in production; verify URLs resolve before submit. | Checklist |
 
 ---
@@ -59,7 +59,7 @@
 
 ## 6. Summary of required actions
 
-1. **Code:** Add Contact/Support URL and Settings row; set Sentry `sendDefaultPii: false`.
+1. **Code:** Add Contact/Support URL and Settings row; set crash reporting `sendDefaultPii: false`.
 2. **Config:** Ensure production env has Privacy Policy URL, Terms URL, and Support URL (or mailto); verify links work.
-3. **Docs:** Privacy Policy updated to match privacy_data_map.md; state account deletion scope and Sentry/RevenueCat retention where relevant.
+3. **Docs:** Privacy Policy updated to match privacy_data_map.md; state account deletion scope and crash reporting/RevenueCat retention where relevant.
 4. **Review notes:** Offer test account or backend instructions if reviewer needs full experience.

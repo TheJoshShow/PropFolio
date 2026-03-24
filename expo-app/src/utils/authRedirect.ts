@@ -4,7 +4,7 @@
  */
 
 import { Platform } from 'react-native';
-import * as Linking from 'expo-linking';
+import { getRuntimeConfig } from '../config';
 
 const AUTH_CALLBACK_PATH = 'auth/callback';
 
@@ -17,41 +17,106 @@ export function getAuthRedirectUrl(): string {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     return window.location.origin;
   }
-  return Linking.createURL(AUTH_CALLBACK_PATH);
+  // Use a deterministic scheme callback for TestFlight/production iOS.
+  const scheme = getRuntimeConfig().appScheme;
+  return `${scheme}://${AUTH_CALLBACK_PATH}`;
 }
 
 /**
- * Parse OAuth/magic-link callback URL and return access_token and refresh_token.
- * Supabase redirects with hash fragment: #access_token=...&refresh_token=...
+ * Parse hash + query like `@supabase/auth-js` `parseParametersFromURL` (search overrides hash).
+ */
+export function parseAuthCallbackParams(href: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  try {
+    const url = new URL(href);
+    if (url.hash && url.hash[0] === '#') {
+      try {
+        const hashSearchParams = new URLSearchParams(url.hash.substring(1));
+        hashSearchParams.forEach((value, key) => {
+          result[key] = value;
+        });
+      } catch {
+        // hash is not a query string
+      }
+    }
+    url.searchParams.forEach((value, key) => {
+      result[key] = value;
+    });
+  } catch {
+    return {};
+  }
+  return result;
+}
+
+/**
+ * Parse OAuth/magic-link callback URL and return access_token and refresh_token (implicit flow).
+ * Supabase may redirect with hash fragment: #access_token=...&refresh_token=...
  */
 export function getSessionParamsFromUrl(url: string): { access_token: string; refresh_token: string } | null {
   try {
-    const parsed = new URL(url);
-    // Supabase typically returns tokens in the URL hash (#access_token=...&refresh_token=...),
-    // but some providers/environments can return them in the query string.
-    const hash = parsed.hash.replace(/^#/, '');
-    const fromHash = (() => {
-      if (!hash) return null;
-      const params = new URLSearchParams(hash);
-      const access_token = params.get('access_token');
-      if (!access_token) return null;
-      return { access_token, refresh_token: params.get('refresh_token') ?? '' };
-    })();
-
-    if (fromHash) return fromHash;
-
-    const access_token = parsed.searchParams.get('access_token');
+    const params = parseAuthCallbackParams(url);
+    const access_token = params.access_token;
     if (!access_token) return null;
-    const refresh_token = parsed.searchParams.get('refresh_token') ?? '';
-    return { access_token, refresh_token };
+    return { access_token, refresh_token: params.refresh_token ?? '' };
   } catch {
     return null;
   }
 }
 
+function isOurAuthCallbackPath(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (lower.startsWith('propfolio:')) {
+    try {
+      const u = new URL(url);
+      const host = u.hostname.toLowerCase();
+      const path = u.pathname.toLowerCase();
+      if (host === 'auth' && path === '/callback') return true;
+      if (path === '/auth/callback' || path.endsWith('/auth/callback')) return true;
+      const bareSchemeCallback =
+        host === '' &&
+        (path === '' || path === '/') &&
+        (u.hash.length > 1 || u.search.length > 1);
+      if (bareSchemeCallback) return true;
+    } catch {
+      return lower.includes('auth/callback');
+    }
+    return lower.includes('auth/callback');
+  }
+
+  try {
+    const u = new URL(url);
+    const path = u.pathname.toLowerCase();
+    return path === '/auth/callback' || path.endsWith('/auth/callback');
+  } catch {
+    return lower.includes('auth/callback');
+  }
+}
+
 /**
- * Whether the URL is our auth callback (so we can ignore other deep links).
+ * Whether the URL carries OAuth / magic-link / recovery result material we should handle.
+ * PKCE returns `code=`; implicit returns `access_token=`; provider errors return `error=`.
+ */
+export function hasAuthCallbackPayload(url: string): boolean {
+  const params = parseAuthCallbackParams(url);
+  return Boolean(
+    params.code ||
+      params.access_token ||
+      params.error ||
+      params.error_code ||
+      params.error_description
+  );
+}
+
+/**
+ * Whether the URL is our auth callback (so we handle it and ignore unrelated deep links).
+ * Requires auth path + code/token/error material so arbitrary URLs do not trigger session handling.
  */
 export function isAuthCallbackUrl(url: string): boolean {
-  return url.includes('access_token=') || url.includes('#access_token=');
+  if (typeof url !== 'string' || url.length === 0) return false;
+  if (!hasAuthCallbackPayload(url)) return false;
+  return isOurAuthCallbackPath(url);
+}
+
+export function getAuthCallbackPath(): string {
+  return AUTH_CALLBACK_PATH;
 }

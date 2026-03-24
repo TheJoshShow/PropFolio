@@ -2,7 +2,7 @@
 
 iOS-first real estate investment intelligence app. Helps buyers feel confident they will make money on an investment property.
 
-**Current app (cross-platform):** The main shipping app is **expo-app** (iOS, Android, Web). See `expo-app/` and `expo-app/docs/LAUNCH_AND_TEST.md` for run steps. The `PropFolio/` folder is the legacy iOS Swift app (reference); formulas have been ported to `expo-app/src/lib`. The former separate **web** app (Vite+React) was moved to `_archive_review/web` during cleanup; web is now served by expo-app (React Native Web).
+**Current app (cross-platform):** The main shipping app is **expo-app** (iOS, Android, Web). See `expo-app/` and `expo-app/docs/LAUNCH_AND_TEST.md` for run steps. **Crash reporting (iOS):** `expo-app/docs/MONITORING_SETUP.md` (Firebase Crashlytics). The `PropFolio/` folder is the legacy iOS Swift app (reference); formulas have been ported to `expo-app/src/lib`. **Web** is **expo-app** (React Native Web), not a separate `web/` folder in this repo—see `expo-app/README.md`.
 
 ## Public legal pages (website)
 
@@ -10,7 +10,7 @@ Privacy Policy and Terms of Service for **propfolio.app** (`/privacy`, `/terms`)
 
 ## Git
 
-Install [Git for Windows](https://git-scm.com/download/win), then from this folder run **`git init`** (or **`powershell -ExecutionPolicy Bypass -File scripts/init-git.ps1`**) to create the repository. The root **`.gitignore`** excludes secrets, `node_modules`, Expo caches, and Apple/EAS key material (`.p8`, etc.).
+From this folder run **`git init`** if the repo is new. On Windows you can use **`powershell -ExecutionPolicy Bypass -File scripts/init-git.ps1`** (optional). Install Git from [git-scm.com](https://git-scm.com/downloads) on any OS. The root **`.gitignore`** excludes secrets, `node_modules`, Expo caches, Apple/EAS key material (`.p8`, etc.), and local EAS submit debug logs.
 
 ## Setup
 
@@ -26,6 +26,8 @@ Install [Git for Windows](https://git-scm.com/download/win), then from this fold
 - **docs/** — Roadmap, phase status, and **backend config setup** (see below).
 
 See `docs/FILE-TREE.md` for the full file tree and `docs/PROPFOLIO-ROADMAP.md` for the build phases. For detailed run steps, simulator choice, demo data, and a full test checklist, see **docs/DEVELOPMENT.md**.
+
+**Docs link check:** From the repo root, run `node scripts/verify-markdown-links.mjs` to confirm relative links in `*.md` files resolve (after moves/renames).
 
 ## Founder index
 

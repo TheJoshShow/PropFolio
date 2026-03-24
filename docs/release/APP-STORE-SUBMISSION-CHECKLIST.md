@@ -19,10 +19,10 @@
   - [ ] All migrations applied, including free-tier and subscription tables/triggers.
   - [ ] Edge functions deployed (`geocode-address`, `places-autocomplete`, `rent-estimate`, `openai-summarize`, `census-data`, `revenuecat-webhook`, `delete-account`).
 - **RevenueCat**
-  - [ ] iOS/Android apps created in RevenueCat with correct bundle IDs/package names.
+  - [ ] iOS app created in RevenueCat with the correct bundle ID.
   - [ ] Entitlement `pro_access` (or matching value in `ENTITLEMENT_PRO_ACCESS`) exists.
-  - [ ] Default offering with monthly/annual packages configured and mapped to App Store / Play products.
-  - [ ] Public app-specific API keys set as `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` / `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`.
+  - [ ] Default offering with monthly/annual packages configured and mapped to App Store products.
+  - [ ] Public app-specific API key set as `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`.
 
 ### 3. Privacy, legal, and compliance
 

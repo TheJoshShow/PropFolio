@@ -56,7 +56,7 @@ Use this when you decide to ship a **new** version that is the previous good sta
 - [ ] **Upload to App Store Connect:** New build, new version or new build number for same version (per Apple rules).
 - [ ] **Submit for review** (or release to TestFlight first, then submit).
 - [ ] **Document:** Note in release notes or internal doc that this is a rollback/hotfix for [issue].
-- [ ] **Monitor:** Watch Sentry and support after rollout.
+- [ ] **Monitor:** Watch crash reporting and support after rollout.
 
 ---
 

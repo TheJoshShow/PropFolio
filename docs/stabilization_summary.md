@@ -15,7 +15,7 @@
 ## 2. Run the app
 
 - **Command:** From `expo-app/`, run `npm run ios` or `npx expo start --ios`.
-- **Blocker:** In this environment, `npm install` failed (path/postinstall), so `node_modules` may be missing or incomplete (e.g. @sentry/react-native, react-native-purchases). If the app fails to start or typecheck fails, run `npm install` from a path without spaces/special characters (e.g. `C:\propfolio`) then run the app again.
+- **Blocker:** In this environment, `npm install` failed (path/postinstall), so `node_modules` may be missing or incomplete (e.g. react-native-purchases). If the app fails to start or typecheck fails, run `npm install` from a path without spaces/special characters (e.g. `C:\propfolio`) then run the app again.
 
 ---
 
@@ -23,8 +23,8 @@
 
 | Check | Result |
 |-------|--------|
-| **TypeScript (npm run typecheck)** | **Fails.** Cannot find module '@sentry/react-native' or 'react-native-purchases'. Cause: those packages are missing from node_modules (likely due to failed/corrupted npm install in this path). |
-| **Tests (npm run test)** | **Pass.** 2 test suites, 8 tests (dealScoringEngine, underwritingEngine). Tests do not depend on Sentry or react-native-purchases. |
+| **TypeScript (npm run typecheck)** | **Fails.** Cannot find module 'react-native-purchases'. Cause: those packages are missing from node_modules (likely due to failed/corrupted npm install in this path). |
+| **Tests (npm run test)** | **Pass.** 2 test suites, 8 tests (dealScoringEngine, underwritingEngine). Tests do not depend on crash reporting or react-native-purchases. |
 | **Lint** | Not run (typecheck failed first). |
 | **App run** | Not run (node_modules incomplete). |
 
@@ -35,7 +35,7 @@
 ## 4. Fixes applied
 
 - No broken imports or path aliases were introduced; all removed files were unreferenced.
-- Sentry and RevenueCat code paths are unchanged; only Platform conditions and billing key handling were simplified for iOS.
+- crash reporting and RevenueCat code paths are unchanged; only Platform conditions and billing key handling were simplified for iOS.
 
 ---
 

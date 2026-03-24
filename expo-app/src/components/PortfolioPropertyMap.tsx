@@ -5,16 +5,20 @@
 import React, { useMemo, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import MapView, { Marker, type Region } from 'react-native-maps';
+import { navigateToPortfolioDetail } from '../utils/appNavigation';
 import { useRouter } from 'expo-router';
 import { Card } from './Card';
+import { Button } from './Button';
 import { useThemeColors } from './useThemeColors';
 import { spacing, fontSizes, fontWeights, lineHeights, radius } from '../theme';
 import type { PortfolioListItem } from '../hooks/usePortfolioProperties';
 import { regionForCoordinates } from '../utils/mapRegion';
+import { logMapStep } from '../services/diagnostics';
 
 export interface PortfolioPropertyMapProps {
   properties: PortfolioListItem[];
   loading: boolean;
+  onRetry?: () => void;
 }
 
 function addressLine(item: PortfolioListItem): string {
@@ -23,7 +27,7 @@ function addressLine(item: PortfolioListItem): string {
   return [a, b].filter(Boolean).join('\n');
 }
 
-export function PortfolioPropertyMap({ properties, loading }: PortfolioPropertyMapProps) {
+export function PortfolioPropertyMap({ properties, loading, onRetry }: PortfolioPropertyMapProps) {
   const colors = useThemeColors();
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
@@ -65,6 +69,17 @@ export function PortfolioPropertyMap({ properties, loading }: PortfolioPropertyM
   const total = properties.length;
   const mapped = withCoords.length;
   const missingGeo = total > 0 && mapped === 0;
+  const missingAddressCount = properties.filter((p) => !p.streetAddress || !p.city || !p.state).length;
+  const pendingGeocodeCount = properties.filter((p) => p.geocodeStatus === 'pending' || p.geocodeStatus === 'in_progress').length;
+  const failedGeocodeCount = properties.filter((p) => p.geocodeStatus === 'failed').length;
+
+  logMapStep('marker_transform', {
+    total,
+    mapped,
+    missingAddressCount,
+    pendingGeocodeCount,
+    failedGeocodeCount,
+  });
 
   if (Platform.OS === 'web') {
     return (
@@ -120,9 +135,29 @@ export function PortfolioPropertyMap({ properties, loading }: PortfolioPropertyM
           ]}
         >
           <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-            We couldn’t place these properties on the map yet. Pull to refresh on Portfolio, or re-import after we
-            finish syncing addresses.
+            {missingAddressCount > 0
+              ? `${missingAddressCount} properties are missing required address fields (street/city/state).`
+              : pendingGeocodeCount > 0
+                ? `Address sync in progress for ${pendingGeocodeCount} properties.`
+                : failedGeocodeCount > 0
+                  ? `Geocoding failed for ${failedGeocodeCount} properties.`
+                  : 'No valid coordinates are available yet for these properties.'}
           </Text>
+          {failedGeocodeCount > 0 ? (
+            <Text style={[styles.emptyBody, { color: colors.textMuted, marginTop: spacing.xs }]}>
+              Retry after confirming the address format in property details.
+            </Text>
+          ) : null}
+          {onRetry ? (
+            <Button
+              title="Retry map sync"
+              onPress={onRetry}
+              variant="secondary"
+              fullWidth
+              pill={false}
+              style={{ marginTop: spacing.s }}
+            />
+          ) : null}
         </View>
       ) : (
         <View style={[styles.mapWrap, { marginHorizontal: spacing.m, marginBottom: spacing.m }]}>
@@ -146,7 +181,9 @@ export function PortfolioPropertyMap({ properties, loading }: PortfolioPropertyM
                 }}
                 title={p.streetAddress}
                 description={[p.city, p.state].filter(Boolean).join(', ')}
-                onCalloutPress={() => router.push(`/portfolio/${p.id}`)}
+                onCalloutPress={() => {
+                  navigateToPortfolioDetail(router, p.id);
+                }}
                 accessibilityLabel={addressLine(p)}
               />
             ))}

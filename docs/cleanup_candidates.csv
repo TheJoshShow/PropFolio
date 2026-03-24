@@ -11,7 +11,7 @@ expo-app/assets/images/android-icon-foreground.png,2,Android adaptive icon.,Dele
 expo-app/assets/images/android-icon-background.png,2,Android adaptive icon.,Same as above.
 expo-app/assets/images/android-icon-monochrome.png,2,Android adaptive icon.,Same as above.
 expo-app/assets/images/favicon.png,2,Web favicon.,Delete if web is dropped and no other reference.
-expo-app/app/_layout.tsx Platform.OS === 'web' (Sentry),3,Sentry only on native; isWeb check.,Refactor: use Platform.OS === 'ios' for iOS-only or keep check for future Android.
+expo-app/app/_layout.tsx Platform.OS === 'web',3,Web branch in root layout; native vs web init.,Refactor: use Platform.OS === 'ios' for iOS-only or keep check for future Android.
 expo-app/app/(tabs)/_layout.tsx SymbolView ios/android/web,3,Tab bar icons use three platform names.,Refactor to ios-only name or single string per SymbolView.
 expo-app/app/(tabs)/settings.tsx Platform.OS web branches,3,Restore disabled on web; message "iOS or Android app".,Refactor: remove web branches; update copy to "this app" or "iOS app".
 expo-app/app/paywall.tsx Platform.OS web branches,3,Hide purchase UI on web; early return on web.,Refactor: remove web branches for iOS-only.
@@ -58,4 +58,4 @@ expo-app/app/(auth)/forgot-password.tsx,4,Forgot password.,Keep unchanged.
 expo-app/app/paywall.tsx,4,Paywall screen.,Keep unchanged (refactor Platform branches).
 expo-app/app/update-password.tsx,4,Update password.,Keep unchanged.
 expo-app/app/+not-found.tsx,4,404 screen.,Keep unchanged.
-expo-app/app/_layout.tsx,4,Root layout.,Keep unchanged (refactor Sentry isWeb only).
+expo-app/app/_layout.tsx,4,Root layout.,Keep unchanged (optional refactor web branches for iOS-only).

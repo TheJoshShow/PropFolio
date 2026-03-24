@@ -30,7 +30,6 @@ Set these in `expo-app/.env` (do not commit real keys). See `expo-app/.env.examp
 | Variable | Where to get it | Required for |
 |----------|------------------|--------------|
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat Dashboard → Project → API Keys → Public app-specific (iOS) | iOS subscriptions |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID` | RevenueCat Dashboard → Project → API Keys → Public app-specific (Android) | Android subscriptions |
 
 - Keys are read at runtime via `expo-app/src/config/billing.ts` (`getRevenueCatApiKey()`, `isBillingConfigured()`).
 - No keys are hardcoded in the repo.
@@ -41,7 +40,7 @@ Set these in `expo-app/.env` (do not commit real keys). See `expo-app/.env.examp
 
 **File:** `expo-app/src/config/billing.ts`
 
-- **Env var names:** `ENV_REVENUECAT_API_KEY_IOS`, `ENV_REVENUECAT_API_KEY_ANDROID`.
+- **Env var names:** `ENV_REVENUECAT_API_KEY_IOS`.
 - **Helpers:** `getRevenueCatApiKey()`, `isBillingConfigured()`.
 - **Entitlement:** `ENTITLEMENT_PRO = 'pro'` — must match RevenueCat Dashboard → Entitlements.
 - **Offering:** `OFFERING_IDENTIFIER_DEFAULT = 'default'` — must match RevenueCat Dashboard → Offerings (replace if you use another identifier).
@@ -57,7 +56,6 @@ Comments in `billing.ts` mark where to insert dashboard values.
 | What | Where | Notes |
 |------|--------|--------|
 | RevenueCat iOS API key | `.env`: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | From RevenueCat Dashboard → API Keys (iOS). |
-| RevenueCat Android API key | `.env`: `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID` | From RevenueCat Dashboard → API Keys (Android). |
 | Entitlement identifier | RevenueCat Dashboard → Entitlements | Create entitlement; use `pro` to match `ENTITLEMENT_PRO` in `billing.ts`, or change `ENTITLEMENT_PRO` to match dashboard. |
 | Offering identifier | RevenueCat Dashboard → Offerings | Create offering (e.g. "default"); if different, set `OFFERING_IDENTIFIER_DEFAULT` in `billing.ts`. |
 | Product IDs (iOS) | App Store Connect → In-App Purchases | Create subscription products; add in RevenueCat → Products and attach to offering. Optionally set `PRODUCT_IDS.monthly` / `PRODUCT_IDS.annual` in `billing.ts`. |
@@ -68,12 +66,11 @@ Comments in `billing.ts` mark where to insert dashboard values.
 
 ## 6. Manual Configuration Steps (Outside Codebase)
 
-1. **RevenueCat:** Create project; add iOS and Android apps; create entitlement (e.g. `pro`); create offering and packages; add product IDs from App Store Connect / Play Console.
+1. **RevenueCat:** Create project; add iOS app; create entitlement (e.g. `pro`); create offering and packages; add product IDs from App Store Connect.
 2. **App Store Connect:** Create in-app subscription products; sign agreements; link app to RevenueCat if using App Store Server Notifications.
-3. **Google Play Console:** Create subscription products; link to RevenueCat.
-4. **RevenueCat API keys:** Copy public app-specific API keys into `.env` as above.
-5. **Expo:** Run `npx expo prebuild` then `npx expo run:ios` / `run:android` for device/simulator builds that can use IAP.
-6. **Supabase (existing):** Ensure `subscription_status` and RevenueCat webhook are configured so server and client stay in sync.
+3. **RevenueCat API key:** Copy the public iOS app-specific API key into `.env` as above.
+4. **Expo:** Run `npx expo prebuild` then `npx expo run:ios` for device/simulator builds that can use IAP.
+5. **Supabase (existing):** Ensure `subscription_status` and RevenueCat webhook are configured so server and client stay in sync.
 
 ---
 
@@ -83,7 +80,7 @@ Comments in `billing.ts` mark where to insert dashboard values.
 - [ ] **Config import:** App builds and starts (e.g. `npx expo start`). No runtime error from importing `src/config/billing.ts`.
 - [ ] **Web:** Run for web; no crash when RevenueCat is not configured (billing helpers return empty/false on web).
 - [ ] **Env:** With RevenueCat keys **unset** in `.env`, native app still launches; `isBillingConfigured()` is false; no hardcoded keys in repo.
-- [ ] **Env:** After setting only `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` in `.env`, `getRevenueCatApiKey()` returns that value on iOS and empty on Android/web.
+- [ ] **Env:** After setting `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` in `.env`, `getRevenueCatApiKey()` returns that value on iOS and empty on non-iOS.
 - [ ] **revenueCat.ts:** Subscription flow (configure, getOfferings, hasProAccess) still uses `PRO_ENTITLEMENT_ID` and API key from billing config; no duplicate constants.
 - [ ] **Prebuild (optional):** Run `npx expo prebuild` in `expo-app/`; `ios/` and `android/` generate without errors; `app.json` is valid including `expo.extra.billingRequiresPrebuild`.
 

@@ -27,7 +27,7 @@
 
 | Area | Finding | Recommendation |
 |------|---------|----------------|
-| **Startup** | SplashScreen.preventAutoHideAsync(); fonts loaded then hide. Auth + Subscription context load on mount. | Keep. Consider lazy-initializing Sentry after first paint. |
+| **Startup** | SplashScreen.preventAutoHideAsync(); fonts loaded then hide. Auth + Subscription context load on mount. | Keep. Consider lazy-initializing crash reporting after first paint. |
 | **Transitions** | Default Stack/Tabs. | No custom heavy animations. Acceptable. |
 | **Fonts** | SpaceMono loaded in _layout. | Single font; minimal impact. |
 
@@ -58,7 +58,7 @@
 | Item | Action |
 |------|--------|
 | **responsiveContentContainer** | Platform.select: default {}; no-op on iOS. Keep. |
-| **Lazy Sentry** | Sentry.init in _layout runs at startup. Optional: defer init until after RootLayout first paint. |
+| **Lazy crash reporting** | crash reporting.init in _layout runs at startup. Optional: defer init until after RootLayout first paint. |
 | **Bundle** | No analysis run here. Removing web/Android already reduced surface. |
 
 ---
@@ -66,5 +66,5 @@
 ## 7. Implementation checklist
 
 - [ ] When adding property list: use FlatList with stable id and avoid inline renderItem.
-- [ ] Optional: defer Sentry.init by one frame after mount.
+- [ ] Optional: defer crash reporting.init by one frame after mount.
 - [ ] No immediate code changes required for current scope; document for future list/chart work.

@@ -2,7 +2,8 @@
  * Portfolio list: saved properties with deal/confidence badges, pull-to-refresh, loading/empty/error.
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   Text,
   StyleSheet,
@@ -13,9 +14,10 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { usePortfolioProperties, type PortfolioListItem } from '../../../src/hooks/usePortfolioProperties';
+import { usePortfolioCoordinateBackfill } from '../../../src/hooks/usePortfolioCoordinateBackfill';
 import { Card, Button, Chip, ImportFab } from '../../../src/components';
 import { useThemeColors } from '../../../src/components/useThemeColors';
 import { spacing, fontSizes, lineHeights, radius, fontWeights } from '../../../src/theme';
@@ -24,6 +26,7 @@ import { IMPORT_FAB_SCROLL_INSET } from '../../../src/constants/fabLayout';
 import type { DealScoreBand } from '../../../src/lib/scoring/types';
 import type { ConfidenceMeterBand } from '../../../src/lib/confidence/types';
 import { trackEvent } from '../../../src/services/analytics';
+import { hrefPortfolioPropertyDetail } from '../../../src/utils/appNavigation';
 
 function formatCurrency(n: number | null): string {
   if (n == null) return '—';
@@ -121,17 +124,26 @@ function PropertyRow({
 
 export default function PortfolioListScreen() {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
   const userId = session?.id ?? null;
-  const { list, loading, error, refresh } = usePortfolioProperties(userId);
+  const { list, rawProperties, loading, error, refresh } = usePortfolioProperties(userId);
+  usePortfolioCoordinateBackfill(userId, rawProperties, refresh);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (userId) void refresh();
+    }, [userId, refresh])
+  );
 
   const handleRetry = () => {
     refresh();
   };
 
   const handlePropertyPress = (id: string) => {
-    router.push({ pathname: '/(tabs)/portfolio/[id]', params: { id } });
+    const href = hrefPortfolioPropertyDetail(id);
+    if (href) router.push(href);
   };
 
   useEffect(() => {
@@ -207,7 +219,11 @@ export default function PortfolioListScreen() {
           renderItem={({ item }) => (
             <PropertyRow item={item} onPress={() => handlePropertyPress(item.id)} colors={colors} />
           )}
-          contentContainerStyle={[styles.listContent, responsiveContentContainer]}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: styles.listContent.paddingBottom + insets.bottom },
+            responsiveContentContainer,
+          ]}
           style={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -257,5 +273,5 @@ const styles = StyleSheet.create({
   errorTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, marginBottom: spacing.xs },
   errorBody: { fontSize: fontSizes.base, marginBottom: spacing.m },
   footerError: { padding: spacing.xl, alignItems: 'center', gap: spacing.s },
-  footerErrorText: { fontSize: fontSizes.sm },
+  footerErrorText: { fontSize: fontSizes.sm, textAlign: 'center' },
 });

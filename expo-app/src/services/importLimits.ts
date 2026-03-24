@@ -9,6 +9,7 @@ import { logErrorSafe, logImportStep } from './diagnostics';
 import { parseAddress } from '../lib/parsers';
 import { ensureUserReadyForImport } from './accountReady';
 import { IMPORT_USER_MESSAGES } from './importErrorMessages';
+import { mapPropertyImportDbError } from './importErrorMapping';
 
 const FREE_IMPORT_LIMIT = 2;
 
@@ -61,28 +62,33 @@ export async function getImportCount(supabase: SupabaseClient | null): Promise<I
     return { count: 0, freeRemaining: FREE_IMPORT_LIMIT, canImport: true };
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user?.id) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) {
+      return { count: 0, freeRemaining: FREE_IMPORT_LIMIT, canImport: true };
+    }
+
+    const { count, error } = await supabase
+      .from('property_imports')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (error) {
+      logErrorSafe('ImportLimits getImportCount', error);
+      return { count: 0, freeRemaining: FREE_IMPORT_LIMIT, canImport: true };
+    }
+
+    const n = typeof count === 'number' ? count : 0;
+    const freeRemaining = Math.max(0, FREE_IMPORT_LIMIT - n);
+    return {
+      count: n,
+      freeRemaining,
+      canImport: true, // Caller combines with hasProAccess: canImport = (n < FREE_IMPORT_LIMIT) || hasProAccess
+    };
+  } catch (e) {
+    logErrorSafe('ImportLimits getImportCount unexpected', e);
     return { count: 0, freeRemaining: FREE_IMPORT_LIMIT, canImport: true };
   }
-
-  const { count, error } = await supabase
-    .from('property_imports')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id);
-
-  if (error) {
-    logErrorSafe('ImportLimits getImportCount', error);
-    return { count: 0, freeRemaining: FREE_IMPORT_LIMIT, canImport: true };
-  }
-
-  const n = typeof count === 'number' ? count : 0;
-  const freeRemaining = Math.max(0, FREE_IMPORT_LIMIT - n);
-  return {
-    count: n,
-    freeRemaining,
-    canImport: true, // Caller combines with hasProAccess: canImport = (n < FREE_IMPORT_LIMIT) || hasProAccess
-  };
 }
 
 /**
@@ -192,6 +198,13 @@ function toPropertyRow(
     bathrooms: data.bathrooms ?? null,
     sqft: data.sqft ?? null,
     rent: data.rent ?? null,
+    full_address: [data.streetAddress, data.unit, data.city, data.state, data.postalCode]
+      .filter(Boolean)
+      .join(', '),
+    geocode_status: 'pending',
+    geocode_source: 'import',
+    geocode_error: null,
+    last_geocoded_at: null,
     data_source: source,
     fetched_at: new Date().toISOString(),
   };
@@ -203,6 +216,8 @@ function toPropertyRow(
   ) {
     row.latitude = data.latitude;
     row.longitude = data.longitude;
+    row.geocode_status = 'resolved';
+    row.last_geocoded_at = new Date().toISOString();
   }
   return row;
 }
@@ -237,6 +252,7 @@ export async function recordPropertyImportEnforced(
 
   logImportStep('import_start', { source, authPresent: true });
 
+  try {
   // Profiles(id) is a FK dependency for portfolios(user_id). Use a centralized account readiness helper
   // so import doesn't fail during auth hydration races.
   const ready = await ensureUserReadyForImport(supabase, _userId);
@@ -256,6 +272,19 @@ export async function recordPropertyImportEnforced(
   }
   const portfolioId = portfolioResult.portfolioId;
 
+  const existingId = await findExistingPropertyInPortfolio(supabase, portfolioId, data);
+  if (existingId) {
+    logImportStep('import_dedupe_skip_insert', { duplicate: true });
+    const { count } = await getImportCount(supabase);
+    // Intentionally `allowed_free` for type compatibility; import count is unchanged (no new RPC).
+    // Callers should treat this like success + navigate to propertyId; analytics may distinguish via duplicate flag in logs only.
+    return {
+      status: 'allowed_free',
+      propertyId: existingId,
+      property_import_count: count,
+    };
+  }
+
   const propertyRow = toPropertyRow(portfolioId, data, source);
   logImportStep('import_property_insert', { portfolioIdPresent: true });
 
@@ -271,9 +300,11 @@ export async function recordPropertyImportEnforced(
       code: (propError as { code?: string })?.code,
       message: (propError as { message?: string })?.message,
     });
+    const pe = propError as { message?: string; code?: string } | null;
+    const userMsg = mapPropertyImportDbError(pe?.message, pe?.code);
     return {
       status: 'failed_retryable',
-      error: IMPORT_USER_MESSAGES.importTemporaryFailure,
+      error: userMsg,
     };
   }
   logImportStep('import_property_ok', { propertyIdPresent: true });
@@ -286,9 +317,11 @@ export async function recordPropertyImportEnforced(
   if (rpcError) {
     logErrorSafe('ImportLimits record_property_import RPC', rpcError);
     logImportStep('import_rpc_failed', { code: (rpcError as { code?: string }).code });
+    const re = rpcError as { message?: string; code?: string };
+    const userMsg = mapPropertyImportDbError(re?.message, re?.code);
     return {
       status: 'failed_retryable',
-      error: IMPORT_USER_MESSAGES.importTemporaryFailure,
+      error: userMsg,
     };
   }
 
@@ -321,9 +354,17 @@ export async function recordPropertyImportEnforced(
       await supabase.from('properties').delete().eq('id', property.id);
       return {
         status: 'failed_retryable',
-        error: IMPORT_USER_MESSAGES.importTemporaryFailure,
+        error: IMPORT_USER_MESSAGES.importBackendUnavailable,
       };
     }
+  }
+  } catch (e) {
+    logErrorSafe('ImportLimits recordPropertyImportEnforced unexpected', e);
+    logImportStep('import_unexpected_throw', {});
+    return {
+      status: 'failed_retryable',
+      error: IMPORT_USER_MESSAGES.importBackendUnavailable,
+    };
   }
 }
 
@@ -369,6 +410,81 @@ export function estimateListPriceFromMonthlyRent(
 
   if (!Number.isFinite(price) || price <= 0) return undefined;
   return Math.round(price);
+}
+
+/**
+ * Inverse of estimateListPriceFromMonthlyRent: derive implied monthly rent from list price
+ * using the same vacancy / expense / cap assumptions. Used when listing has price but no rent
+ * so underwriting can still produce loan service, DSCR, and cap rate for scoring.
+ */
+export function estimateMonthlyRentFromListPrice(
+  listPrice: number,
+  opts?: {
+    vacancyRatePercent?: number;
+    expenseRatioEgi?: number;
+    capRate?: number;
+  }
+): number | undefined {
+  if (listPrice == null || !Number.isFinite(listPrice) || listPrice <= 0) return undefined;
+
+  const vacancyRatePercent = opts?.vacancyRatePercent ?? DEFAULT_VACANCY_RATE_PERCENT;
+  const expenseRatioEgi = opts?.expenseRatioEgi ?? DEFAULT_EXPENSE_RATIO_EGI;
+  const capRate = opts?.capRate ?? DEFAULT_CAP_RATE_FOR_LIST_PRICE_ESTIMATE;
+
+  if (!Number.isFinite(vacancyRatePercent) || vacancyRatePercent < 0 || vacancyRatePercent >= 100) return undefined;
+  if (!Number.isFinite(expenseRatioEgi) || expenseRatioEgi < 0 || expenseRatioEgi >= 1) return undefined;
+  if (!Number.isFinite(capRate) || capRate <= 0) return undefined;
+
+  const noiAnnual = listPrice * capRate;
+  if (noiAnnual <= 0) return undefined;
+  const egiAnnual = noiAnnual / (1 - expenseRatioEgi);
+  const denom = 12 * (1 - vacancyRatePercent / 100);
+  if (denom <= 0) return undefined;
+  const monthlyRent = egiAnnual / denom;
+
+  if (!Number.isFinite(monthlyRent) || monthlyRent <= 0) return undefined;
+  return Math.round(monthlyRent);
+}
+
+function normalizeStreetForDedupe(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * If this portfolio already has a row with the same normalized address + unit + postal + state, return its id.
+ * Does not increment import counts — caller should skip insert + RPC.
+ */
+async function findExistingPropertyInPortfolio(
+  supabase: SupabaseClient,
+  portfolioId: string,
+  data: PropertyImportData
+): Promise<string | null> {
+  const state = data.state.length === 2 ? data.state.toUpperCase() : '';
+  const postal = (data.postalCode ?? '').trim().slice(0, 10);
+  if (!state || postal.length < 5) return null;
+
+  const targetStreet = normalizeStreetForDedupe(data.streetAddress);
+  const targetUnit = (data.unit ?? '').trim().toLowerCase();
+
+  const { data: rows, error } = await supabase
+    .from('properties')
+    .select('id, street_address, unit, postal_code, state')
+    .eq('portfolio_id', portfolioId)
+    .eq('state', state)
+    .eq('postal_code', postal);
+
+  if (error || !rows?.length) {
+    if (error) logErrorSafe('ImportLimits findExistingPropertyInPortfolio', error);
+    return null;
+  }
+
+  for (const row of rows) {
+    const r = row as { id: string; street_address: string; unit: string | null; postal_code: string; state: string };
+    const u = (r.unit ?? '').trim().toLowerCase();
+    if (u !== targetUnit) continue;
+    if (normalizeStreetForDedupe(r.street_address) === targetStreet) return r.id;
+  }
+  return null;
 }
 
 export function addressToImportData(

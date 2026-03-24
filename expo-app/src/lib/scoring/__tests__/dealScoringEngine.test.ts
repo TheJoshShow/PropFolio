@@ -2,10 +2,16 @@
  * Unit tests for deal scoring engine.
  */
 
-import { score } from '../dealScoringEngine';
+import { score, listMissingDealScoreRequirements } from '../dealScoringEngine';
 import { bandFromScore } from '../types';
 
 describe('DealScoringEngine', () => {
+  it('listMissingDealScoreRequirements lists absent gates', () => {
+    expect(listMissingDealScoreRequirements({ capRate: 0.06 })).toEqual(
+      expect.arrayContaining(['DSCR', 'data confidence'])
+    );
+  });
+
   it('returns insufficientData when cap rate, cash flow, DSCR, or confidence missing', () => {
     const r = score({ capRate: 0.06 });
     expect(r.band).toBe('insufficientData');

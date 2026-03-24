@@ -22,7 +22,6 @@ None. The app runs in **demo mode** without any env vars (demo user, no real aut
 | `EXPO_PUBLIC_SUPABASE_URL` | Your Supabase project URL (e.g. `https://xxxx.supabase.co`) | When using real auth and DB |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key | When using real auth and DB |
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat public API key for iOS | When using in-app subscriptions on iOS |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID` | RevenueCat public API key for Android | When using in-app subscriptions on Android |
 | `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Full URL to your privacy policy | App Store required; in-app Settings (default: https://www.propfolio.com/privacy) |
 | `EXPO_PUBLIC_TERMS_URL` | Full URL to your terms of service | In-app Settings (default: https://www.propfolio.com/terms) |
 | `EXPO_PUBLIC_SUPPORT_URL` | Full URL for contact/support (or mailto:) | App Store required; Settings → Contact support (default: https://www.propfolio.com/support) |
@@ -30,7 +29,7 @@ None. The app runs in **demo mode** without any env vars (demo user, no real aut
 
 If **both** Supabase vars are set, the app uses Supabase for sign-in/sign-out, session persistence, and profile creation. If either is missing, the app uses a demo user and in-memory session.
 
-RevenueCat keys are platform-specific: the app uses the iOS key on iOS and the Android key on Android. On web, subscriptions are not configured (optional web billing can be added later). Get API keys from the [RevenueCat dashboard](https://app.revenuecat.com) → Project → API keys.
+RevenueCat uses a single canonical env var in this app: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`. On web/Android, subscriptions are not configured. Get the iOS public key from the [RevenueCat dashboard](https://app.revenuecat.com) → Project → API keys.
 
 ## Setup
 
@@ -39,8 +38,12 @@ RevenueCat keys are platform-specific: the app uses the iOS key on iOS and the A
 3. Do **not** commit `.env` (it should be in `.gitignore`).
 4. Restart the dev server after changing env vars (`npm run start` then choose platform).
 
+## Crash reporting (Firebase)
+
+Crashlytics does **not** use `EXPO_PUBLIC_*` variables. Configuration is the **`GoogleService-Info.plist`** file (or EAS file env **`GOOGLE_SERVICES_INFO_PLIST`**). See **`MONITORING_SETUP.md`**.
+
 ## References
 
 - [Expo env vars](https://docs.expo.dev/guides/environment-variables/)
-- Repo root: **`docs/SERVICES-INITIATION-GUIDE.md`** — setup for Supabase, Google Maps, RentCast, EAS, Sentry, OpenAI, Census, and other APIs (including which keys go in client vs server).
+- Repo root: **`docs/SERVICES-INITIATION-GUIDE.md`** — setup for Supabase, Google Maps, RentCast, EAS, Firebase Crashlytics, OpenAI, Census, and other APIs (including which keys go in client vs server).
 - Repo root: `docs/API-KEYS-AND-SUBSCRIPTIONS.md` (if present) for key management.

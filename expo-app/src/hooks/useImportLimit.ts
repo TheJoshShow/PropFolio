@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { getSupabase } from '../services/supabase';
 import { getImportCount, FREE_IMPORT_LIMIT, type ImportCountResult } from '../services/importLimits';
-import { logUsageCheck } from '../services/diagnostics';
+import { logUsageCheck, logErrorSafe } from '../services/diagnostics';
 
 export interface ImportLimitState extends ImportCountResult {
   canImport: boolean;
@@ -37,9 +37,15 @@ export function useImportLimit(): ImportLimitState {
       return;
     }
     setIsLoading(true);
-    const r = await getImportCount(supabase);
-    setResult(r);
-    setIsLoading(false);
+    try {
+      const r = await getImportCount(supabase);
+      setResult(r);
+    } catch (e) {
+      logErrorSafe('useImportLimit getImportCount', e);
+      setResult({ count: 0, freeRemaining: FREE_IMPORT_LIMIT, canImport: true });
+    } finally {
+      setIsLoading(false);
+    }
   }, [session?.id, supabase, authLoading]);
 
   useEffect(() => {

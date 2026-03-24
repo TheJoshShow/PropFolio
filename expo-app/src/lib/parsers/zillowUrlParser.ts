@@ -7,24 +7,50 @@ import { slugToAddressLine } from './slugToAddressLine';
 import { getHostname } from './listingUrlNormalize';
 import { isZillowHost } from './listingProviders';
 
-/** Extract zpid from path segment like 12345678_zpid */
+/**
+ * Extract zpid from a path segment ending in `_zpid`.
+ * Uses the last run of digits before `_zpid` so slug-prefixed segments like
+ * `8216-S-Maryland-Ave-..._205878656_zpid` resolve to the real zpid, not the street number.
+ */
 function zpidFromPathComponent(segment: string): string | null {
+  const m = segment.match(/(\d+)_zpid$/i);
+  return m?.[1] && /^\d+$/.test(m[1]) ? m[1] : null;
+}
+
+/**
+ * Address slug from a path segment that includes `_zpid` (e.g. `123-Main-St-Chicago-IL-60619_12345_zpid`).
+ */
+function slugFromZpidSegment(segment: string): string | null {
   if (!segment.includes('_zpid')) return null;
-  const before = segment.split('_zpid')[0]?.split('_')[0] ?? '';
-  return /^\d+$/.test(before) ? before : null;
+  const beforeZpid = segment.split('_zpid')[0] ?? '';
+  if (!beforeZpid.includes('-') || beforeZpid.length < 6) return null;
+  const numericTail = beforeZpid.match(/^(.+)-(\d{5}(?:-\d{4})?)$/);
+  if (numericTail?.[1]) return beforeZpid;
+  return beforeZpid;
 }
 
 /** Find homedetails address slug (before _zpid segment). */
 function findHomedetailsSlug(components: string[]): string | null {
   const hi = components.findIndex((c) => c.toLowerCase() === 'homedetails');
-  if (hi >= 0 && components[hi + 1] && !components[hi + 1].includes('_zpid')) {
+  if (hi >= 0 && components[hi + 1]) {
     const next = components[hi + 1];
-    if (next.includes('-') && next.length > 5) return next;
+    if (!next.includes('_zpid')) {
+      if (next.includes('-') && next.length > 5) return next;
+    } else {
+      const fromCombined = slugFromZpidSegment(next);
+      if (fromCombined) return fromCombined;
+    }
   }
   const slug = components.find(
     (c) => c.includes('-') && !c.includes('_zpid') && !/^\d+$/.test(c) && c.length > 5
   );
-  return slug ?? null;
+  if (slug) return slug;
+  const combined = components.find((c) => c.includes('_zpid') && c.includes('-'));
+  if (combined) {
+    const s = slugFromZpidSegment(combined);
+    if (s) return s;
+  }
+  return null;
 }
 
 function partialAddressFromSlug(slug: string): PartialAddress | null {
@@ -76,8 +102,9 @@ export function parseZillowUrl(urlString: string): ParseURLResult {
     }
 
     if (!zpid) {
-      const anyZpid = path.match(/(\d+)_zpid/i);
-      if (anyZpid?.[1]) zpid = anyZpid[1];
+      const all = [...path.matchAll(/(\d+)_zpid/gi)];
+      const last = all[all.length - 1];
+      if (last?.[1]) zpid = last[1];
     }
 
     if (!zpid || !/^\d+$/.test(zpid)) {

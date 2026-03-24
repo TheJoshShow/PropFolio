@@ -38,7 +38,6 @@ These values are represented in `PRODUCT_IDS` in `expo-app/src/config/billing.ts
 
 - RevenueCat public API keys:
   - iOS: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`
-  - Android: `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`
 - The app:
   - Reads keys via `getRevenueCatApiKey()`.
   - Configures `react-native-purchases` with the Supabase user id as the RevenueCat app user ID.

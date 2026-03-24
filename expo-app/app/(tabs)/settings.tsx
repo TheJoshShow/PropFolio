@@ -28,7 +28,7 @@ import {
   getManageSubscriptionFallbackMessage,
 } from '../../src/utils/subscriptionManagement';
 import { openUrlSafe, openLegalDocument } from '../../src/utils/openLink';
-import { getBillingHelpUrl, getSupportUrl } from '../../src/config/legalUrls';
+import { getBillingHelpUrl, getSupportUrl, getRuntimeConfigDiagnostics } from '../../src/config';
 import { FREE_IMPORT_LIMIT } from '../../src/services/importLimits';
 import { getRestoreOutcome } from '../../src/services/restorePurchases';
 import { trackEvent } from '../../src/services/analytics';
@@ -37,6 +37,12 @@ import {
   logUsageCheck,
 } from '../../src/services/diagnostics';
 import { formatPhoneForDisplay } from '../../src/utils/phone';
+import {
+  sendCrashlyticsVerificationNonFatal,
+  requestCrashlyticsNativeTestCrash,
+  isCrashlyticsVerificationUiEnabled,
+  isCrashlyticsNativeCrashTestUiEnabled,
+} from '../../src/services/monitoring';
 
 function SectionHeader({
   title,
@@ -86,6 +92,7 @@ export default function SettingsScreen() {
   const [deleting, setDeleting] = useState(false);
   const [manageTried, setManageTried] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const runtimeDiag = getRuntimeConfigDiagnostics();
 
   useFocusEffect(
     useCallback(() => {
@@ -127,6 +134,11 @@ export default function SettingsScreen() {
       const result = await restore();
       const outcome = getRestoreOutcome(result);
       Alert.alert(outcome.title, outcome.message, [{ text: 'OK' }]);
+    } catch (e) {
+      Alert.alert(
+        'Restore failed',
+        e instanceof Error ? e.message : 'Something went wrong. Try again or contact support.'
+      );
     } finally {
       setRestoring(false);
     }
@@ -184,6 +196,20 @@ export default function SettingsScreen() {
 
   const isLoading = subscriptionLoading || limitLoading;
   const billingHelpUrl = getBillingHelpUrl();
+  const showReleaseDiagnostics = __DEV__ || runtimeDiag.qaDiagnosticsEnabled;
+  const releaseBlockers: string[] = [];
+  if (!runtimeDiag.servicesConfigured.supabase) {
+    releaseBlockers.push('Supabase URL or anon key is missing.');
+  }
+  if (!runtimeDiag.subscriptionConfigValid && runtimeDiag.platform === 'ios') {
+    releaseBlockers.push('RevenueCat iOS key is missing.');
+  }
+  if (!runtimeDiag.authRedirectConfigValid) {
+    releaseBlockers.push('Auth redirect scheme is invalid.');
+  }
+  if (runtimeDiag.networkSafety.supabaseUsesLocalhost || runtimeDiag.networkSafety.supabaseUsesLanIp) {
+    releaseBlockers.push('Supabase URL points to localhost/LAN instead of hosted production.');
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -331,6 +357,111 @@ export default function SettingsScreen() {
           <Text style={[styles.linkText, { color: colors.primary }]}>Terms of Service</Text>
         </Pressable>
       </Card>
+
+      {showReleaseDiagnostics && (
+        <>
+          <SectionHeader title="Release readiness diagnostics" colors={colors} />
+          <Card style={styles.card}>
+            <Text style={[styles.debugHint, { color: colors.textSecondary }]}>
+              env={runtimeDiag.environment} platform={runtimeDiag.platform}
+            </Text>
+            <Text style={[styles.debugHint, { color: colors.textSecondary }]}>
+              services: supabase={String(runtimeDiag.servicesConfigured.supabase)} subscriptions={String(runtimeDiag.servicesConfigured.subscriptions)} legalUrls={String(runtimeDiag.servicesConfigured.legalUrls)}
+            </Text>
+            <Text style={[styles.debugHint, { color: colors.textSecondary }]}>
+              apiBase: supabaseUrl={String(runtimeDiag.apiBaseUrlsPresent.supabaseUrl)}
+            </Text>
+            <Text style={[styles.debugHint, { color: colors.textSecondary }]}>
+              authRedirectValid={String(runtimeDiag.authRedirectConfigValid)} subscriptionConfigValid={String(runtimeDiag.subscriptionConfigValid)}
+            </Text>
+            <Text style={[styles.debugHint, { color: colors.textSecondary }]}>
+              supabaseHost={runtimeDiag.networkSafety.supabaseHost || 'missing'} localhost={String(runtimeDiag.networkSafety.supabaseUsesLocalhost)} lanIp={String(runtimeDiag.networkSafety.supabaseUsesLanIp)}
+            </Text>
+            <Text style={[styles.debugHint, { color: colors.textSecondary }]}>
+              qaDiagnosticsEnabled={String(runtimeDiag.qaDiagnosticsEnabled)}
+            </Text>
+          </Card>
+          {releaseBlockers.length > 0 ? (
+            <Card style={styles.card}>
+              <Text style={[styles.blockerTitle, { color: colors.error }]}>Release blockers</Text>
+              {releaseBlockers.map((b) => (
+                <Text key={b} style={[styles.debugHint, { color: colors.textSecondary }]}>
+                  - {b}
+                </Text>
+              ))}
+            </Card>
+          ) : (
+            <Card style={styles.card}>
+              <Text style={[styles.debugHint, { color: colors.success }]}>
+                No config-level release blockers detected on this build.
+              </Text>
+            </Card>
+          )}
+          <Card style={styles.card}>
+            <Text style={[styles.debugHint, { color: colors.textSecondary }]}>
+              Full manual checklist: expo-app/docs/release/FINAL_RELEASE_READINESS_CHECKLIST.md
+            </Text>
+          </Card>
+          {isCrashlyticsVerificationUiEnabled() && (
+            <>
+              <SectionHeader title="Stability checks" colors={colors} />
+              <Card style={styles.card}>
+                <Text style={[styles.debugHint, { color: colors.textSecondary }]}>
+                  Internal use only. Sends a test signal so you can confirm reporting is working.
+                </Text>
+                <Button
+                  title="Send test signal"
+                  variant="secondary"
+                  fullWidth
+                  style={styles.button}
+                  onPress={() => {
+                    void (async () => {
+                      await sendCrashlyticsVerificationNonFatal();
+                      Alert.alert(
+                        'Test signal sent',
+                        'If uploads are enabled for this build, it should appear in your crash reports within a few minutes.',
+                        [{ text: 'OK' }]
+                      );
+                    })();
+                  }}
+                />
+                {isCrashlyticsNativeCrashTestUiEnabled() && (
+                  <>
+                    <Text
+                      style={[
+                        styles.debugHint,
+                        { color: colors.textSecondary, marginTop: spacing.m },
+                      ]}
+                    >
+                      Debug build only: immediately closes the app. Disconnect the debugger to see a report.
+                    </Text>
+                    <Button
+                      title="Close app (test)"
+                      variant="outline"
+                      fullWidth
+                      style={styles.button}
+                      onPress={() => {
+                        Alert.alert(
+                          'Close app?',
+                          'This will immediately stop the app to test crash reporting. Use only when debugging.',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Close app',
+                              style: 'destructive',
+                              onPress: () => requestCrashlyticsNativeTestCrash(),
+                            },
+                          ]
+                        );
+                      }}
+                    />
+                  </>
+                )}
+              </Card>
+            </>
+          )}
+        </>
+      )}
     </ScrollView>
     </SafeAreaView>
   );
@@ -368,6 +499,11 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     marginBottom: spacing.s,
     lineHeight: lineHeights.xs,
+  },
+  blockerTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.semibold,
+    marginBottom: spacing.s,
   },
   toggleRow: {
     flexDirection: 'row',

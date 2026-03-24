@@ -191,7 +191,6 @@ No Supabase migration currently creates a profile on signup (no trigger on `auth
 | `EXPO_PUBLIC_SUPABASE_URL` | Already used. |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Already used. |
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat public API key for iOS (optional; can use one key per platform in app config). |
-| `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID` | RevenueCat public API key for Android. |
 
 RevenueCat public keys are safe for client; they are restricted in RevenueCat dashboard by app bundle id.
 

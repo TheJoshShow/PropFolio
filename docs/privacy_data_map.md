@@ -17,7 +17,7 @@
 | **Usage events** | Yes (funnel events) | Supabase `usage_events` (user_id, event_type, metadata) | Supabase | Analytics; metadata is non-PII (source, outcome, etc.) |
 | **Address / query (geocode, autocomplete)** | Yes (when user types address) | Not stored by app; sent to Edge Function | Google (via Supabase Edge) | Address normalization, suggestions |
 | **Address (rent estimate)** | Yes (normalized address) | Not stored by app; sent to Edge Function | RentCast (via Supabase Edge) | Rent estimate for underwriting |
-| **Crash/error data** | Yes (when Sentry DSN set) | Sentry servers | Sentry | Crash reporting; currently sendDefaultPii configurable |
+| **Crash/error data** | Yes (when crash reporting DSN set) | crash reporting servers | crash reporting | Crash reporting; currently sendDefaultPii configurable |
 
 ---
 
@@ -28,7 +28,7 @@
 | **Supabase (your project)** | Auth users, profiles, properties, portfolios, property_imports, subscription_status, usage_events | Per your Supabase and data retention policy; account deletion removes auth user and can cascade per RLS/schema |
 | **Device (AsyncStorage / UserDefaults)** | Supabase session (tokens); subscription cache (hasProAccess, plan name, expiration) | Session cleared on sign-out; subscription cache keyed by user id, cleared on sign-out |
 | **RevenueCat** | App user id (Supabase user id), purchase/entitlement state | Per RevenueCat policy; user id is opaque to RevenueCat unless you link elsewhere |
-| **Sentry** | Crash reports, breadcrumbs, device/OS, optional PII if sendDefaultPii true | Per Sentry policy; recommend sendDefaultPii false and no custom PII in breadcrumbs |
+| **crash reporting** | Crash reports, breadcrumbs, device/OS, optional PII if sendDefaultPii true | Per crash reporting policy; recommend sendDefaultPii false and no custom PII in breadcrumbs |
 
 ---
 
@@ -38,7 +38,7 @@
 |---------------|------------------|-----------------------------|--------|
 | **@supabase/supabase-js** | Your Supabase project (you control data) | N/A (first-party backend) | Session, API calls; no third-party analytics in SDK |
 | **react-native-purchases (RevenueCat)** | RevenueCat | RevenueCat provides privacy manifest; may require declaration in App Privacy | User id (Supabase id), purchase tokens, product ids; no email from app |
-| **@sentry/react-native** | Sentry | Sentry provides privacy manifest; declare in App Privacy if used | Crashes, breadcrumbs, device/OS; set sendDefaultPii: false to minimize PII |
+| **Third-party crash SDK (if added)** | Vendor TBD | Follow vendor App Privacy guidance when integrated | Crashes, device/OS context per vendor defaults |
 | **@react-native-async-storage/async-storage** | Local device only | App declares NSPrivacyAccessedAPICategoryUserDefaults (CA92.1) in app.json | No transmission |
 | **Expo (expo-router, expo-linking, etc.)** | No external analytics by default | Expo modules as needed | No user data sent to Expo by default |
 | **Google (via Edge Functions)** | Google Maps Platform (Geocoding, Places) | Not in app binary; server-side only | Address strings only; no user id sent from app |
@@ -59,17 +59,17 @@
 - **In-app:** Settings → Delete account → confirmation → Edge Function `delete-account` deletes the auth user in Supabase.
 - **Effect:** Auth user removed; associated data (profiles, portfolios, properties, property_imports, subscription_status, usage_events) should be handled by your schema (cascade delete or retention policy). Document in Privacy Policy what is deleted and what may be retained for legal/backup.
 - **RevenueCat:** Deleting the auth user does not automatically delete RevenueCat data; document that purchase history may remain with the store (Apple) and RevenueCat per their policies.
-- **Sentry:** Events may remain per Sentry retention; no user id needed if sendDefaultPii false and no custom user id set.
+- **crash reporting:** Events may remain per crash reporting retention; no user id needed if sendDefaultPii false and no custom user id set.
 
 ---
 
 ## 6. Privacy Policy checklist (must disclose)
 
 - Identity of data controller and contact (e.g. support@propfolio.app).
-- What data is collected (account, profile, property data, usage events, subscription state, crash data if Sentry used).
+- What data is collected (account, profile, property data, usage events, subscription state, crash data if crash reporting used).
 - Legal basis / purpose for each category.
-- Who it is shared with (Supabase as processor, RevenueCat, Sentry, Google via Edge Functions) and for what purpose.
-- Retention and deletion (account deletion; subscription cache; Sentry/RevenueCat retention).
+- Who it is shared with (Supabase as processor, RevenueCat, crash reporting, Google via Edge Functions) and for what purpose.
+- Retention and deletion (account deletion; subscription cache; crash reporting/RevenueCat retention).
 - User rights (access, deletion, portability as applicable).
 - Cross-border transfer if applicable.
 - Cookie/device ID use if any (e.g. RevenueCat device id).

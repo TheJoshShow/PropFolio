@@ -46,7 +46,7 @@
 |---|------|-----------|--------|
 | 14 | Production env set: EXPO_PUBLIC_SUPABASE_*, EXPO_PUBLIC_REVENUECAT_API_KEY_IOS, legal URLs | [final_metadata_requirements.md](../docs/final_metadata_requirements.md), [production_env_matrix.md](../docs/production_env_matrix.md) | ☐ |
 | 15 | No __DEV__-only UI or debug menus in release build | [release_blocker_report.md](../expo-app/release_blocker_report.md) | ☐ |
-| 16 | Sentry (if used): production-safe config; Privacy Policy discloses crash/error reporting | [sentry_privacy_decision.md](../docs/sentry_privacy_decision.md) | ☐ |
+| 16 | Crash reporting (Firebase Crashlytics): production-safe config; Privacy Policy discloses crash/error reporting | [MONITORING_SETUP.md](../expo-app/docs/MONITORING_SETUP.md) | ☐ |
 | 17 | Version and build number match app.json and EAS; build uploaded and selected in App Store Connect | [final_metadata_requirements.md](../docs/final_metadata_requirements.md) | ☐ |
 
 ---

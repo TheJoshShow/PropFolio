@@ -54,7 +54,7 @@
 
 ### Phase 3: Platform.OS and copy refactors (keep but refactor)
 
-- [ ] **app/_layout.tsx:** Replace `isWeb = Platform.OS === 'web'` with a single check for Sentry: e.g. only init Sentry when `Platform.OS === 'ios'` (or keep `!== 'web'` if Android might return later).
+- [ ] **app/_layout.tsx:** Replace `isWeb = Platform.OS === 'web'` with a single check for crash reporting: e.g. only init crash reporting when `Platform.OS === 'ios'` (or keep `!== 'web'` if Android might return later).
 - [ ] **app/(tabs)/_layout.tsx:** SymbolView `name` – use only the `ios` value (e.g. `name="house.fill"` if API accepts string, or `name={{ ios: 'house.fill' }}` and rely on iOS).
 - [ ] **app/(tabs)/settings.tsx:** Remove `Platform.OS === 'web'` branches; update "Subscription management is available in the iOS or Android app" to "Subscription management is available in the PropFolio app" or "in this app". Ensure restore and delete account are visible and working on iOS.
 - [ ] **app/paywall.tsx:** Remove web early-return and `Platform.OS !== 'web'` conditionals so paywall and purchase UI always show on iOS.

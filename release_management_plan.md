@@ -112,13 +112,13 @@ Use this when moving a build from one stage to the next (e.g. TestFlight → App
 |-------------|---------|----------------|
 | **Local / dev** | Day-to-day development. | `.env` with dev Supabase (or demo); no store keys required. |
 | **TestFlight (staging)** | Internal/external beta. | Same or separate Supabase project; RevenueCat sandbox; env from EAS secrets or `.env` for build. |
-| **Production** | App Store live. | Production Supabase, RevenueCat production, production Sentry; env from EAS secrets. |
+| **Production** | App Store live. | Production Supabase, RevenueCat production, production crash reporting; env from EAS secrets. |
 
 ### Promotion: Dev → TestFlight
 
 - [ ] Version and build number set in `expo-app/app.json` (and EAS if used).
 - [ ] Branch is `main` (or release branch) and up to date.
-- [ ] TestFlight env vars set (Supabase, RevenueCat sandbox, Sentry if used).
+- [ ] TestFlight env vars set (Supabase, RevenueCat sandbox, crash reporting if used).
 - [ ] Build succeeds (e.g. `eas build --platform ios --profile preview` or your profile).
 - [ ] Build uploaded to TestFlight; install and smoke-test.
 - [ ] No secrets or dev-only URLs in the build (use env for all endpoints and keys).
@@ -126,7 +126,7 @@ Use this when moving a build from one stage to the next (e.g. TestFlight → App
 ### Promotion: TestFlight → Production (App Store)
 
 - [ ] Release version and build number are final (and match App Store Connect after upload).
-- [ ] Production env used for build: production Supabase, RevenueCat production, production Sentry.
+- [ ] Production env used for build: production Supabase, RevenueCat production, production crash reporting.
 - [ ] Legal URLs (Privacy, Terms, Support) point to production and match App Store Connect.
 - [ ] Tag created: `vX.Y.Z` from the release commit.
 - [ ] Release checklist and app store release docs completed (see `app_store_release/release_checklist.md`).
@@ -137,7 +137,7 @@ Use this when moving a build from one stage to the next (e.g. TestFlight → App
 
 - [ ] Tag pushed: `git push origin vX.Y.Z`.
 - [ ] Release notes or changelog updated (optional but recommended).
-- [ ] Monitor Sentry/crashes and support for 24–48 hours.
+- [ ] Monitor crash reporting/crashes and support for 24–48 hours.
 
 ---
 

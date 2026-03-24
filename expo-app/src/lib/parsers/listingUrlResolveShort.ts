@@ -4,6 +4,7 @@
  */
 
 import { getHostname } from './listingUrlNormalize';
+import { reportIntegrationStatus } from '../../services/diagnostics';
 
 /** Hosts where one hop may reveal a Zillow/Redfin (or redirect) destination. */
 const SHORT_LINK_HOST_ALLOWLIST = new Set<string>([
@@ -43,6 +44,14 @@ function abortAfter(ms: number): { signal: AbortSignal; cancel: () => void } {
 export async function resolveListingShortUrlIfNeeded(url: string): Promise<string> {
   const host = getHostname(url);
   if (!host || !hostAllowedForResolve(host)) {
+    reportIntegrationStatus({
+      integration: 'listing_parser',
+      configured: true,
+      requestSuccess: true,
+      lastFailureReason: null,
+      fallbackUsed: false,
+      featureImpact: 'none',
+    });
     return url;
   }
 
@@ -82,6 +91,14 @@ export async function resolveListingShortUrlIfNeeded(url: string): Promise<strin
     }
     return finalUrl !== url ? finalUrl : url;
   } catch {
+    reportIntegrationStatus({
+      integration: 'listing_parser',
+      configured: true,
+      requestSuccess: false,
+      lastFailureReason: 'Short-link resolution failed or timed out',
+      fallbackUsed: true,
+      featureImpact: 'partial',
+    });
     first.cancel();
     return url;
   }

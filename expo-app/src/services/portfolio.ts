@@ -27,6 +27,11 @@ export interface PropertyRow {
   rent?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  full_address?: string | null;
+  geocode_status?: 'pending' | 'in_progress' | 'resolved' | 'failed' | null;
+  geocode_source?: string | null;
+  geocode_error?: string | null;
+  last_geocoded_at?: string | null;
 }
 
 /** Single-line address for geocoding / map fallbacks */
@@ -110,5 +115,15 @@ export async function getPropertyById(
     logErrorSafe('portfolio getPropertyById', error);
     return null;
   }
-  return data as PropertyRow | null;
+  const row = data as PropertyRow | null;
+  if (
+    !row ||
+    typeof row.id !== 'string' ||
+    row.id.trim().length === 0 ||
+    typeof row.portfolio_id !== 'string' ||
+    row.portfolio_id.trim().length === 0
+  ) {
+    return null;
+  }
+  return row;
 }

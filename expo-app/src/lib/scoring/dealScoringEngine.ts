@@ -52,6 +52,19 @@ function add(
   components.push({ id: factor, rawValue: raw, subScore: sub, weight: w, contribution });
 }
 
+/** Human-readable labels for which gating inputs are missing (for UI / dev logs). */
+export function listMissingDealScoreRequirements(inputs: DealScoreInputs): string[] {
+  const hasProfitability =
+    inputs.capRate != null ||
+    inputs.monthlyCashFlow != null ||
+    inputs.annualCashFlow != null;
+  const missing: string[] = [];
+  if (!hasProfitability) missing.push('cap rate or cash flow');
+  if (inputs.dscr == null) missing.push('DSCR');
+  if (inputs.dataConfidence == null) missing.push('data confidence');
+  return missing;
+}
+
 export function score(inputs: DealScoreInputs): DealScoreResult {
   const components: DealScoreComponent[] = [];
 

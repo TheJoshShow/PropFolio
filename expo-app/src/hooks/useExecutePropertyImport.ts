@@ -24,7 +24,9 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useImportLimit } from './useImportLimit';
 import { logImportStep } from '../services/diagnostics';
+import { recordFlowIssue } from '../services/monitoring/flowInstrumentation';
 import { IMPORT_USER_MESSAGES } from '../services/importErrorMessages';
+import { notifyPortfolioRefresh } from '../services/portfolioRefresh';
 
 export interface ExecutePropertyImportOptions {
   /** Called after a successful import (allowed_free or allowed_paid). */
@@ -87,8 +89,33 @@ export function useExecutePropertyImport(
         const opts = optionsRef.current;
         logImportStep('execute_result', { status: result.status });
 
+        if (result.status !== 'allowed_free' && result.status !== 'allowed_paid') {
+          if (result.status === 'blocked_upgrade_required') {
+            recordFlowIssue('import_pipeline_blocked', {
+              source,
+              status: result.status,
+              stage: 'persist',
+              recoverable: true,
+            });
+          } else if (result.status === 'failed_retryable') {
+            recordFlowIssue('import_pipeline_failed_retryable', {
+              source,
+              stage: 'persist',
+              recoverable: true,
+            });
+          } else if (result.status === 'failed_nonretryable') {
+            recordFlowIssue('import_pipeline_failed_nonretryable', {
+              source,
+              stage: 'persist',
+              recoverable: false,
+            });
+          }
+        }
+
         if (result.status === 'allowed_free' || result.status === 'allowed_paid') {
           await refresh();
+          // Fire-and-forget: subscribers kick off their own async fetch; no need to block navigation.
+          notifyPortfolioRefresh();
           opts.onSuccess?.({ propertyId: result.propertyId, property_import_count: result.property_import_count });
         } else if (result.status === 'blocked_upgrade_required') {
           opts.onBlocked?.();

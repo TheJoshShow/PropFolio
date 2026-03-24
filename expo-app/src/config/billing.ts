@@ -3,11 +3,12 @@
  * No secrets here — only env var names, placeholder identifiers, and feature flags.
  * Dashboard values (product IDs, offering ID) must be inserted manually where indicated.
  *
- * Production purchases: iOS only. Android key is reserved for future use; getRevenueCatApiKey
- * returns empty string on non-iOS so purchase/restore no-op or return "not available on this platform".
+ * Production purchases: iOS only. getRevenueCatApiKey returns empty string on non-iOS
+ * so purchase/restore no-op or return "not available on this platform".
  */
 
 import { Platform } from 'react-native';
+import { getRuntimeConfig } from './runtimeConfig';
 
 // -----------------------------------------------------------------------------
 // Environment variable names (values go in .env; never commit real keys)
@@ -15,21 +16,61 @@ import { Platform } from 'react-native';
 
 /** Env key for RevenueCat iOS API key. Insert value from RevenueCat Dashboard → Project → API Keys → Public app-specific API key (iOS). */
 export const ENV_REVENUECAT_API_KEY_IOS = 'EXPO_PUBLIC_REVENUECAT_API_KEY_IOS';
-
-/** Env key for RevenueCat Android API key (reserved; not used for production purchases on iOS-only app). */
+/** Env key for RevenueCat Android API key. */
 export const ENV_REVENUECAT_API_KEY_ANDROID = 'EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID';
-
-/** Whether RevenueCat API key is set for iOS. Does not validate key format. Production IAP is iOS-only. */
-export function isBillingConfigured(): boolean {
-  return Platform.OS === 'ios' && Boolean((process.env[ENV_REVENUECAT_API_KEY_IOS] ?? '').trim());
+export interface BillingConfig {
+  platform: 'ios' | 'android' | 'web';
+  revenueCatApiKey: string;
+  configured: boolean;
+  keySource: typeof ENV_REVENUECAT_API_KEY_IOS | typeof ENV_REVENUECAT_API_KEY_ANDROID | 'none';
 }
 
-/** Get RevenueCat API key for current platform. iOS only for production purchases; returns empty string on Android/web. */
-export function getRevenueCatApiKey(): string {
-  if (Platform.OS === 'ios') {
-    return (process.env[ENV_REVENUECAT_API_KEY_IOS] ?? '').trim();
+function readFirstEnv(candidates: readonly string[]): { value: string; source: string | 'none' } {
+  const runtime = getRuntimeConfig();
+  for (const k of candidates) {
+    const v =
+      k === ENV_REVENUECAT_API_KEY_IOS
+        ? runtime.revenueCatApiKeyIos
+        : k === ENV_REVENUECAT_API_KEY_ANDROID
+          ? runtime.revenueCatApiKeyAndroid
+          : '';
+    if (v) return { value: v, source: k };
   }
-  return '';
+  return { value: '', source: 'none' };
+}
+
+/** Single source of truth for billing env resolution and platform key selection. */
+export function getBillingConfig(): BillingConfig {
+  const platform = Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : 'web';
+  if (platform === 'ios') {
+    const read = readFirstEnv([ENV_REVENUECAT_API_KEY_IOS]);
+    return {
+      platform,
+      revenueCatApiKey: read.value,
+      configured: Boolean(read.value),
+      keySource: read.source as BillingConfig['keySource'],
+    };
+  }
+  if (platform === 'android') {
+    const read = readFirstEnv([ENV_REVENUECAT_API_KEY_ANDROID]);
+    return {
+      platform,
+      revenueCatApiKey: read.value,
+      configured: Boolean(read.value),
+      keySource: read.source as BillingConfig['keySource'],
+    };
+  }
+  return { platform, revenueCatApiKey: '', configured: false, keySource: 'none' };
+}
+
+/** Whether current platform has a RevenueCat key configured. */
+export function isBillingConfigured(): boolean {
+  return getBillingConfig().configured;
+}
+
+/** Get RevenueCat API key for current platform. */
+export function getRevenueCatApiKey(): string {
+  return getBillingConfig().revenueCatApiKey;
 }
 
 // -----------------------------------------------------------------------------

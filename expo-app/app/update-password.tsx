@@ -18,6 +18,7 @@ import { Button, TextInput } from '../src/components';
 import { spacing, fontSizes, fontWeights } from '../src/theme';
 import { useThemeColors } from '../src/components/useThemeColors';
 import { responsiveContentContainer } from '../src/utils/responsive';
+import { dismissOrReplaceSettings } from '../src/utils/appNavigation';
 import {
   getAuthErrorMessage,
   isPasswordLongEnough,
@@ -83,7 +84,7 @@ export default function UpdatePasswordScreen() {
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Your password has been changed. Use it the next time you sign in.
           </Text>
-          <Button title="Back to Settings" onPress={() => router.back()} fullWidth />
+          <Button title="Back to Settings" onPress={() => dismissOrReplaceSettings(router)} fullWidth />
         </View>
       </SafeAreaView>
     );
@@ -134,7 +135,7 @@ export default function UpdatePasswordScreen() {
             fullWidth
             style={styles.submit}
           />
-          <Button title="Cancel" onPress={() => router.back()} variant="ghost" fullWidth />
+          <Button title="Cancel" onPress={() => dismissOrReplaceSettings(router)} variant="ghost" fullWidth />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

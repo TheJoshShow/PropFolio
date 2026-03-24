@@ -350,7 +350,7 @@ RevenueCat sends event (e.g. INITIAL_PURCHASE, RENEWAL, EXPIRATION)
 ## 13. Manual Configuration Steps (Outside Codebase)
 
 1. **Environment variables (Expo):**  
-   Set `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`; for native: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`, `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`. Optional: `EXPO_PUBLIC_SENTRY_DSN`.
+   Set `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`; for native: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`.
 
 2. **Supabase:**  
    Run all migrations (including 00016, 00017, 00018) so `property_imports`, `subscription_status`, RLS, and `check_property_import_limit` trigger exist. Deploy Edge Functions; set `REVENUECAT_WEBHOOK_AUTHORIZATION` for revenuecat-webhook.

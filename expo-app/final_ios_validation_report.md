@@ -18,9 +18,9 @@
 | Command | Result |
 |---------|--------|
 | **npm run test** | **Pass.** 2 test suites, 8 tests (dealScoringEngine, underwritingEngine). |
-| **npm run typecheck** | **Fail** (expected in some environments). Errors: (1) Cannot find module `@sentry/react-native`; (2) Cannot find module `react-native-purchases`; (3) PaywallContent `openUrl` — **fixed** to `openUrlSafe`. |
+| **npm run typecheck** | **Fail** (expected in some environments). Errors: (1) Cannot find module `react-native-purchases` (if node_modules incomplete); (3) PaywallContent `openUrl` — **fixed** to `openUrlSafe`. |
 
-**Note:** Sentry and react-native-purchases are optional/native dependencies. With full `npm install` and native toolchain, typecheck may pass. The only code defect (PaywallContent Terms link) was fixed.
+**Note:** crash reporting and react-native-purchases are optional/native dependencies. With full `npm install` and native toolchain, typecheck may pass. The only code defect (PaywallContent Terms link) was fixed.
 
 ---
 

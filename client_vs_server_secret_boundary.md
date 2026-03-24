@@ -11,7 +11,6 @@ Where secrets live, who may use them, and how the client talks to the server.
 │  CLIENT (expo-app / iOS)                                         │
 │  • EXPO_PUBLIC_SUPABASE_URL + EXPO_PUBLIC_SUPABASE_ANON_KEY       │
 │  • EXPO_PUBLIC_REVENUECAT_API_KEY_IOS                             │
-│  • EXPO_PUBLIC_SENTRY_DSN                                         │
 │  • EXPO_PUBLIC_PRIVACY_POLICY_URL, TERMS_URL, SUPPORT_URL (opt)   │
 │  • User session: JWT from Supabase Auth (in memory / storage)     │
 │  • NO service role, NO backend API keys, NO webhook secrets       │
@@ -45,7 +44,7 @@ Where secrets live, who may use them, and how the client talks to the server.
 | Supabase project URL | ✅ Yes | Public. |
 | Supabase **anon** key | ✅ Yes | Designed for client; RLS + auth enforce access. |
 | RevenueCat **public** app API key | ✅ Yes | Public key; only used for SDK. |
-| Sentry DSN | ✅ Yes | Public; only allows sending events. |
+| Third-party crash SDK keys (if added later) | ✅ Only if public by vendor design | Follow vendor docs; none required today. |
 | Privacy / Terms / Support URLs | ✅ Yes | No secrets. |
 | User JWT (session) | ✅ Yes | User’s own token; from auth flow. |
 | Supabase **service role** key | ❌ Never | Bypasses RLS; server-only. |

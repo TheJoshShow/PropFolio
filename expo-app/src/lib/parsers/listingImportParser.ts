@@ -8,6 +8,7 @@ import { resolveListingShortUrlIfNeeded } from './listingUrlResolveShort';
 import { parseZillowUrl, zillowAddressLineForImport } from './zillowUrlParser';
 import { parseRedfinUrl, redfinAddressLineForImport } from './redfinUrlParser';
 import type { ListingSource } from './types';
+import { recordFlowIssue } from '../../services/monitoring/flowInstrumentation';
 
 export type ListingImportParseResult =
   | { ok: true; provider: ListingSource; addressLine: string; normalizedUrl: string; listingId: string }
@@ -87,5 +88,13 @@ export async function parseListingImportForImportAsync(
     if (again) normalizedUrl = again;
   }
 
-  return parseNormalizedUrl(normalizedUrl);
+  const parsed = parseNormalizedUrl(normalizedUrl);
+  if (!parsed.ok) {
+    recordFlowIssue('import_listing_parse_failed', {
+      reason: parsed.reason,
+      stage: 'parse',
+      recoverable: true,
+    });
+  }
+  return parsed;
 }

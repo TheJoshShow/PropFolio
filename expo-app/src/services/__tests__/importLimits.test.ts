@@ -1,4 +1,8 @@
-import { addressToImportData, estimateListPriceFromMonthlyRent } from '../importLimits';
+import {
+  addressToImportData,
+  estimateListPriceFromMonthlyRent,
+  estimateMonthlyRentFromListPrice,
+} from '../importLimits';
 
 describe('estimateListPriceFromMonthlyRent', () => {
   it('estimates deterministically from monthly rent (default assumptions)', () => {
@@ -17,6 +21,16 @@ describe('estimateListPriceFromMonthlyRent', () => {
   it('supports overriding assumptions deterministically', () => {
     // With capRate=0.08, price = 17100/0.08 = 213750
     expect(estimateListPriceFromMonthlyRent(2500, { capRate: 0.08 })).toBe(213_750);
+  });
+});
+
+describe('estimateMonthlyRentFromListPrice', () => {
+  it('inverts default assumptions (round trip approx)', () => {
+    const rent = 2500;
+    const price = estimateListPriceFromMonthlyRent(rent);
+    expect(price).toBeDefined();
+    const back = estimateMonthlyRentFromListPrice(price!);
+    expect(back).toBe(rent);
   });
 });
 

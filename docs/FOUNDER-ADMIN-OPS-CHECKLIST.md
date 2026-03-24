@@ -18,7 +18,7 @@ This is a simple checklist for **running PropFolio as a small team**: what to wa
 
 ### 1.2 Error and crash logs
 
-Depending on your tooling (e.g. Xcode, Sentry, Crashlytics):
+Depending on your tooling (e.g. Xcode, crash reporting, Crashlytics):
 
 - [ ] Review **new crashes** and **serious errors**.
 - [ ] For each new serious issue, file a short ticket:

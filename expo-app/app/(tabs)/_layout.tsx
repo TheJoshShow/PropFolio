@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { Tabs, useRouter, useSegments } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useThemeColors } from '../../src/components/useThemeColors';
@@ -12,6 +13,7 @@ export default function TabLayout() {
   const segments = useSegments();
   const { session, isLoading } = useAuth();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const isOnTabsRoute = Array.isArray(segments) && segments[0] === '(tabs)';
 
@@ -38,7 +40,14 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          height: 60 + Math.max(insets.bottom, 0),
+          paddingBottom: Math.max(insets.bottom, spacing.xs),
+          paddingTop: spacing.xs,
+        },
+        tabBarLabelStyle: { paddingBottom: spacing.xxs },
         headerShown: useClientOnlyValue(false, true),
       }}>
       <Tabs.Screen

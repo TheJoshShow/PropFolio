@@ -51,7 +51,10 @@ import {
   clearCachedSubscription,
   type CachedSubscriptionSnapshot,
 } from '../services/subscriptionCache';
-import { logEntitlementState, logOfferingsLoad } from '../services/diagnostics';
+import { logEntitlementState, logErrorSafe, logOfferingsLoad, logStoreStep } from '../services/diagnostics';
+import { recordFlowException, recordFlowIssue } from '../services/monitoring/flowInstrumentation';
+import { getBillingConfig, isBillingConfigured } from '../config';
+import { isEntitlementBootstrapPending as computeEntitlementBootstrapPending } from '../subscription/entitlementPolicy';
 
 export interface OfferingsState {
   current: RevenueCatOffering | null;
@@ -71,8 +74,15 @@ interface SubscriptionContextValue {
   isLoading: boolean;
   /** Last error message (e.g. network, restore failed). */
   error: string | null;
-  /** RevenueCat is available (native + configured). */
+  /** User session present (legacy alias for “can attempt billing flows”). */
   isAvailable: boolean;
+  /** True after RevenueCat configure() succeeded for this session (API key present and SDK init OK). */
+  revenueCatSdkReady: boolean;
+  /**
+   * True while signed in, subscription load in flight, and neither customerInfo nor cache is present yet.
+   * UI should not treat entitlement as definitively "free" for premium upsells during this window.
+   */
+  entitlementBootstrapPending: boolean;
   /** Fetch offerings and customer info (e.g. on mount or pull-to-refresh). */
   refresh: () => Promise<void>;
   /** Purchase a package (use raw package from offerings.rawCurrentPackages). */
@@ -81,6 +91,16 @@ interface SubscriptionContextValue {
   restore: () => Promise<RestoreResult>;
   /** Clear last error. */
   clearError: () => void;
+  /** Internal diagnostics for QA/debug UI. */
+  diagnostics: {
+    initialized: boolean;
+    platform: 'ios' | 'android' | 'web';
+    billingConfigured: boolean;
+    billingKeySource: string;
+    offeringsLoaded: boolean;
+    entitlementActive: boolean;
+    lastError: string | null;
+  };
 }
 
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
@@ -93,28 +113,43 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [cachedSnapshot, setCachedSnapshot] = useState<CachedSubscriptionSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revenueCatSdkReady, setRevenueCatSdkReady] = useState(false);
   const lastForegroundRefreshRef = useRef<number>(0);
   const refreshRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  /** Set to session id only after initial `load()` completes — avoids RC refresh racing boot. */
+  const foregroundRefreshSessionRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | undefined>(session?.id);
   const lastKnownUserIdRef = useRef<string | undefined>(session?.id);
   sessionIdRef.current = session?.id;
   if (session?.id) lastKnownUserIdRef.current = session.id;
 
   const load = useCallback(async () => {
-    if (!session?.id) {
+    const uid = session?.id;
+    if (!uid) {
       setOfferings(null);
       setCustomerInfo(null);
-      return;
-    }
-    const configured = await configureRevenueCat(session.id);
-    if (!configured) {
-      setOfferings(null);
-      setCustomerInfo(null);
-      // Do not clear cachedSnapshot: offline or RC unavailable; keep showing last-known state.
+      setRevenueCatSdkReady(false);
       setIsLoading(false);
       return;
     }
+    const markForegroundEligible = () => {
+      if (sessionIdRef.current === uid) {
+        foregroundRefreshSessionRef.current = uid;
+      }
+    };
     setIsLoading(true);
+    const configured = await configureRevenueCat(uid);
+    if (!configured) {
+      setRevenueCatSdkReady(false);
+      setOfferings({ current: null, rawCurrentPackages: [] });
+      setCustomerInfo(null);
+      logStoreStep('configure_failed', { billingEnvSet: isBillingConfigured() });
+      // Do not clear cachedSnapshot: offline or RC unavailable; keep showing last-known state.
+      setIsLoading(false);
+      markForegroundEligible();
+      return;
+    }
+    setRevenueCatSdkReady(true);
     setError(null);
     try {
       const [offeringsResult, info] = await Promise.all([getOfferings(), getCustomerInfo()]);
@@ -124,47 +159,70 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           rawCurrentPackages: offeringsResult.rawCurrentPackages,
         });
       } else {
-        setOfferings(null);
+        setOfferings({ current: null, rawCurrentPackages: [] });
+        setError('Could not load subscription plans. Check your connection and try again.');
+        logStoreStep('offerings_null', {});
+        recordFlowIssue('billing_paywall_offerings_empty', { stage: 'offerings', recoverable: true });
       }
       setCustomerInfo(info ?? null);
       // Persist so next launch or failed refresh can show this state (do not revoke on error).
       const snapshot = buildCacheSnapshotFromCustomerInfo(info ?? null);
-      if (snapshot) await setCachedSubscription(session.id, snapshot);
+      if (snapshot) await setCachedSubscription(uid, snapshot);
       logEntitlementState({ hasProAccess: checkProAccess(info ?? null), source: 'fresh' });
       logOfferingsLoad({
         planCount: offeringsResult?.rawCurrentPackages?.length ?? 0,
         hasOfferings: !!offeringsResult?.current,
-        error: false,
+        error: !offeringsResult,
       });
     } catch (e) {
       // Do not set customerInfo to null: keep previous or cached state so we don't revoke Pro.
+      recordFlowException('billing_subscription_load_failed', e, { stage: 'subscription_load' });
       setError(e instanceof Error ? e.message : 'Couldn’t load subscription. Check your connection and try again.');
     } finally {
       setIsLoading(false);
+      markForegroundEligible();
     }
   }, [session?.id]);
 
   // App launch & auth restore: hydrate from cache then load. Sign-out: clear state and cache.
   useEffect(() => {
     if (session?.id) {
+      foregroundRefreshSessionRef.current = null;
       let cancelled = false;
-      (async () => {
-        const cached = await getCachedSubscription(session!.id);
-        if (!cancelled) {
-          setCachedSnapshot(cached ?? null);
-          if (cached) logEntitlementState({ hasProAccess: cached.hasProAccess, source: 'cache' });
+      void (async () => {
+        try {
+          const cached = await getCachedSubscription(session!.id);
+          if (!cancelled) {
+            setCachedSnapshot(cached ?? null);
+            if (cached) logEntitlementState({ hasProAccess: cached.hasProAccess, source: 'cache' });
+          }
+          await load();
+        } catch (e) {
+          if (!cancelled) {
+            recordFlowException('billing_subscription_boot_effect_failed', e, { stage: 'subscription_boot' });
+            setIsLoading(false);
+            setRevenueCatSdkReady(false);
+          }
         }
-        await load();
       })();
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     } else {
+      foregroundRefreshSessionRef.current = null;
       const prevId = lastKnownUserIdRef.current;
-      if (prevId) clearCachedSubscription(prevId);
+      if (prevId) {
+        void clearCachedSubscription(prevId).catch((e) =>
+          logErrorSafe('SubscriptionContext clearCachedSubscription on sign-out', e)
+        );
+      }
       logOutRevenueCat();
       setOfferings(null);
       setCustomerInfo(null);
       setCachedSnapshot(null);
       setError(null);
+      setRevenueCatSdkReady(false);
+      setIsLoading(false);
     }
   }, [session?.id, load]);
 
@@ -172,6 +230,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const hasProAccess = customerInfo
     ? checkProAccess(customerInfo)
     : (cachedSnapshot?.hasProAccess ?? false);
+
+  const entitlementBootstrapPending = computeEntitlementBootstrapPending({
+    sessionUserId: session?.id,
+    subscriptionLoading: isLoading,
+    customerInfoPresent: customerInfo !== null,
+    cachePresent: cachedSnapshot !== null,
+  });
   const subscriptionStatus = useMemo(
     () =>
       customerInfo
@@ -184,12 +249,29 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     // Guard against overwriting entitlement_active with a default "false" before we have
     // either cachedSnapshot or fresh customerInfo loaded.
     if (session?.id && !isLoading && (customerInfo !== null || cachedSnapshot !== null)) {
-      syncSubscriptionStatus(getSupabase(), session.id, hasProAccess);
+      void syncSubscriptionStatus(getSupabase(), session.id, hasProAccess).catch((e) =>
+        logErrorSafe('SubscriptionContext syncSubscriptionStatus effect', e)
+      );
     }
   }, [session?.id, hasProAccess, customerInfo, cachedSnapshot, isLoading]);
 
   const refresh = useCallback(async () => {
-    if (!session?.id) return;
+    const uid = session?.id;
+    if (!uid) return;
+    const markForegroundEligible = () => {
+      if (sessionIdRef.current === uid) {
+        foregroundRefreshSessionRef.current = uid;
+      }
+    };
+    const configured = await configureRevenueCat(uid);
+    if (!configured) {
+      setRevenueCatSdkReady(false);
+      setOfferings({ current: null, rawCurrentPackages: [] });
+      logStoreStep('refresh_configure_failed', { billingEnvSet: isBillingConfigured() });
+      markForegroundEligible();
+      return;
+    }
+    setRevenueCatSdkReady(true);
     setError(null);
     setIsLoading(true);
     try {
@@ -199,15 +281,20 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           current: offeringsResult.current,
           rawCurrentPackages: offeringsResult.rawCurrentPackages,
         });
+      } else {
+        setOfferings({ current: null, rawCurrentPackages: [] });
+        setError('Could not load subscription plans. Check your connection and try again.');
       }
       setCustomerInfo(info ?? null);
       const snapshot = buildCacheSnapshotFromCustomerInfo(info ?? null);
-      if (snapshot) await setCachedSubscription(session.id, snapshot);
+      if (snapshot) await setCachedSubscription(uid, snapshot);
     } catch (e) {
       // Do not overwrite customerInfo: keep showing last state (or cache) so we don't revoke Pro.
+      recordFlowException('billing_subscription_refresh_failed', e, { stage: 'subscription_refresh' });
       setError(e instanceof Error ? e.message : 'Couldn’t load subscription. Check your connection and try again.');
     } finally {
       setIsLoading(false);
+      markForegroundEligible();
     }
   }, [session?.id]);
 
@@ -218,8 +305,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       setCustomerInfo(info ?? null);
       const snapshot = buildCacheSnapshotFromCustomerInfo(info ?? null);
       if (snapshot) await setCachedSubscription(session.id, snapshot);
-    } catch {
-      // ignore; UI already has result from purchase/restore; do not revoke on network error
+    } catch (e) {
+      logErrorSafe('SubscriptionContext refreshCustomerInfoOnly', e);
     }
   }, [session?.id]);
 
@@ -231,6 +318,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state !== 'active' || !sessionIdRef.current) return;
+      if (foregroundRefreshSessionRef.current !== sessionIdRef.current) return;
       const now = Date.now();
       if (now - lastForegroundRefreshRef.current < FOREGROUND_REFRESH_THROTTLE_MS) return;
       lastForegroundRefreshRef.current = now;
@@ -242,6 +330,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const purchase = useCallback(
     async (rawPackage: RawPurchasesPackage, _displayPackage: RevenueCatPackage): Promise<PurchaseResult> => {
       setError(null);
+      if (rawPackage == null || typeof rawPackage !== 'object') {
+        const msg = 'Subscription plan is not available. Pull to refresh and try again.';
+        setError(msg);
+        recordFlowIssue('billing_purchase_invalid_package', { stage: 'purchase', recoverable: true });
+        return { success: false, error: msg };
+      }
       const result = await purchasePackage(rawPackage);
       if (result.success && result.customerInfo && session?.id) {
         setCustomerInfo(result.customerInfo);
@@ -275,6 +369,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const clearError = useCallback(() => setError(null), []);
 
   const isAvailable = !!session?.id;
+  const billing = getBillingConfig();
 
   const value: SubscriptionContextValue = {
     offerings,
@@ -284,10 +379,21 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     isLoading,
     error,
     isAvailable,
+    revenueCatSdkReady,
+    entitlementBootstrapPending,
     refresh,
     purchase,
     restore,
     clearError,
+    diagnostics: {
+      initialized: revenueCatSdkReady,
+      platform: billing.platform,
+      billingConfigured: billing.configured,
+      billingKeySource: billing.keySource,
+      offeringsLoaded: Boolean(offerings?.current),
+      entitlementActive: hasProAccess,
+      lastError: error,
+    },
   };
 
   return (

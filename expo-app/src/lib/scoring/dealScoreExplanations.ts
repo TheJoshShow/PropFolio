@@ -12,6 +12,13 @@ export function insufficientDataReason(): string {
   return 'We need at least cap rate or cash flow, DSCR, and data confidence to score this deal. Add or confirm those inputs to see a score.';
 }
 
+/** More specific copy when we already know which gates failed (mapping / missing inputs). */
+export function insufficientDataReasonFromMissing(missing: string[]): string {
+  if (missing.length === 0) return insufficientDataReason();
+  const parts = missing.join(', ');
+  return `We can’t show a deal score yet—missing: ${parts}. Listing price or estimated rent unlocks profitability and DSCR; confidence improves as more fields are confirmed.`;
+}
+
 export function bandSentence(band: DealScoreBand): string {
   switch (band) {
     case 'exceptional': return 'Exceptional deal';

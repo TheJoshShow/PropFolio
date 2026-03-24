@@ -4,12 +4,38 @@
  * We only ever validate URL + anon key (client-safe). Service role must never be in client env.
  */
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+import { getRuntimeConfig } from './runtimeConfig';
 
 export interface AuthEnvResult {
   isValid: boolean;
   missing: string[];
+  /** Non-empty reasons why values look unusable (placeholders, localhost in production, etc.). */
+  invalidReasons: string[];
+}
+
+function getHostname(rawUrl: string): string {
+  try {
+    return new URL(rawUrl.trim()).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+/** Reject template placeholders so `isAuthConfigured` matches a real Supabase project. */
+function looksLikePlaceholderSupabaseUrl(url: string): boolean {
+  const u = url.trim().toLowerCase();
+  if (!u) return true;
+  if (u.includes('your_supabase') || u.includes('your-project') || u.includes('placeholder')) return true;
+  if (u.includes('paste_your') || u.includes('xxx')) return true;
+  return false;
+}
+
+function looksLikePlaceholderAnonKey(key: string): boolean {
+  const k = key.trim();
+  if (k.length < 80) return true;
+  const lower = k.toLowerCase();
+  if (lower.includes('placeholder') || lower.includes('your_anon')) return true;
+  return false;
 }
 
 /**
@@ -18,22 +44,43 @@ export interface AuthEnvResult {
  * Production/TestFlight builds require these; when invalid, auth and backend features are unavailable.
  */
 export function validateAuthEnv(): AuthEnvResult {
+  const cfg = getRuntimeConfig();
   const missing: string[] = [];
-  if (!SUPABASE_URL || SUPABASE_URL.trim() === '') {
+  const invalidReasons: string[] = [];
+  if (!cfg.supabaseUrl) {
     missing.push('EXPO_PUBLIC_SUPABASE_URL');
   }
-  if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.trim() === '') {
+  if (!cfg.supabaseAnonKey) {
     missing.push('EXPO_PUBLIC_SUPABASE_ANON_KEY');
   }
-  const isValid = missing.length === 0;
-  if (!isValid && typeof __DEV__ !== 'undefined' && __DEV__) {
-    console.warn(
-      '[PropFolio] Auth env missing:',
-      missing.join(', '),
-      '— set both in .env (or EAS env) for production auth.'
-    );
+
+  if (cfg.supabaseUrl && looksLikePlaceholderSupabaseUrl(cfg.supabaseUrl)) {
+    invalidReasons.push('EXPO_PUBLIC_SUPABASE_URL looks like a placeholder');
   }
-  return { isValid, missing };
+  if (cfg.supabaseAnonKey && looksLikePlaceholderAnonKey(cfg.supabaseAnonKey)) {
+    invalidReasons.push('EXPO_PUBLIC_SUPABASE_ANON_KEY is missing or too short to be a real anon key');
+  }
+
+  const host = cfg.supabaseUrl ? getHostname(cfg.supabaseUrl) : '';
+  const isProdBuild = typeof __DEV__ !== 'undefined' && !__DEV__;
+  if (isProdBuild && host && (host === 'localhost' || host === '127.0.0.1' || host === '::1')) {
+    invalidReasons.push('EXPO_PUBLIC_SUPABASE_URL must not point to localhost in production builds');
+  }
+
+  const isValid = missing.length === 0 && invalidReasons.length === 0;
+  if (!isValid && typeof __DEV__ !== 'undefined' && __DEV__) {
+    if (missing.length > 0) {
+      console.warn(
+        '[PropFolio] Auth env missing:',
+        missing.join(', '),
+        '— set both in .env (or EAS env) for production auth.'
+      );
+    }
+    if (invalidReasons.length > 0) {
+      console.warn('[PropFolio] Auth env invalid:', invalidReasons.join('; '));
+    }
+  }
+  return { isValid, missing, invalidReasons };
 }
 
 /**

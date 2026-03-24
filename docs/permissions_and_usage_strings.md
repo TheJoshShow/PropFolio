@@ -46,8 +46,8 @@ Keep text short, specific, and in plain language (Apple guidance).
 
 ## 3. App Store Connect – App Privacy
 
-- **Data types to declare:** Align with **privacy_data_map.md**: identifiers (user id, device id if used), account info (email, name), purchase history (subscription state), usage data (analytics events), crash data (if Sentry used). Do not declare location/contacts/photos if not collected.
-- **Third-party SDKs:** RevenueCat and Sentry may require declaring their data use; check their current App Privacy guidance and privacy manifests.
+- **Data types to declare:** Align with **privacy_data_map.md**: identifiers (user id, device id if used), account info (email, name), purchase history (subscription state), usage data (analytics events), crash data (if crash reporting used). Do not declare location/contacts/photos if not collected.
+- **Third-party SDKs:** RevenueCat and crash reporting may require declaring their data use; check their current App Privacy guidance and privacy manifests.
 
 ---
 

@@ -135,7 +135,7 @@ Every file below is part of the current auth / free-tier / paywall / subscriptio
    - Create project; add iOS and Android apps; link App Store Connect and Google Play.
    - Create entitlement with identifier **`pro_access`** (must match `billing.ts`).
    - Create offering (e.g. **`default`**); add products from App Store / Play and attach to offering.
-   - Copy **public** app-specific API keys into `expo-app/.env`: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`, `EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID`.
+   - Copy the **public** app-specific iOS API key into `expo-app/.env`: `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS`.
 
 3. **App Store Connect**
    - Create subscription products and subscription group; note product IDs.
@@ -200,6 +200,6 @@ Every file below is part of the current auth / free-tier / paywall / subscriptio
 
 ### Build and tooling
 
-- [ ] `npm run typecheck` in expo-app passes when `@sentry/react-native` and `react-native-purchases` are installed.
+- [ ] `npm run typecheck` in expo-app passes when dependencies (e.g. `react-native-purchases`) are installed.
 - [ ] iOS and Android development builds run; IAP works in dev build (not in Expo Go).
 - [ ] Web: app runs; subscriptions/paywall show web message or no-op; no crash when RevenueCat is not configured.

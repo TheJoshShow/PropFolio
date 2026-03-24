@@ -13,8 +13,8 @@
 | 1 | Privacy Policy published at a stable URL (e.g., propfolio.app/privacy) | ☐ |
 | 2 | URL matches in-app links and App Store Connect ([final_metadata_requirements.md](../docs/final_metadata_requirements.md)) | ☐ |
 | 3 | Policy describes: what data is collected (account, property, usage), how it’s used, storage, sharing, and user rights | ☐ |
-| 4 | Third-party services disclosed (e.g., Supabase, RevenueCat, Sentry, analytics) | ☐ |
-| 5 | Crash/error reporting (e.g., Sentry) disclosed; no PII by default ([sentry_privacy_decision.md](../docs/sentry_privacy_decision.md)) | ☐ |
+| 4 | Third-party services disclosed (e.g., Supabase, RevenueCat, analytics; crash SDK if added) | ☐ |
+| 5 | Crash/error reporting (Firebase Crashlytics) disclosed; no PII by default ([MONITORING_SETUP.md](../expo-app/docs/MONITORING_SETUP.md)) | ☐ |
 | 6 | Data retention and deletion (e.g., account deletion) described | ☐ |
 | 7 | Contact for privacy questions (e.g., support URL or email) included | ☐ |
 | 8 | Policy updated when practices change; last updated date shown | ☐ |
@@ -63,7 +63,7 @@
 
 - **Legal URLs:** [expo-app/src/config/legalUrls.ts](../expo-app/src/config/legalUrls.ts) — Privacy Policy URL from env or default.
 - **Account deletion:** Edge Function `delete-account`; in-app flow in Settings; see [app_store_hardening_changes.md](../docs/app_store_hardening_changes.md).
-- **Sentry:** Production config (sendDefaultPii: false, replay masking) documented in [sentry_privacy_decision.md](../docs/sentry_privacy_decision.md).
+- **Crash reporting:** Firebase Crashlytics — document Google/Firebase processing in Privacy Policy; engineering details in [MONITORING_SETUP.md](../expo-app/docs/MONITORING_SETUP.md).
 - **Terms and support:** [final_legal_and_support_matrix.md](../docs/final_legal_and_support_matrix.md).
 
 ---

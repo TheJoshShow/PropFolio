@@ -19,7 +19,6 @@ Set these for the **production** build (EAS build or release build). Do not comm
 | 5 | **EXPO_PUBLIC_TERMS_URL** | Recommended | Must resolve (e.g. https://propfolio.app/terms). |
 | 6 | **EXPO_PUBLIC_SUPPORT_URL** | Recommended (App Store) | Must resolve; match App Store Connect Support URL. |
 | 7 | **EXPO_PUBLIC_BILLING_HELP_URL** | Optional | If set, used for "Billing help & FAQ" in Settings. |
-| 8 | **EXPO_PUBLIC_SENTRY_DSN** | Optional | If set, Sentry is enabled. Can leave empty for release. |
 
 **Checklist:**
 

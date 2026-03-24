@@ -97,7 +97,7 @@ No demo-only code paths run in production when configured correctly.
 
 - **getSupabase():** Returns null when env missing; callers (auth, import, subscription) handle null. ✓  
 - **RevenueCat:** Lazy `require('react-native-purchases')` in try/catch; returns null on web or when unavailable. ✓  
-- **Sentry:** Dynamic require in _layout.tsx; null on failure. ✓  
+- **crash reporting:** Dynamic require in _layout.tsx; null on failure. ✓  
 - **Edge Function invoke:** `edgeFunctions.ts` checks getSupabase() and handles error. ✓  
 - **Optional:** Ensure any `Linking.openURL` / `handleOpenUrl` has try/catch (already present in Settings).
 

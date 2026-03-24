@@ -18,7 +18,7 @@ This folder contains **draft** Privacy Policy and Terms of Service for counsel r
 | **Property & analysis data** | User-entered addresses, listing URLs, import metadata, normalized property records, analyses, scores, confidence metrics, scenarios, renovation line items, portfolio organization; optional latitude/longitude **derived from geocoding** user-supplied addresses (not device GPS in current app routes). |
 | **Usage / product analytics** | Events written to `usage_events` (e.g. signup, import funnel, paywall, purchases, portfolio views) with **non-PII** metadata per app conventions. |
 | **Subscriptions** | RevenueCat (native) for in-app purchases; server webhook syncs entitlement state to Supabase (`subscription_status`). Database schema also includes legacy Stripe-related columns on `subscriptions`; **in-app billing path in the Expo app is store purchases via RevenueCat**—confirm with counsel whether Stripe appears in production. |
-| **Crash / diagnostics** | Sentry on **iOS** when `EXPO_PUBLIC_SENTRY_DSN` is set: errors, performance traces, optional **session replay** with text/images masked; `sendDefaultPii: false`. |
+| **Crash / diagnostics** | Firebase Crashlytics on iOS via `src/services/monitoring` — see **`expo-app/docs/MONITORING_SETUP.md`**. |
 | **Third-party APIs (via Supabase Edge Functions)** | Google Geocoding & Places (address autocomplete/geocode); RentCast (rent estimates); OpenAI (plain-language summarization—**not** used for financial calculations in product rules); U.S. Census-related data (census-data function). |
 | **Maps** | `react-native-maps` displays pins using **stored/geocoded** coordinates; no `expo-location` usage found under `expo-app/app`. |
 

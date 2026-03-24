@@ -3,6 +3,9 @@
 # dependencies
 node_modules/
 
+# Mistaken nested duplicate folder (e.g. accidental `expo-app` inside `expo-app`)
+/expo-app/
+
 # Expo
 .expo/
 dist/

@@ -17,18 +17,15 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect, type Router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Card, Button, TextInput } from '../../src/components';
 import { useThemeColors } from '../../src/components/useThemeColors';
 import { spacing, fontSizes, fontWeights, lineHeights, radius } from '../../src/theme';
 import { parseListingImportForImportAsync } from '../../src/lib/parsers';
 import { responsiveContentContainer } from '../../src/utils/responsive';
-import {
-  geocodeAddress,
-  placesAutocomplete,
-  rentEstimate,
-  getSupabase,
-} from '../../src/services';
+import { placesAutocomplete, getSupabase } from '../../src/services';
+import { enrichAddressForImport } from '../../src/services/propertyImportOrchestrator';
+import { importEnrichmentAlert } from '../../src/services/importErrorCodes';
 import { useImportLimit } from '../../src/hooks/useImportLimit';
 import { useSubscription } from '../../src/contexts/SubscriptionContext';
 import { useImportResume } from '../../src/contexts/ImportResumeContext';
@@ -38,10 +35,9 @@ import { FreeImportsIndicator } from '../../src/components';
 import { useExecutePropertyImport } from '../../src/hooks/useExecutePropertyImport';
 import { trackEvent } from '../../src/services/analytics';
 import { logErrorSafe, logImportStep } from '../../src/services/diagnostics';
-import {
-  IMPORT_USER_MESSAGES,
-  messageForAccountSetupFailure,
-} from '../../src/services/importErrorMessages';
+import { IMPORT_USER_MESSAGES, resolveImportFailureMessage } from '../../src/services/importErrorMessages';
+import { mapAutocompleteEdgeError, mapImportException } from '../../src/services/importPipelineErrors';
+import { navigateToPortfolioDetail } from '../../src/utils/appNavigation';
 
 const DEBOUNCE_MS = 400;
 
@@ -60,9 +56,10 @@ function showPaywallForBlocked(router: Router) {
 
 export default function ImportScreen() {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session, isLoading: authLoading } = useAuth();
-  const { count, freeRemaining, canImport, isLoading: limitLoading, refresh: importLimitRefresh } = useImportLimit();
+  const { freeRemaining, canImport, isLoading: limitLoading, refresh: importLimitRefresh } = useImportLimit();
   const { hasProAccess, refresh: subscriptionRefresh } = useSubscription();
   const { pendingImport, setPendingImport } = useImportResume();
   const { execute, isSubmitting } = useExecutePropertyImport();
@@ -102,6 +99,11 @@ export default function ImportScreen() {
         return;
       }
 
+      if (!session?.id) {
+        Alert.alert('Sign in required', IMPORT_USER_MESSAGES.notSignedIn);
+        return;
+      }
+
       trackEvent('import_started', { metadata: { source } });
 
       // Standardize address + get rent when available.
@@ -124,30 +126,22 @@ export default function ImportScreen() {
         const showAddressProgress = source === 'manual';
         if (showAddressProgress) setAddressLoading(true);
         try {
-          // Geocoding is best-effort; if it fails, we still continue with the raw address line.
-          const geocodeRes = await geocodeAddress(trimmed);
-          if (geocodeRes.error && __DEV__) {
-            logImportStep('geocode_warning', { stage: 'manual_or_link', hasError: true });
+          const enrichedResult = await enrichAddressForImport({
+            trimmedAddressLine: trimmed,
+            hasSupabase: true,
+            source,
+          });
+          if (!enrichedResult.ok) {
+            const { title, message } = importEnrichmentAlert(enrichedResult.code);
+            Alert.alert(title, message);
+            return;
           }
-          if (!geocodeRes.error && geocodeRes.data?.formatted_address) {
-            addressLine = geocodeRes.data.formatted_address;
-          }
-          const lat = geocodeRes.data?.lat;
-          const lng = geocodeRes.data?.lng;
-          if (
-            lat != null &&
-            lng != null &&
-            Number.isFinite(lat) &&
-            Number.isFinite(lng)
-          ) {
-            geocodeLat = lat;
-            geocodeLng = lng;
-          }
-
-          const rentRes = await rentEstimate({ address: addressLine });
-          const parsedRent = rentRes.data?.rent ?? (rentRes.data as { monthlyRent?: number })?.monthlyRent;
-          rent = parsedRent ?? undefined;
-          rentUnavailable = Boolean(rentRes.error && rent == null);
+          const enriched = enrichedResult.enriched;
+          addressLine = enriched.addressLine;
+          geocodeLat = enriched.geocodeLat;
+          geocodeLng = enriched.geocodeLng;
+          rent = enriched.rent;
+          rentUnavailable = enriched.rentUnavailable;
         } finally {
           if (showAddressProgress) setAddressLoading(false);
         }
@@ -155,11 +149,6 @@ export default function ImportScreen() {
         // No offline import support in production; the branch above guards this.
         rent = undefined;
         rentUnavailable = true;
-      }
-
-      if (!session?.id) {
-        Alert.alert('Error', IMPORT_USER_MESSAGES.notSignedIn);
-        return;
       }
 
       const importData = addressToImportData(addressLine, rent != null ? Number(rent) : undefined);
@@ -185,7 +174,9 @@ export default function ImportScreen() {
         }
 
         // Take user straight to the detail view so they can confirm it's working.
-        router.push(`/portfolio/${result.propertyId}`);
+        if (!navigateToPortfolioDetail(router, result.propertyId)) {
+          Alert.alert('Could not open property', 'Something was wrong with the saved property link. Check your portfolio.');
+        }
         return;
       }
 
@@ -197,8 +188,7 @@ export default function ImportScreen() {
       }
 
       if (result.status === 'failed_retryable') {
-        const msg =
-          messageForAccountSetupFailure({ rawMessage: result.error }).userMessage;
+        const msg = resolveImportFailureMessage(result.error);
         Alert.alert('Import failed', msg, [
           { text: 'OK' },
           { text: 'Try again', onPress: () => importByAddressLine(rawAddressLine, source, opts) },
@@ -207,8 +197,7 @@ export default function ImportScreen() {
       }
 
       if (result.status === 'failed_nonretryable') {
-        const msg =
-          messageForAccountSetupFailure({ rawMessage: result.error ?? '' }).userMessage;
+        const msg = resolveImportFailureMessage(result.error);
         Alert.alert('Import failed', msg);
         return;
       }
@@ -225,8 +214,6 @@ export default function ImportScreen() {
       setPendingImport,
       execute,
       router,
-      geocodeAddress,
-      rentEstimate,
       trackEvent,
     ]
   );
@@ -266,7 +253,8 @@ export default function ImportScreen() {
       await importByAddressLine(parsed.addressLine, parsed.provider, { clearInputs: true });
     } catch (e) {
       logErrorSafe('Import handlePasteLink', e);
-      Alert.alert('Import failed', IMPORT_USER_MESSAGES.importTemporaryFailure);
+      const mapped = mapImportException(e);
+      Alert.alert(mapped.title, mapped.message);
     } finally {
       setLinkLoading(false);
     }
@@ -288,39 +276,47 @@ export default function ImportScreen() {
       if (query.length < 3) return;
       setAutocompleteError(null);
       setAutocompleteLoading(true);
-      const { data, error } = await placesAutocomplete(query);
-      setAutocompleteLoading(false);
+      try {
+        const { data, error } = await placesAutocomplete(query);
+        setAutocompleteLoading(false);
 
-      if (addressInputRef.current !== query) return;
+        if (addressInputRef.current !== query) return;
 
-      if (error) {
+        if (error) {
+          setSuggestions([]);
+          const mapped = mapAutocompleteEdgeError(error);
+          setAutocompleteError(
+            mapped.userMessage || 'Suggestions unavailable. You can still type an address and tap Use address.'
+          );
+          if (__DEV__) {
+            logImportStep('autocomplete_edge_error', { errLen: String(error).length });
+          }
+          return;
+        }
+
+        const preds = data?.predictions ?? [];
+        const normalized: { description: string; place_id: string }[] = preds
+          .map((p) => ({
+            description: String(p.description ?? '').trim(),
+            place_id: String(p.place_id ?? '').trim(),
+          }))
+          .filter((p) => p.description.length > 0);
+        setSuggestions(normalized);
+        // Empty predictions = no matches, not a failure — clear error banner.
+        setAutocompleteError(null);
+        if (__DEV__ && normalized.length === 0) {
+          logImportStep('autocomplete_empty', { queryLen: query.length });
+        }
+      } catch (e) {
+        setAutocompleteLoading(false);
+        if (addressInputRef.current !== query) return;
+        logErrorSafe('Import placesAutocomplete', e);
         setSuggestions([]);
+        const mapped = mapAutocompleteEdgeError(e instanceof Error ? e.message : String(e));
         setAutocompleteError(
-          error.toUpperCase().includes('GOOGLE_MAPS_API_KEY')
-            ? 'Address suggestions are unavailable right now. Please try again later.'
-            : 'Suggestions unavailable. You can still type an address and tap Use address.'
+          mapped.userMessage || 'Suggestions unavailable. You can still type an address and tap Use address.'
         );
-        if (__DEV__) console.warn('[Import] placesAutocomplete error', error);
-        return;
       }
-
-      const raw = data as { predictions?: unknown[]; data?: { predictions?: unknown[] } } | null | undefined;
-      const list = Array.isArray(raw?.predictions)
-        ? raw.predictions
-        : Array.isArray(raw?.data?.predictions)
-          ? raw.data.predictions
-          : [];
-      const normalized: { description: string; place_id: string }[] = list
-        .map((p: unknown) => {
-          const o = p as { description?: string; place_id?: string };
-          return {
-            description: String(o?.description ?? ''),
-            place_id: String(o?.place_id ?? ''),
-          };
-        })
-        .filter((p) => p.description.length > 0);
-      setSuggestions(normalized);
-      setAutocompleteError(null);
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [addressInput, hasSupabase]);
@@ -353,7 +349,7 @@ export default function ImportScreen() {
       let cancelled = false;
       (async () => {
         await Promise.all([subscriptionRefresh(), importLimitRefresh()]);
-        if (__DEV__ && !cancelled) console.log('[Import] Refreshed for resume; canImport will update.');
+        if (__DEV__ && !cancelled) logImportStep('resume_subscription_refresh', {});
       })();
       return () => { cancelled = true; };
     }, [pendingImport, subscriptionRefresh, importLimitRefresh])
@@ -382,7 +378,7 @@ export default function ImportScreen() {
             'Pro access is not active yet. Tap "Retry" below to check again, or try again in a moment.'
           );
         } else {
-          const err = 'error' in result ? result.error : 'Import failed';
+          const err = resolveImportFailureMessage('error' in result ? result.error : undefined);
           Alert.alert('Import failed', err);
         }
       })
@@ -390,7 +386,8 @@ export default function ImportScreen() {
         logErrorSafe('Import resume after upgrade', err);
         resumeExecutedRef.current = false;
         setPendingImport(data);
-        Alert.alert('Import failed', IMPORT_USER_MESSAGES.importTemporaryFailure);
+        const mapped = mapImportException(err);
+        Alert.alert(mapped.title, mapped.message);
       });
   }, [pendingImport, canImport, isSubmitting, authLoading, setPendingImport, execute]);
 
@@ -410,7 +407,11 @@ export default function ImportScreen() {
     >
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, responsiveContentContainer]}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: styles.content.paddingBottom + insets.bottom },
+        responsiveContentContainer,
+      ]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
@@ -516,7 +517,7 @@ export default function ImportScreen() {
           </View>
         )}
         {autocompleteError && (
-          <Text style={[styles.autocompleteError, { color: colors.textSecondary }]} numberOfLines={2}>
+          <Text style={[styles.autocompleteError, { color: colors.textSecondary }]}>
             {autocompleteError}
           </Text>
         )}

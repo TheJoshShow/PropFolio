@@ -14,7 +14,7 @@
 | **Language** | Swift 5.x |
 | **Entry point** | `PropFolioApp.swift` — `@main`, `WindowGroup`, auth gate then `RootTabView` |
 | **Platform** | **iOS-only** (macOS/Android/Web not targeted) |
-| **Existing “web”** | Separate **Vite + React + TypeScript** app — was in `/web`, now in **`_archive_review/web`** (archived). **Not** shared codebase; duplicate screens and demo data. Current web is expo-app (RN Web). |
+| **Existing “web”** | A legacy **Vite + React** app lived at **`/web`** in older repo layouts; it is **not** in this tree anymore. **Current web** is **`expo-app`** (React Native Web), same codebase as iOS/Android. |
 
 **Verdict:** The app is **iOS-native SwiftUI** with a **separate React web shell**. There is no shared core; business logic lives entirely in Swift.
 
@@ -164,9 +164,9 @@ All engines use **Foundation only** (no SwiftUI/UIKit). Input/output types are s
 | **UserDefaults** | useDemoData, etc. | AsyncStorage (RN), localStorage (web). |
 | **NotificationCenter** | switchToImportTab | In-memory event bus or React context. |
 | **UIKit (minimal)** | Keyboard dismiss | RN: Keyboard.dismiss(); web: blur(). |
-| **OSLog** | Structured logging | Same concept in TS (e.g. Sentry, console, or logger). |
+| **OSLog** | Structured logging | Same concept in TS (e.g. crash reporting, console, or logger). |
 
-No other platform-locked frameworks (e.g. StoreKit, Core Data) are used in the audited code. Subscriptions (RevenueCat) and crash reporting (Sentry) are to be added in the new stack.
+No other platform-locked frameworks (e.g. StoreKit, Core Data) are used in the audited code. Subscriptions (RevenueCat) and crash reporting (crash reporting) are to be added in the new stack.
 
 ---
 
@@ -237,7 +237,7 @@ These exist as SwiftUI views today; rebuild in React/RN with same behavior and d
 | **Supabase** | Already in use; same backend for auth and DB on all platforms. |
 | **RevenueCat** | Standard for mobile subscriptions; Expo-compatible. |
 | **Stripe** | For web subscriptions or hybrid; abstraction so paywall logic is shared. |
-| **Sentry** | Cross-platform error/crash reporting. |
+| **crash reporting** | Cross-platform error/crash reporting. |
 | **Modular feature-based structure** | `/src/features/{auth,onboarding,property-import,...}` plus shared `/src/lib`, `/src/components`, `/src/theme`. |
 
 **Why not Flutter:**  
@@ -263,7 +263,7 @@ Two native codebases (Swift + Kotlin) plus web triples maintenance and doubles t
    Auth, onboarding, home, import (all phases), portfolio, analysis, what-if, renovation, settings, paywall. Use shared logic and design system; platform-specific only where necessary.
 
 5. **Phase 6 — API and platform integration**  
-   Supabase (auth + DB), address autocomplete (Google or backend), property/market adapters, Sentry, RevenueCat, Stripe (or billing abstraction).
+   Supabase (auth + DB), address autocomplete (Google or backend), property/market adapters, crash reporting, RevenueCat, Stripe (or billing abstraction).
 
 6. **Phase 7 — Responsive web**  
    Layout rules, container widths, desktop nav, keyboard/focus, URL routing, no mobile-only assumptions.
@@ -287,7 +287,7 @@ Two native codebases (Swift + Kotlin) plus web triples maintenance and doubles t
 - **Current:** iOS-only SwiftUI app with deterministic, well-tested engines (Foundation only); separate Vite+React web app; Supabase backend.
 - **Reusable:** All calculation and parser logic (reimplemented in TypeScript); state and flow design; API contracts and caching strategy.
 - **Rewrite:** All UI and view models; navigation; platform config and native integrations.
-- **Recommended:** React Native + Expo + TypeScript + shared core; Expo Router; React Native Web; Supabase; RevenueCat + Stripe; Sentry; feature-based modular structure.
+- **Recommended:** React Native + Expo + TypeScript + shared core; Expo Router; React Native Web; Supabase; RevenueCat + Stripe; crash reporting; feature-based modular structure.
 - **Blockers:** None that prevent the recommended path; main risks are formula drift and regression, mitigated by a single TS core and strong tests.
 
 Phase 1 is complete. Next: **Phase 2 — Create the target architecture** (scaffold Expo app and folder structure).
