@@ -10,6 +10,9 @@
 #
 # This workflow uses --no-wait so the job finishes after the build is queued; open the printed URL
 # on expo.dev to watch progress (iOS builds often take 15–25+ minutes).
+#
+# Node: use Node 24 for this job and opt JS composite actions into Node 24 (GitHub Actions guidance).
+# npm cache is disabled here so a flaky Actions cache API (400 / “services aren't available”) does not fail the job.
 
 name: EAS iOS production build
 
@@ -29,6 +32,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     defaults:
       run:
         working-directory: expo-app
@@ -39,9 +44,7 @@ jobs:
       # expo-dev-client cannot resolve and the build fails before upload.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: expo-app/package-lock.json
+          node-version: '24'
 
       - name: Install dependencies
         run: npm ci
