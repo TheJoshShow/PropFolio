@@ -1,0 +1,46 @@
+# EAS iOS production build from Git — each run uses the commit SHA Expo shows on the build page.
+#
+# Prerequisites (one-time):
+# 1. Create an Expo access token: https://expo.dev/accounts/<your-account>/settings/access-tokens
+# 2. GitHub → repo → Settings → Secrets and variables → Actions → New repository secret:
+#    Name: EXPO_TOKEN   Value: (paste token)
+#
+# EAS still injects env vars from your Expo project (production environment + eas.json) — no need
+# to duplicate EXPO_PUBLIC_* in GitHub for the build itself.
+#
+# This workflow uses --no-wait so the job finishes after the build is queued; open the printed URL
+# on expo.dev to watch progress (iOS builds often take 15–25+ minutes).
+
+name: EAS iOS production build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'expo-app/**'
+      - '.github/workflows/eas-ios-production.yml'
+
+concurrency:
+  group: eas-ios-production-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Queue iOS production build on EAS
+        run: eas build --platform ios --profile production --non-interactive --no-wait
