@@ -35,6 +35,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # EAS runs `npx expo config` on the runner first; without node_modules, plugins like
+      # expo-dev-client cannot resolve and the build fails before upload.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: expo-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: expo-app
+
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
         with:
@@ -43,4 +55,6 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Queue iOS production build on EAS
+        env:
+          EAS_BUILD_NO_EXPO_GO_WARNING: 'true'
         run: eas build --platform ios --profile production --non-interactive --no-wait
