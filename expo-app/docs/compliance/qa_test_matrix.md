@@ -127,4 +127,4 @@ Use this matrix for manual (or automated) testing before each release and for Ap
 
 ---
 
-*Use alongside `release_blocker_report.md` and `launch_candidate_summary.md` for release and App Store submission.*
+*Use alongside [`../archive/ios-audit/release_blocker_report.md`](../archive/ios-audit/release_blocker_report.md) and [`../archive/ios-audit/launch_candidate_summary.md`](../archive/ios-audit/launch_candidate_summary.md) for release and App Store submission.*

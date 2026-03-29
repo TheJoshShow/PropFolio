@@ -54,7 +54,7 @@ You **do not** hand-edit `Podfile` / `AppDelegate` in-repo for Firebase; the **c
 
 ## 4. How should `GoogleService-Info.plist` be supplied for EAS builds?
 
-**Two supported patterns** (see also repo root **`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**).
+**Two supported patterns** (see also **`docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**).
 
 ### A. Committed file (simplest)
 
@@ -116,7 +116,7 @@ This app uses **CNG** (`ios/` is **generated**, not committed). The **`@react-na
 
 - Confirm crashes are from a **Release** / TestFlight build, not a mismatched dev build.
 - Re-run prebuild and confirm the **Crashlytics** Run Script phase is still present (`app.config.ts` plugin order unchanged).
-- See repo root **`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`** §5 and Firebase Console hints.
+- See **`docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`** §5 and Firebase Console hints.
 
 ### 5.4 Summary table
 
@@ -164,6 +164,6 @@ There is **no** second Firebase initializer in app code beyond **`initMonitoring
 |-----|---------|
 | **`FIREBASE_SETUP_CHECKLIST.md`** | Short **finish setup** steps (Console → plist → verify → test) |
 | **`FIREBASE_CONSOLE_PLIST.md`** | **Download + overwrite** `GoogleService-Info.plist` (requires Firebase login) |
-| Repo root **`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`** | Deeper Firebase + plist + EAS file var + dSYM notes |
+| **`docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`** | Deeper Firebase + plist + EAS file var + dSYM notes |
 | **`MONITORING_SETUP.md`** | JS monitoring facade, privacy, troubleshooting |
-| Repo root **`CRASHLYTICS_RELEASE_VERIFICATION.md`** | TestFlight / production verification |
+| **`docs/monitoring/CRASHLYTICS_RELEASE_VERIFICATION.md`** | TestFlight / production verification |

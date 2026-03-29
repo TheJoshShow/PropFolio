@@ -37,11 +37,11 @@ Use this for **each version** you submit to App Store Connect (TestFlight or App
 Before submission, confirm these open correctly in **Safari** (not just in-app):
 
 - [ ] **Privacy Policy URL** (App Store Connect + in-app): ________  
-  - In-app: Settings → Privacy Policy. Env: `EXPO_PUBLIC_PRIVACY_POLICY_URL` or fallback `https://propfolio.app/privacy`.
+  - In-app: Settings → Privacy Policy. Env: `EXPO_PUBLIC_PRIVACY_POLICY_URL` or fallback `https://prop-folio.vercel.app/privacy`.
 - [ ] **Terms of Service URL** (in-app only; required for IAP/sign-up): ________  
-  - In-app: Settings → Terms; Paywall footer; Sign-up agreement. Env: `EXPO_PUBLIC_TERMS_URL` or fallback `https://propfolio.app/terms`.
+  - In-app: Settings → Terms; Paywall footer; Sign-up agreement. Env: `EXPO_PUBLIC_TERMS_URL` or fallback `https://prop-folio.vercel.app/terms`.
 - [ ] **Support URL** (App Store Connect + in-app): ________  
-  - In-app: Settings → Contact support. Env: `EXPO_PUBLIC_SUPPORT_URL` or fallback `https://propfolio.app/support`.
+  - In-app: Settings → Contact support. Env: `EXPO_PUBLIC_SUPPORT_URL` or fallback `https://prop-folio.vercel.app/support`.
 - [ ] **Marketing URL** (optional in Connect): ________  
 
 **Rule:** The URLs in App Store Connect must match (or redirect to) the same content as the in-app links. Support URL must be valid and monitored during review.

@@ -11,13 +11,22 @@
 export {
   getRuntimeConfig,
   validateRuntimeConfigForDev,
+  validateRuntimeConfigForRelease,
   getRuntimeConfigDiagnostics,
   CLIENT_EXPO_PUBLIC_ENV_KEYS,
   type RuntimeConfig,
   type RuntimeConfigDiagnostics,
+  type RuntimeReleaseValidationResult,
 } from './runtimeConfig';
 
-export { validateAuthEnv, isAuthEnvConfigured, type AuthEnvResult } from './env';
+export {
+  validateAuthEnv,
+  isAuthEnvConfigured,
+  getAuthConfigurationUserMessage,
+  type AuthEnvResult,
+} from './env';
+
+export { getAccountServicesUnavailableBannerMessage } from './accountServicesAvailability';
 
 export * from './billing';
 export * from './legalUrls';

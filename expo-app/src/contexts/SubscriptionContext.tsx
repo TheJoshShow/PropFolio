@@ -54,7 +54,7 @@ import {
 import { logEntitlementState, logErrorSafe, logOfferingsLoad, logStoreStep } from '../services/diagnostics';
 import { recordFlowException, recordFlowIssue } from '../services/monitoring/flowInstrumentation';
 import { getBillingConfig, isBillingConfigured } from '../config';
-import { isEntitlementBootstrapPending as computeEntitlementBootstrapPending } from '../subscription/entitlementPolicy';
+import { isEntitlementBootstrapPending as computeEntitlementBootstrapPending } from '../features/subscriptions/entitlementPolicy';
 
 export interface OfferingsState {
   current: RevenueCatOffering | null;

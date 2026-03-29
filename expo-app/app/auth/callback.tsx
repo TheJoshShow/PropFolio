@@ -8,11 +8,9 @@ import { useThemeColors } from '../../src/components/useThemeColors';
 import { spacing, fontSizes, fontWeights, lineHeights, radius } from '../../src/theme';
 
 /**
- * Deep-link entry point for Supabase email confirmation and magic-link / OAuth callbacks.
- * Native redirect URL (mobile/TestFlight) uses `propfolio://auth/callback`.
- *
- * Session restoration is handled by `AuthContext` listening for the callback URL and calling
- * `supabase.auth.setSession(...)`. This screen just waits for session state and routes.
+ * Route shown when the app opens via `propfolio://auth/callback` (email confirm or password reset).
+ * Session is completed in `AuthContext` via PKCE `exchangeCodeForSession` from the same URL (Linking).
+ * This screen only bridges UX: wait for session, then go to tabs or login.
  */
 export default function AuthCallbackScreen() {
   const router = useRouter();
@@ -35,12 +33,12 @@ export default function AuthCallbackScreen() {
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.title, { color: colors.text }]}>
-          {isLoading ? 'Signing you in…' : 'Redirecting…'}
+          {isLoading ? 'Opening your link…' : 'Redirecting…'}
         </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           {Platform.OS === 'ios'
-            ? 'Completing authentication'
-            : 'Completing sign-in'}
+            ? 'Confirming your email or finishing password reset'
+            : 'Finishing sign-in from your email link'}
         </Text>
       </View>
     </SafeAreaView>

@@ -15,8 +15,8 @@ Set these for the **production** build (EAS build or release build). Do not comm
 | 1 | **EXPO_PUBLIC_SUPABASE_URL** | Yes (for real auth) | Production Supabase project URL. App will run in demo mode if missing. |
 | 2 | **EXPO_PUBLIC_SUPABASE_ANON_KEY** | Yes (for real auth) | Production anon key from Supabase Dashboard. **Never** service role key. |
 | 3 | **EXPO_PUBLIC_REVENUECAT_API_KEY_IOS** | Yes (for IAP) | RevenueCat Dashboard → API Keys → Public iOS key. Required for paywall and restore. |
-| 4 | **EXPO_PUBLIC_PRIVACY_POLICY_URL** | Recommended (App Store) | Must resolve (e.g. https://propfolio.app/privacy). Match App Store Connect. |
-| 5 | **EXPO_PUBLIC_TERMS_URL** | Recommended | Must resolve (e.g. https://propfolio.app/terms). |
+| 4 | **EXPO_PUBLIC_PRIVACY_POLICY_URL** | Recommended (App Store) | Must resolve (e.g. https://prop-folio.vercel.app/privacy). Match App Store Connect. |
+| 5 | **EXPO_PUBLIC_TERMS_URL** | Recommended | Must resolve (e.g. https://prop-folio.vercel.app/terms). |
 | 6 | **EXPO_PUBLIC_SUPPORT_URL** | Recommended (App Store) | Must resolve; match App Store Connect Support URL. |
 | 7 | **EXPO_PUBLIC_BILLING_HELP_URL** | Optional | If set, used for "Billing help & FAQ" in Settings. |
 

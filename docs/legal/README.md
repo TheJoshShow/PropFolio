@@ -14,7 +14,7 @@ This folder contains **draft** Privacy Policy and Terms of Service for counsel r
 
 | Category | Details |
 |----------|---------|
-| **Account & identity** | Email and password (handled by Supabase Auth); optional OAuth via Google or Apple; optional magic link / OTP email flows; first/last name; optional phone number (E.164) in auth metadata and `profiles.phone_number`; profile fields such as `display_name`, `avatar_url`. |
+| **Account & identity** | Email and password (handled by Supabase Auth); optional OAuth via Google or Apple; optional magic link / OTP email flows; first/last name; `profiles.phone_number` is optional and **not** collected on the sign-up screen (legacy/sync or future Settings only); profile fields such as `display_name`, `avatar_url`. |
 | **Property & analysis data** | User-entered addresses, listing URLs, import metadata, normalized property records, analyses, scores, confidence metrics, scenarios, renovation line items, portfolio organization; optional latitude/longitude **derived from geocoding** user-supplied addresses (not device GPS in current app routes). |
 | **Usage / product analytics** | Events written to `usage_events` (e.g. signup, import funnel, paywall, purchases, portfolio views) with **non-PII** metadata per app conventions. |
 | **Subscriptions** | RevenueCat (native) for in-app purchases; server webhook syncs entitlement state to Supabase (`subscription_status`). Database schema also includes legacy Stripe-related columns on `subscriptions`; **in-app billing path in the Expo app is store purchases via RevenueCat**—confirm with counsel whether Stripe appears in production. |
@@ -28,7 +28,7 @@ This folder contains **draft** Privacy Policy and Terms of Service for counsel r
 
 **Contact / URLs in code**
 
-- Defaults: `https://propfolio.app/privacy`, `https://propfolio.app/terms`, `https://propfolio.app/support` (`expo-app/src/config/legalUrls.ts`). Replace via env for production.
+- Defaults: `https://prop-folio.vercel.app/privacy`, `https://prop-folio.vercel.app/terms`, `https://prop-folio.vercel.app/support` (`expo-app/src/config/legalUrls.ts`). Replace via env for production.
 
 **TODOs for legal / product**
 
@@ -44,8 +44,8 @@ Files: `privacy-policy.md`, `terms-of-service.md`.
 
 The **`website/`** folder at the repo root builds static pages from the markdown above (`npm run build`). Deploy **`website`** to your domain so these URLs work:
 
-- `https://propfolio.app/privacy`
-- `https://propfolio.app/terms`
+- `https://prop-folio.vercel.app/privacy`
+- `https://prop-folio.vercel.app/terms`
 
 See **`website/README.md`** for Vercel, Netlify, and preview steps.
 

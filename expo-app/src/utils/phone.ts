@@ -64,19 +64,3 @@ export function getPhoneValidationError(phoneRaw: string): string | null {
 
   return null;
 }
-
-/**
- * Validation for optional phone fields (e.g. sign-up). Blank / whitespace-only is valid.
- * If the user types something, it must normalize to E.164 or we show a field-level error.
- */
-export function getOptionalPhoneFieldError(phoneRaw: string): string | null {
-  const trimmed = (phoneRaw ?? '').trim();
-  if (!trimmed) return null;
-
-  const normalized = normalizePhoneNumber(trimmed);
-  if (!normalized) {
-    return 'Enter a valid phone number or leave this field blank.';
-  }
-  return null;
-}
-

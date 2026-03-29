@@ -1,10 +1,10 @@
 /**
- * Outlined pill badge for labels (e.g. "AI DRIVEN REAL ESTATE INTELLIGENCE").
+ * Refined pill badge — warm gold frame on a subtle tinted surface (welcome / labels).
  */
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { spacing, radius, fontSizes } from '../theme';
+import { spacing, radius, fontSizes, fontWeights } from '../theme';
 import { useThemeColors } from './useThemeColors';
 
 export interface PillBadgeProps {
@@ -15,8 +15,16 @@ export function PillBadge({ label }: PillBadgeProps) {
   const colors = useThemeColors();
 
   return (
-    <View style={[styles.pill, { borderColor: colors.primary }]}>
-      <Text style={[styles.label, { color: colors.primary }]} numberOfLines={1}>
+    <View
+      style={[
+        styles.pill,
+        {
+          backgroundColor: colors.primaryMuted,
+          borderColor: colors.primary,
+        },
+      ]}
+    >
+      <Text style={[styles.label, { color: colors.primary }]} numberOfLines={1} allowFontScaling>
         {label}
       </Text>
     </View>
@@ -26,14 +34,15 @@ export function PillBadge({ label }: PillBadgeProps) {
 const styles = StyleSheet.create({
   pill: {
     alignSelf: 'flex-start',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     borderRadius: radius.pill,
-    paddingVertical: spacing.xxs,
-    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.m,
   },
   label: {
     fontSize: fontSizes.xs,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontWeight: fontWeights.semibold,
+    letterSpacing: 0.85,
+    textTransform: 'uppercase',
   },
 });

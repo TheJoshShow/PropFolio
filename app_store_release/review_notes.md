@@ -51,7 +51,7 @@ If the reviewer is offline or our backend is slow, they may see "Address lookup 
 
 ## API-dependent behavior
 
-- **Sign in / sign up:** Uses Supabase Auth (email/password, OAuth, magic link). Works with real backend.
+- **Sign in / sign up:** Uses Supabase Auth (email/password; confirmation and password-reset links via email). Works with real backend.
 - **Address autocomplete and geocoding:** Requires network; calls our Edge Functions (which call Google APIs). No autocomplete when offline.
 - **Rent estimate:** Requires network; calls our Edge Function (RentCast). If it fails, we still save the property; rent can be "unavailable."
 - **Subscription state:** RevenueCat (and Apple IAP). In Sandbox, reviewers can complete a test purchase to see Pro state.

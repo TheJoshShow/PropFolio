@@ -6,6 +6,38 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logErrorSafe } from './diagnostics';
 
+const PROPERTY_SELECT_COLUMNS = [
+  'id',
+  'portfolio_id',
+  'street_address',
+  'unit',
+  'city',
+  'state',
+  'postal_code',
+  'country_code',
+  'list_price',
+  'bedrooms',
+  'bathrooms',
+  'sqft',
+  'lot_sqft',
+  'year_built',
+  'property_type',
+  'normalized_snapshot',
+  'overall_confidence',
+  'data_source',
+  'fetched_at',
+  'created_at',
+  'updated_at',
+  'rent',
+  'latitude',
+  'longitude',
+  'full_address',
+  'geocode_status',
+  'geocode_source',
+  'geocode_error',
+  'last_geocoded_at',
+].join(', ');
+
 /** Raw property row as returned by Supabase (snake_case). */
 export interface PropertyRow {
   id: string;
@@ -20,6 +52,11 @@ export interface PropertyRow {
   bedrooms: number | null;
   bathrooms: number | null;
   sqft: number | null;
+  lot_sqft?: number | null;
+  year_built?: number | null;
+  property_type?: string | null;
+  normalized_snapshot?: Record<string, unknown> | null;
+  overall_confidence?: number | null;
   data_source: string | null;
   fetched_at: string;
   created_at?: string | null;
@@ -32,6 +69,61 @@ export interface PropertyRow {
   geocode_source?: string | null;
   geocode_error?: string | null;
   last_geocoded_at?: string | null;
+}
+
+function asFiniteNumber(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function asNullableString(v: unknown): string | null {
+  return typeof v === 'string' ? v : null;
+}
+
+function asGeocodeStatus(v: unknown): PropertyRow['geocode_status'] {
+  if (v === 'pending' || v === 'in_progress' || v === 'resolved' || v === 'failed') {
+    return v;
+  }
+  return null;
+}
+
+function looksLikeSchemaColumnError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes('column') &&
+    (m.includes('does not exist') || m.includes('schema cache') || m.includes('could not find'))
+  );
+}
+
+/**
+ * Defensive row normalization so app code can rely on known optional fields even if
+ * schema evolves or stale rows contain unexpected values.
+ */
+function normalizePropertyRow(raw: unknown): PropertyRow | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as Record<string, unknown>;
+  if (
+    typeof row.id !== 'string' ||
+    row.id.trim().length === 0 ||
+    typeof row.portfolio_id !== 'string' ||
+    row.portfolio_id.trim().length === 0
+  ) {
+    return null;
+  }
+  return {
+    ...(row as PropertyRow),
+    rent: asFiniteNumber(row.rent),
+    latitude: asFiniteNumber(row.latitude),
+    longitude: asFiniteNumber(row.longitude),
+    lot_sqft: asFiniteNumber(row.lot_sqft),
+    year_built: asFiniteNumber(row.year_built),
+    overall_confidence: asFiniteNumber(row.overall_confidence),
+    property_type: asNullableString(row.property_type),
+    normalized_snapshot:
+      row.normalized_snapshot && typeof row.normalized_snapshot === 'object'
+        ? (row.normalized_snapshot as Record<string, unknown>)
+        : null,
+    geocode_status: asGeocodeStatus(row.geocode_status),
+  };
 }
 
 /** Single-line address for geocoding / map fallbacks */
@@ -83,14 +175,22 @@ export async function getPortfolioProperties(
   }
   const { data, error } = await supabase
     .from('properties')
-    .select('*')
+    .select(PROPERTY_SELECT_COLUMNS)
     .eq('portfolio_id', portfolioId)
     .order('fetched_at', { ascending: false });
   if (error) {
+    if (looksLikeSchemaColumnError(error.message ?? '')) {
+      logErrorSafe(
+        'portfolio schema mismatch: expected properties columns are missing (run latest migrations)',
+        error
+      );
+    }
     logErrorSafe('portfolio getPortfolioProperties', error);
     return { properties: [], error: error.message };
   }
-  const properties = (data ?? []) as PropertyRow[];
+  const properties = (data ?? [])
+    .map((row) => normalizePropertyRow(row))
+    .filter((row): row is PropertyRow => row != null);
   return { properties, error: null };
 }
 
@@ -107,23 +207,19 @@ export async function getPropertyById(
   if (!portfolioId) return null;
   const { data, error } = await supabase
     .from('properties')
-    .select('*')
+    .select(PROPERTY_SELECT_COLUMNS)
     .eq('id', propertyId)
     .eq('portfolio_id', portfolioId)
     .maybeSingle();
   if (error) {
+    if (looksLikeSchemaColumnError(error.message ?? '')) {
+      logErrorSafe(
+        'portfolio schema mismatch: expected properties columns are missing (run latest migrations)',
+        error
+      );
+    }
     logErrorSafe('portfolio getPropertyById', error);
     return null;
   }
-  const row = data as PropertyRow | null;
-  if (
-    !row ||
-    typeof row.id !== 'string' ||
-    row.id.trim().length === 0 ||
-    typeof row.portfolio_id !== 'string' ||
-    row.portfolio_id.trim().length === 0
-  ) {
-    return null;
-  }
-  return row;
+  return normalizePropertyRow(data);
 }

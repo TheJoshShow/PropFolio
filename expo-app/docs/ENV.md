@@ -22,9 +22,9 @@ None. The app runs in **demo mode** without any env vars (demo user, no real aut
 | `EXPO_PUBLIC_SUPABASE_URL` | Your Supabase project URL (e.g. `https://xxxx.supabase.co`) | When using real auth and DB |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key | When using real auth and DB |
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat public API key for iOS | When using in-app subscriptions on iOS |
-| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Full URL to your privacy policy | App Store required; in-app Settings (default: https://www.propfolio.com/privacy) |
-| `EXPO_PUBLIC_TERMS_URL` | Full URL to your terms of service | In-app Settings (default: https://www.propfolio.com/terms) |
-| `EXPO_PUBLIC_SUPPORT_URL` | Full URL for contact/support (or mailto:) | App Store required; Settings → Contact support (default: https://www.propfolio.com/support) |
+| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Full URL to your privacy policy | App Store required; in-app Settings (default: https://prop-folio.vercel.app/privacy) |
+| `EXPO_PUBLIC_TERMS_URL` | Full URL to your terms of service | In-app Settings (default: https://prop-folio.vercel.app/terms) |
+| `EXPO_PUBLIC_SUPPORT_URL` | Full URL for contact/support (or mailto:) | App Store required; Settings → Contact support (default: https://prop-folio.vercel.app/support) |
 | `EXPO_PUBLIC_BILLING_HELP_URL` | Optional billing/FAQ page | When set, Settings shows "Billing help & FAQ" link |
 
 If **both** Supabase vars are set, the app uses Supabase for sign-in/sign-out, session persistence, and profile creation. If either is missing, the app uses a demo user and in-memory session.

@@ -10,9 +10,9 @@
 
 | Purpose | Env variable | Default (if unset) | Used in |
 |---------|--------------|---------------------|--------|
-| **Privacy Policy** | `EXPO_PUBLIC_PRIVACY_POLICY_URL` | `https://propfolio.app/privacy` | Settings → Legal; Paywall footer; Sign-up agreement |
-| **Terms of Service** | `EXPO_PUBLIC_TERMS_URL` | `https://propfolio.app/terms` | Settings → Legal; Paywall footer; Sign-up agreement |
-| **Contact / Support** | `EXPO_PUBLIC_SUPPORT_URL` | `https://propfolio.app/support` | Settings → Help & support → Contact support |
+| **Privacy Policy** | `EXPO_PUBLIC_PRIVACY_POLICY_URL` | `https://prop-folio.vercel.app/privacy` | Settings → Legal; Paywall footer; Sign-up agreement |
+| **Terms of Service** | `EXPO_PUBLIC_TERMS_URL` | `https://prop-folio.vercel.app/terms` | Settings → Legal; Paywall footer; Sign-up agreement |
+| **Contact / Support** | `EXPO_PUBLIC_SUPPORT_URL` | `https://prop-folio.vercel.app/support` | Settings → Help & support → Contact support |
 | **Billing help** | `EXPO_PUBLIC_BILLING_HELP_URL` | (empty) | Settings → Help & support → "Billing help & FAQ" (row only if URL set) |
 
 **Code:** `expo-app/src/config/legalUrls.ts` — `getPrivacyPolicyUrl()`, `getTermsUrl()`, `getSupportUrl()`, `getBillingHelpUrl()`.

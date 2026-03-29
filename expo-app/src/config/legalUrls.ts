@@ -6,12 +6,12 @@
 import { getRuntimeConfig } from './runtimeConfig';
 
 /**
- * Default public pages — live site (www.propfolio.com).
+ * Default public pages — deployed marketing / legal site (Vercel).
  * Override with EXPO_PUBLIC_* if the hosted domain or paths change.
  */
-export const DEFAULT_PRIVACY_POLICY_URL = 'https://www.propfolio.com/privacy';
-export const DEFAULT_TERMS_OF_SERVICE_URL = 'https://www.propfolio.com/terms';
-export const DEFAULT_SUPPORT_URL = 'https://www.propfolio.com/support';
+export const DEFAULT_PRIVACY_POLICY_URL = 'https://prop-folio.vercel.app/privacy';
+export const DEFAULT_TERMS_OF_SERVICE_URL = 'https://prop-folio.vercel.app/terms';
+export const DEFAULT_SUPPORT_URL = 'https://prop-folio.vercel.app/support';
 
 export function getPrivacyPolicyUrl(): string {
   const v = getRuntimeConfig().privacyPolicyUrl;

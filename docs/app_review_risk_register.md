@@ -11,7 +11,7 @@
 |------|-------------|------------|--------|
 | **No in-app Contact/Support** | Reviewer or user cannot find how to contact support. | Added Settings → Help & support → "Contact support" (getSupportUrl()). | ✅ Done |
 | **crash reporting sendDefaultPii: true** | Sending default PII to crash reporting may conflict with Privacy Policy or trigger review questions. | Set `sendDefaultPii: false` in crash reporting.init. | ✅ Done |
-| **Legal URLs not set in production** | Default propfolio.app URLs may 404 if site not live. | Set EXPO_PUBLIC_PRIVACY_POLICY_URL and EXPO_PUBLIC_TERMS_URL in production; verify URLs resolve before submit. | Checklist |
+| **Legal URLs not set in production** | Default prop-folio.vercel.app URLs may 404 if site not live. | Set EXPO_PUBLIC_PRIVACY_POLICY_URL and EXPO_PUBLIC_TERMS_URL in production; verify URLs resolve before submit. | Checklist |
 
 ---
 

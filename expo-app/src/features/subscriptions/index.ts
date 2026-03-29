@@ -1,5 +1,5 @@
 /**
- * Paywall, plan selection, RevenueCat/Stripe abstraction.
+ * Subscription entitlement rules, paywall-related policy (not SDK I/O — see services/revenueCat).
  */
 
-export type {};
+export { isEntitlementBootstrapPending } from './entitlementPolicy';

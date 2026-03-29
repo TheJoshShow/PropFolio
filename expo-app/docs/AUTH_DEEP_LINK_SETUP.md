@@ -10,7 +10,7 @@ In Supabase Dashboard -> Auth -> URL configuration:
 
 1. Add the app deep link callback:
    - `propfolio://auth/callback`
-2. Ensure your production site URL does not point to localhost.
+2. Set **Site URL** to your production web origin (e.g. `https://prop-folio.vercel.app`) — not `localhost` for shipped builds.
 3. For email confirmation and password reset, allow redirecting to the same callback above.
 
 ## App-side behavior

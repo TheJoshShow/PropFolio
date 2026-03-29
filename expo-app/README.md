@@ -7,7 +7,7 @@ Single codebase for **iOS**, **Android**, and **Web**. Built with Expo, Expo Rou
 - **`app/`** — Expo Router routes (tabs, stacks, modals).
 - **`src/`** — Shared source:
   - **`src/lib`** — Business logic (underwriting, scoring, confidence, simulation, renovation). All formulas live here.
-  - **`src/features`** — Feature modules (auth, property-import, portfolio, etc.).
+  - **`src/features`** — Feature modules (property-import, portfolio, paywall, **`subscriptions/`** entitlement policy, etc.). Auth UI lives under **`app/(auth)/`**; avoid empty placeholder feature folders.
   - **`src/components`** — Reusable UI (design system).
   - **`src/services`** — API and platform services (Supabase, adapters).
   - **`src/theme`** — Design tokens (spacing, radius, colors).
@@ -98,6 +98,9 @@ After the real plist is in place: `npm run verify:firebase-config:strict` (from 
 
 - **[LAUNCH_AND_TEST.md](docs/LAUNCH_AND_TEST.md)** — Exact commands, order, and demo flow for iOS, Android, and web.
 - **[TESTING_CHECKLIST.md](docs/TESTING_CHECKLIST.md)** — Feature-by-feature checklist for manual QA.
+- **[RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)** — Pre-submission / store release checklist.
+- **Archived iOS audit notes:** [`docs/archive/ios-audit/`](docs/archive/ios-audit/) (historical reports, not required for daily dev).
+- **Compliance matrices:** [`docs/compliance/`](docs/compliance/).
 
 Quick validation before running the app:
 

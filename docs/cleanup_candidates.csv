@@ -31,7 +31,7 @@ expo-app/src/theme/index.ts comment "iOS Android and Web",4,Comment only.,Option
 PropFolio/ (entire Swift project),2,Parallel native iOS codebase.,Do not delete until decision: abandon in favor of Expo or replace Expo with native. Review before any deletion.
 expo-app/_quarantine,4,Already quarantined unused modal and components.,Keep unchanged; documented in AUDIT-OBSOLETE-UNUSED.md.
 expo-app/src/store/index.ts,3,Placeholder (export type {}).,Keep if adding global state later; or remove and delete any imports.
-expo-app/src/dev/subscriptionDebugOverrides.ts,4,__DEV__ only; no production impact.,Keep unchanged.
+expo-app/src/dev/ (removed),4,Was empty; historical doc referred to subscriptionDebugOverrides.,Folder deleted in structure cleanup; no file to keep.
 docs/release/*,4,App Store and release documentation.,Keep unchanged.
 supabase/,4,Backend migrations and Edge Functions.,Keep unchanged.
 expo-app/src/lib/*,4,Scoring confidence underwriting simulation parsers renovation.,Keep unchanged.

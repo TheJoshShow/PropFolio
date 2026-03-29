@@ -17,7 +17,7 @@
 | Crashlytics structure | `app.config.ts` / `expo config`, plugins, `ios.googleServicesFile` |
 | Duplicate init | `initCrashlytics` uses `initCalled`; `installGlobalErrorHandlers` uses `installed` |
 | Lint (monitoring) | `eslint src/services/monitoring/**/*.ts` (clean) |
-| Docs consistency | `IOS_LAUNCH_AUDIT.md`, `release_blocker_report.md`, `diagnostics.ts` comment |
+| Docs consistency | `IOS_LAUNCH_AUDIT.md`, `expo-app/docs/archive/ios-audit/release_blocker_report.md`, `diagnostics.ts` comment |
 
 **Not validated on this machine (environment limits):**
 
@@ -51,7 +51,7 @@
 | Item | Change |
 |------|--------|
 | Stale documentation | `expo-app/docs/IOS_LAUNCH_AUDIT.md` — monitoring row + `app.config.ts` reference (was `app.json` + “stubs until Crashlytics”). |
-| Stale documentation | `expo-app/release_blocker_report.md` — crash section updated for Firebase Crashlytics + link to `MONITORING_SETUP.md`. |
+| Stale documentation | `expo-app/docs/archive/ios-audit/release_blocker_report.md` — crash section updated for Firebase Crashlytics + link to `MONITORING_SETUP.md`. |
 | Stale comment | `expo-app/src/services/diagnostics.ts` — `logErrorSafe` comment now reflects Crashlytics forwarding (not “until wired”). |
 | ESLint on intentional `require()` | `expo-app/src/services/monitoring/crashlytics.ts` — `eslint-disable-next-line` with rationale for dynamic native import. |
 
@@ -62,7 +62,7 @@
 1. **Local `.env`:** If `EXPO_PUBLIC_SENTRY_DSN` still appears when running Expo (e.g. `env: export … EXPO_PUBLIC_SENTRY_DSN`), **remove it** from your local `.env` — it is obsolete and was already removed from `runtimeConfig` / `.env.example`.
 2. **EAS / Expo dashboard:** Delete **`EXPO_PUBLIC_SENTRY_DSN`** (and any other Sentry-related variables) from project secrets if they were ever set.
 3. **Sentry.io:** Archive or delete the old Sentry project if unused.
-4. **Firebase:** Ensure production **`GoogleService-Info.plist`** matches bundle id `com.propfolio.mobile` and is available locally and/or via **`GOOGLE_SERVICES_INFO_PLIST`** on EAS (see `FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`).
+4. **Firebase:** Ensure production **`GoogleService-Info.plist`** matches bundle id `com.propfolio.mobile` and is available locally and/or via **`GOOGLE_SERVICES_INFO_PLIST`** on EAS (see `docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`).
 5. **Privacy Policy:** Counsel review that Google/Firebase crash processing is disclosed as needed.
 
 ---
@@ -84,7 +84,7 @@ npm ls @sentry/react-native
 # → (empty tree at expo-app root)
 ```
 
-**Documentation:** The file `MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md` **intentionally** retains the word “Sentry” as a **historical** migration record. Current operational docs are **`expo-app/docs/MONITORING_SETUP.md`**.
+**Documentation:** The file **`docs/archive/migrations/MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`** **intentionally** retains the word “Sentry” as a **historical** migration record. Current operational docs are **`expo-app/docs/MONITORING_SETUP.md`**.
 
 ---
 

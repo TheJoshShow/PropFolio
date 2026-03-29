@@ -1,6 +1,6 @@
 # PropFolio public website (legal pages)
 
-Static **Privacy Policy** and **Terms of Service** built from `../docs/legal/*.md`. Deploy the **`dist/`** output to your domain root (e.g. `propfolio.app`) so URLs match the app defaults in `expo-app/src/config/legalUrls.ts`.
+Static **Privacy Policy** and **Terms of Service** built from `../docs/legal/*.md`. Deploy the **`dist/`** output (e.g. Vercel project **prop-folio** → `https://prop-folio.vercel.app`) so URLs match the app defaults in `expo-app/src/config/legalUrls.ts`.
 
 **Content updates do not require a mobile release** — edit the markdown under `docs/legal/`, run `npm run build`, and redeploy this site.
 
@@ -11,6 +11,7 @@ Static **Privacy Policy** and **Terms of Service** built from `../docs/legal/*.m
 | `/` | Legal hub | PropFolio — Legal |
 | `/privacy/` | Privacy Policy | **PropFolio Privacy Policy** |
 | `/terms/` | Terms of Service | **PropFolio Terms of Service** |
+| `/support/` | Support / contact | **PropFolio — Support** |
 
 Also generated: **`/robots.txt`**, **`/sitemap.xml`** (for SEO; update sitemap dates when legal content changes materially).
 
@@ -18,8 +19,9 @@ Trailing slashes work; hosts often redirect `/privacy` → `/privacy/`.
 
 **App / store submission URLs** (defaults in the Expo app):
 
-- `https://propfolio.app/privacy`
-- `https://propfolio.app/terms`
+- `https://prop-folio.vercel.app/privacy`
+- `https://prop-folio.vercel.app/terms`
+- `https://prop-folio.vercel.app/support`
 
 ## Build
 
@@ -29,7 +31,7 @@ npm install
 npm run build
 ```
 
-Output: `dist/` — `index.html`, `privacy/index.html`, `terms/index.html`, `assets/legal.css`, `robots.txt`, `sitemap.xml`.
+Output: `dist/` — `index.html`, `privacy/index.html`, `terms/index.html`, `support/index.html`, `assets/legal.css`, `robots.txt`, `sitemap.xml`.
 
 ## Styling & placeholders
 
@@ -51,7 +53,7 @@ Serves `http://localhost:3333` (requires `dist/` from `npm run build`).
 1. New Project → Import this repo → **Root Directory:** `website`
 2. Framework: **Other** / static
 3. **Build Command:** `npm run build` — **Output Directory:** `dist`
-4. Attach custom domain (e.g. `propfolio.app`) and enable HTTPS
+4. Optional: attach a custom domain later; default Vercel URL is `https://prop-folio.vercel.app`
 
 `vercel.json` adds security headers.
 

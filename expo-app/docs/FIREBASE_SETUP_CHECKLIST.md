@@ -1,6 +1,6 @@
 # Finish Firebase setup — step-by-step (PropFolio iOS)
 
-Use this as a **single checklist**. **Replace the plist:** **`FIREBASE_CONSOLE_PLIST.md`** (exact Console steps). Other details: **`EXPO_EAS_FIREBASE_IOS.md`**, **`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`** (repo root), **`MONITORING_VERIFICATION.md`**.
+Use this as a **single checklist**. **Replace the plist:** **`FIREBASE_CONSOLE_PLIST.md`** (exact Console steps). Other details: **`EXPO_EAS_FIREBASE_IOS.md`**, **`../../docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**, **`MONITORING_VERIFICATION.md`**.
 
 ---
 

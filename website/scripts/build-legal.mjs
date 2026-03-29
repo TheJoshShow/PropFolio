@@ -1,5 +1,5 @@
 /**
- * Builds static HTML for /privacy and /terms from docs/legal/*.md
+ * Builds static HTML for /privacy, /terms, and /support from docs/legal/*.md (plus a static support page).
  * Run from repo: cd website && npm install && npm run build
  */
 
@@ -12,6 +12,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const websiteRoot = join(__dirname, '..');
 /** Repo root (parent of website/) */
 const repoRoot = join(websiteRoot, '..');
+/** Public site origin for canonical, Open Graph, robots, and sitemap (no trailing slash). */
+const PUBLIC_SITE_ORIGIN = 'https://prop-folio.vercel.app';
 const dist = join(websiteRoot, 'dist');
 const docsLegal = join(repoRoot, 'docs', 'legal');
 
@@ -19,6 +21,14 @@ marked.setOptions({
   gfm: true,
   breaks: false,
 });
+
+/** Shared header nav + inline footer links (trailing paths use slash for static hosts). */
+const NAV_LINKS_HTML = `
+          <a href="/privacy/">Privacy</a>
+          <a href="/terms/">Terms</a>
+          <a href="/support/">Support</a>
+`;
+const FOOTER_INLINE_LINKS = `<a href="/">Home</a> · <a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/support/">Support</a>`;
 
 function extractPublicMarkdown(filename, beginMarker) {
   const raw = readFileSync(join(docsLegal, filename), 'utf8');
@@ -45,13 +55,13 @@ function wrapPage({ metaTitle, description, bodyHtml, canonicalPath }) {
   <meta property="og:site_name" content="PropFolio" />
   <meta property="og:title" content="${safeMetaTitle}" />
   <meta property="og:description" content="${safeDesc}" />
-  <meta property="og:url" content="https://propfolio.app${canonicalPath}" />
+  <meta property="og:url" content="${PUBLIC_SITE_ORIGIN}${canonicalPath}" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="${safeMetaTitle}" />
   <meta name="twitter:description" content="${safeDesc}" />
   <title>${safeMetaTitle}</title>
   <link rel="stylesheet" href="/assets/legal.css" />
-  <link rel="canonical" href="https://propfolio.app${canonicalPath}" />
+  <link rel="canonical" href="${PUBLIC_SITE_ORIGIN}${canonicalPath}" />
 </head>
 <body>
   <div class="legal-shell">
@@ -60,9 +70,8 @@ function wrapPage({ metaTitle, description, bodyHtml, canonicalPath }) {
       <div class="legal-header-inner">
         <a class="legal-brand" href="/">PropFolio</a>
         <span class="legal-tagline">Real estate investment intelligence</span>
-        <nav class="legal-nav" aria-label="Legal">
-          <a href="/privacy/">Privacy</a>
-          <a href="/terms/">Terms</a>
+        <nav class="legal-nav" aria-label="Legal and support">
+          ${NAV_LINKS_HTML}
         </nav>
       </div>
     </header>
@@ -71,7 +80,7 @@ function wrapPage({ metaTitle, description, bodyHtml, canonicalPath }) {
         <p class="legal-skip-note"><a class="legal-skip-link" href="#doc-title">Skip to content</a></p>
         ${bodyHtml}
         <footer class="legal-page-footer">
-          <p>© ${new Date().getFullYear()} PropFolio. <a href="/">Home</a> · <a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a></p>
+          <p>© ${new Date().getFullYear()} PropFolio. ${FOOTER_INLINE_LINKS}</p>
         </footer>
       </article>
     </main>
@@ -119,10 +128,10 @@ function buildHub() {
   <meta property="og:site_name" content="PropFolio" />
   <meta property="og:title" content="PropFolio — Legal" />
   <meta property="og:description" content="Privacy Policy and Terms of Service for PropFolio." />
-  <meta property="og:url" content="https://propfolio.app/" />
+  <meta property="og:url" content="${PUBLIC_SITE_ORIGIN}/" />
   <title>PropFolio — Legal</title>
   <link rel="stylesheet" href="/assets/legal.css" />
-  <link rel="canonical" href="https://propfolio.app/" />
+  <link rel="canonical" href="${PUBLIC_SITE_ORIGIN}/" />
 </head>
 <body>
   <div class="legal-shell">
@@ -131,9 +140,8 @@ function buildHub() {
       <div class="legal-header-inner">
         <a class="legal-brand" href="/">PropFolio</a>
         <span class="legal-tagline">Real estate investment intelligence</span>
-        <nav class="legal-nav" aria-label="Legal">
-          <a href="/privacy/">Privacy</a>
-          <a href="/terms/">Terms</a>
+        <nav class="legal-nav" aria-label="Legal and support">
+          ${NAV_LINKS_HTML}
         </nav>
       </div>
     </header>
@@ -144,9 +152,10 @@ function buildHub() {
         <ul class="legal-hub-list">
           <li><a href="/privacy/">Privacy Policy</a> — how we handle your information</li>
           <li><a href="/terms/">Terms of Service</a> — rules for using PropFolio</li>
+          <li><a href="/support/">Support</a> — contact and help</li>
         </ul>
         <footer class="legal-page-footer">
-          <p>© ${new Date().getFullYear()} PropFolio. All rights reserved.</p>
+          <p>© ${new Date().getFullYear()} PropFolio. ${FOOTER_INLINE_LINKS}</p>
         </footer>
       </article>
     </main>
@@ -160,7 +169,7 @@ function buildRobots() {
   const body = `User-agent: *
 Allow: /
 
-Sitemap: https://propfolio.app/sitemap.xml
+Sitemap: ${PUBLIC_SITE_ORIGIN}/sitemap.xml
 `;
   writeFileSync(join(dist, 'robots.txt'), body, 'utf8');
 }
@@ -169,9 +178,10 @@ function buildSitemap() {
   const lastmod = new Date().toISOString().split('T')[0];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://propfolio.app/</loc><lastmod>${lastmod}</lastmod></url>
-  <url><loc>https://propfolio.app/privacy/</loc><lastmod>${lastmod}</lastmod></url>
-  <url><loc>https://propfolio.app/terms/</loc><lastmod>${lastmod}</lastmod></url>
+  <url><loc>${PUBLIC_SITE_ORIGIN}/</loc><lastmod>${lastmod}</lastmod></url>
+  <url><loc>${PUBLIC_SITE_ORIGIN}/privacy/</loc><lastmod>${lastmod}</lastmod></url>
+  <url><loc>${PUBLIC_SITE_ORIGIN}/terms/</loc><lastmod>${lastmod}</lastmod></url>
+  <url><loc>${PUBLIC_SITE_ORIGIN}/support/</loc><lastmod>${lastmod}</lastmod></url>
 </urlset>
 `;
   writeFileSync(join(dist, 'sitemap.xml'), xml.trim(), 'utf8');
@@ -179,6 +189,7 @@ function buildSitemap() {
 
 mkdirSync(join(dist, 'privacy'), { recursive: true });
 mkdirSync(join(dist, 'terms'), { recursive: true });
+mkdirSync(join(dist, 'support'), { recursive: true });
 mkdirSync(join(dist, 'assets'), { recursive: true });
 
 cpSync(join(websiteRoot, 'assets', 'legal.css'), join(dist, 'assets', 'legal.css'));
@@ -213,6 +224,27 @@ writeFileSync(
   'utf8'
 );
 
+const supportBody = `<h1 id="doc-title">Support</h1>
+<p>Need help with <strong>PropFolio</strong> — account access, imports, analysis, or subscriptions? We’re here to assist.</p>
+<h2>Contact us</h2>
+<p>The fastest way to reach us is by email:</p>
+<p><a href="mailto:support@propfolio.app">support@propfolio.app</a></p>
+<p>Please include your account email (if applicable) and a short description of the issue. We aim to respond within a few business days.</p>
+<h2>In the app</h2>
+<p>For subscription and billing questions, check <strong>Settings</strong> in the PropFolio app for account and help options.</p>`;
+
+writeFileSync(
+  join(dist, 'support', 'index.html'),
+  wrapPage({
+    metaTitle: 'PropFolio — Support',
+    description:
+      'Contact PropFolio support for help with the real estate investment intelligence app — account, technical, and billing questions.',
+    bodyHtml: supportBody,
+    canonicalPath: '/support/',
+  }),
+  'utf8'
+);
+
 buildHub();
 buildRobots();
 buildSitemap();
@@ -222,3 +254,4 @@ console.log('Built:', join(dist, 'robots.txt'));
 console.log('Built:', join(dist, 'sitemap.xml'));
 console.log('Built:', join(dist, 'privacy', 'index.html'));
 console.log('Built:', join(dist, 'terms', 'index.html'));
+console.log('Built:', join(dist, 'support', 'index.html'));

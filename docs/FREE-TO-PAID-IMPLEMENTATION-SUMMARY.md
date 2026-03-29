@@ -99,7 +99,7 @@ Every file below is part of the current auth / free-tier / paywall / subscriptio
 | `expo-app/src/components/FreeImportsIndicator.tsx` | Remaining free imports (or hidden for Pro); loading state. |
 | `expo-app/src/utils/subscriptionManagement.ts` | openSubscriptionManagement; platform fallback messages. |
 | `expo-app/src/utils/authRedirect.ts` | OAuth/magic link redirect and session from URL. |
-| `expo-app/src/dev/subscriptionDebugOverrides.ts` | Dev-only “Simulate at limit” for QA (no-op in production). |
+| `expo-app/src/features/subscriptions/entitlementPolicy.ts` | Entitlement bootstrap policy (gating); `src/dev/` removed. |
 
 ### Backend (Supabase migrations)
 

@@ -22,9 +22,9 @@ Every env var used in the repo, where it is read, and whether it is client-safe.
 | **EXPO_PUBLIC_SUPABASE_URL** | expo-app: supabase.ts, env.ts | Client | ✅ Yes | Supabase project URL. Required for auth/API when set. |
 | **EXPO_PUBLIC_SUPABASE_ANON_KEY** | expo-app: supabase.ts, env.ts | Client | ✅ Yes | Anon key only. RLS + auth protect data. Never use service role in client. |
 | **EXPO_PUBLIC_REVENUECAT_API_KEY_IOS** | expo-app: billing.ts, revenueCat.ts | Client | ✅ Yes | RevenueCat public app-specific key (iOS). |
-| **EXPO_PUBLIC_PRIVACY_POLICY_URL** | expo-app: legalUrls.ts | Client | ✅ Yes | Optional; fallback https://propfolio.app/privacy. |
-| **EXPO_PUBLIC_TERMS_URL** | expo-app: legalUrls.ts | Client | ✅ Yes | Optional; fallback https://propfolio.app/terms. |
-| **EXPO_PUBLIC_SUPPORT_URL** | expo-app: legalUrls.ts | Client | ✅ Yes | Optional; fallback https://propfolio.app/support. |
+| **EXPO_PUBLIC_PRIVACY_POLICY_URL** | expo-app: legalUrls.ts | Client | ✅ Yes | Optional; fallback https://prop-folio.vercel.app/privacy. |
+| **EXPO_PUBLIC_TERMS_URL** | expo-app: legalUrls.ts | Client | ✅ Yes | Optional; fallback https://prop-folio.vercel.app/terms. |
+| **EXPO_PUBLIC_SUPPORT_URL** | expo-app: legalUrls.ts | Client | ✅ Yes | Optional; fallback https://prop-folio.vercel.app/support. |
 | **EXPO_PUBLIC_BILLING_HELP_URL** | expo-app: legalUrls.ts | Client | ✅ Yes | Optional; empty = no link. |
 | **SUPABASE_URL** | supabase/functions: delete-account, revenuecat-webhook | Server | ❌ N/A | Injected by Supabase for Edge Functions. |
 | **SUPABASE_ANON_KEY** | supabase/functions: delete-account | Server | ❌ N/A | Used with user JWT in delete-account to resolve user. |

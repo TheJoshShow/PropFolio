@@ -10,7 +10,7 @@
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | Privacy Policy published at a stable URL (e.g., propfolio.app/privacy) | ☐ |
+| 1 | Privacy Policy published at a stable URL (e.g., prop-folio.vercel.app/privacy) | ☐ |
 | 2 | URL matches in-app links and App Store Connect ([final_metadata_requirements.md](../docs/final_metadata_requirements.md)) | ☐ |
 | 3 | Policy describes: what data is collected (account, property, usage), how it’s used, storage, sharing, and user rights | ☐ |
 | 4 | Third-party services disclosed (e.g., Supabase, RevenueCat, analytics; crash SDK if added) | ☐ |

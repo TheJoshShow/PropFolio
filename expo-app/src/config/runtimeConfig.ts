@@ -113,6 +113,44 @@ export function validateRuntimeConfigForDev(): { ok: boolean; missing: string[] 
   return { ok: missing.length === 0, missing };
 }
 
+export interface RuntimeReleaseValidationResult {
+  ok: boolean;
+  /** Required for production runtime correctness on native platforms. */
+  missingRequired: string[];
+  /** Recommended for App Store readiness and user trust; app can still run without these. */
+  missingRecommended: string[];
+}
+
+/**
+ * Release/runtime validation (non-dev builds).
+ * - Required: Supabase URL + anon key on all platforms, plus iOS RevenueCat key on iOS.
+ * - Recommended: legal/support URLs so release builds do not rely on fallback domains.
+ */
+export function validateRuntimeConfigForRelease(): RuntimeReleaseValidationResult {
+  const c = getRuntimeConfig();
+  const missingRequired: string[] = [];
+  const missingRecommended: string[] = [];
+
+  if (!c.supabaseUrl) missingRequired.push('EXPO_PUBLIC_SUPABASE_URL');
+  if (!c.supabaseAnonKey) missingRequired.push('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  if (c.platform === 'ios' && !c.revenueCatApiKeyIos) {
+    missingRequired.push('EXPO_PUBLIC_REVENUECAT_API_KEY_IOS');
+  }
+  if (c.platform === 'android' && !c.revenueCatApiKeyAndroid) {
+    missingRequired.push('EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID');
+  }
+
+  if (!c.privacyPolicyUrl) missingRecommended.push('EXPO_PUBLIC_PRIVACY_POLICY_URL');
+  if (!c.termsUrl) missingRecommended.push('EXPO_PUBLIC_TERMS_URL');
+  if (!c.supportUrl) missingRecommended.push('EXPO_PUBLIC_SUPPORT_URL');
+
+  return {
+    ok: missingRequired.length === 0,
+    missingRequired,
+    missingRecommended,
+  };
+}
+
 export function getRuntimeConfigDiagnostics(): RuntimeConfigDiagnostics {
   const c = getRuntimeConfig();
   const supabaseHost = getHostname(c.supabaseUrl);

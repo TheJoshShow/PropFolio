@@ -50,5 +50,5 @@ export const SERVICE_BOOT_NOTES = {
   revenueCat: 'Configured after session exists; missing iOS key → subscriptions disabled, no crash.',
   firebaseCrashlytics: 'Native; lazy require; missing plist → native risk (build/config), not JS.',
   edgeFunctions: 'All optional at launch; failures return { data: null, error } or structured import errors.',
-  legalUrls: 'Defaults to propfolio.com; openUrlSafe validates scheme; bad URL → alert, no crash.',
+  legalUrls: 'Defaults to prop-folio.vercel.app; openUrlSafe validates scheme; bad URL → alert, no crash.',
 } as const;

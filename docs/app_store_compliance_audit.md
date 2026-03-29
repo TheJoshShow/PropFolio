@@ -14,9 +14,9 @@
 | **Account deletion** | ✅ | In-app path: Settings → Delete account → confirmation → Edge Function deletes auth user → sign out. Demo mode throws clear message. |
 | **Restore purchases** | ✅ | Settings and Paywall both expose "Restore purchases"; outcome messaging (success, no purchases, failed, offline) is clear. |
 | **Manage subscription** | ✅ | Settings and Paywall have "Manage subscription"; opens RevenueCat management URL or App Store subscriptions URL with fallback copy. |
-| **Terms of Use** | ✅ | Settings → Legal → Terms of Service; Paywall footer links. URL from `getTermsUrl()` (env or https://propfolio.app/terms). |
-| **Privacy Policy** | ✅ | Settings → Legal → Privacy Policy; Paywall footer links. URL from `getPrivacyPolicyUrl()` (env or https://propfolio.app/privacy). |
-| **Contact / Support** | ✅ | Settings → Help & support → "Contact support" opens getSupportUrl() (EXPO_PUBLIC_SUPPORT_URL or https://propfolio.app/support). |
+| **Terms of Use** | ✅ | Settings → Legal → Terms of Service; Paywall footer links. URL from `getTermsUrl()` (env or https://prop-folio.vercel.app/terms). |
+| **Privacy Policy** | ✅ | Settings → Legal → Privacy Policy; Paywall footer links. URL from `getPrivacyPolicyUrl()` (env or https://prop-folio.vercel.app/privacy). |
+| **Contact / Support** | ✅ | Settings → Help & support → "Contact support" opens getSupportUrl() (EXPO_PUBLIC_SUPPORT_URL or https://prop-folio.vercel.app/support). |
 | **Subscription billing copy** | ✅ | Paywall footer: "Payment will be charged to your Apple ID… Manage subscriptions in your device settings." |
 | **No mandatory sign-in for non-account features** | ✅ | App is account-centric (portfolio, imports); demo mode when Supabase not configured. |
 | **No hidden or unclear subscriptions** | ✅ | Paywall shown when free limit reached; plan selection and restore are visible. |
@@ -61,7 +61,7 @@
 
 ## 6. Broken links and placeholder content
 
-- **Legal URLs:** Default to `https://propfolio.app/privacy` and `https://propfolio.app/terms`. Production should set `EXPO_PUBLIC_PRIVACY_POLICY_URL` and `EXPO_PUBLIC_TERMS_URL` and ensure pages resolve.
+- **Legal URLs:** Default to `https://prop-folio.vercel.app/privacy` and `https://prop-folio.vercel.app/terms`. Production should set `EXPO_PUBLIC_PRIVACY_POLICY_URL` and `EXPO_PUBLIC_TERMS_URL` and ensure pages resolve.
 - **Billing help:** `EXPO_PUBLIC_BILLING_HELP_URL` may be empty; inline copy used. No broken link.
 - **Support:** No in-app support URL yet; add `getSupportUrl()` (mailto or support page) and Settings row.
 

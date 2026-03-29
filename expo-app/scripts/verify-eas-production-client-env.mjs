@@ -19,7 +19,7 @@ function main() {
     return;
   }
   const profile = (process.env.EAS_BUILD_PROFILE ?? '').trim();
-  if (profile !== 'production') {
+  if (profile !== 'production' && profile !== 'preview' && profile !== 'development') {
     return;
   }
 
@@ -30,7 +30,7 @@ function main() {
     }
   }
 
-  if (missing.length > 0) {
+  if (missing.length > 0 && profile === 'production') {
     console.error(
       '[verify-eas-production-client-env] Production build aborted: these env vars are empty on the EAS worker:',
       missing.join(', '),
@@ -41,7 +41,15 @@ function main() {
     process.exit(1);
   }
 
-  console.log('[verify-eas-production-client-env] Required EXPO_PUBLIC_* keys for production are non-empty.');
+  if (missing.length > 0) {
+    console.warn(
+      `[verify-eas-production-client-env] ${profile} build has missing EXPO_PUBLIC_* keys: ${missing.join(', ')}. Build will continue, but auth/subscriptions may be disabled.`
+    );
+  } else {
+    console.log(
+      `[verify-eas-production-client-env] Required EXPO_PUBLIC_* keys for ${profile} are non-empty.`
+    );
+  }
 
   if (!(process.env.IOS_GOOGLE_MAPS_API_KEY ?? '').trim()) {
     console.warn(

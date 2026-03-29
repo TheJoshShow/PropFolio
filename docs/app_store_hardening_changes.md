@@ -10,7 +10,7 @@
 
 | Requirement | Status | Notes |
 |-------------|--------|--------|
-| **Contact support link** | ✅ | Settings → Help & support → "Contact support" opens `getSupportUrl()` (EXPO_PUBLIC_SUPPORT_URL or https://propfolio.app/support). |
+| **Contact support link** | ✅ | Settings → Help & support → "Contact support" opens `getSupportUrl()` (EXPO_PUBLIC_SUPPORT_URL or https://prop-folio.vercel.app/support). |
 | **Privacy Policy link** | ✅ | Settings → Legal; Paywall footer; Sign-up. URL from `getPrivacyPolicyUrl()`. |
 | **Terms of Service link** | ✅ | Settings → Legal; Paywall footer; Sign-up. URL from `getTermsUrl()`. |
 | **Restore purchases** | ✅ | Settings and Paywall; outcome messaging (success, no purchases, failed, offline). |
@@ -45,7 +45,7 @@
 
 The legacy third-party crash SDK has been removed. The app uses `src/services/monitoring` (dev-only console stubs; production no-op until Firebase Crashlytics or similar is integrated).
 
-**Documentation:** See **`expo-app/docs/MONITORING_SETUP.md`** for Crashlytics setup; repo root **`MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`** for historical migration context only.
+**Documentation:** See **`expo-app/docs/MONITORING_SETUP.md`** for Crashlytics setup; **`docs/archive/migrations/MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`** for historical migration context only.
 
 ---
 

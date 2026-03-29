@@ -30,8 +30,8 @@ These must be set **at build time** for the App Store build (e.g. EAS Build “p
 | `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL | EAS Secrets or `eas.json` env for production profile |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key | EAS Secrets or `eas.json` env |
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat iOS public API key | EAS Secrets or `eas.json` env |
-| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Optional; default `https://propfolio.app/privacy` | EAS Secrets if you override |
-| `EXPO_PUBLIC_TERMS_URL` | Optional; default `https://propfolio.app/terms` | EAS Secrets if you override |
+| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Optional; default `https://prop-folio.vercel.app/privacy` | EAS Secrets if you override |
+| `EXPO_PUBLIC_TERMS_URL` | Optional; default `https://prop-folio.vercel.app/terms` | EAS Secrets if you override |
 
 **Important:** For EAS Build, set these in [EAS Project → Secrets](https://docs.expo.dev/build-reference/variables/#using-secrets) and attach them to the **production** build profile so the production iOS binary has the correct Supabase and RevenueCat keys. Without them, the app will run in demo mode and subscriptions will not work.
 

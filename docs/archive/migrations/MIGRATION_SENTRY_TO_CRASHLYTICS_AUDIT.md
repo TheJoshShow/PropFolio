@@ -137,7 +137,7 @@ Representative paths at audit time:
 - `docs/sentry_privacy_decision.md` — **deleted** (superseded by Crashlytics / Firebase privacy posture in `MONITORING_SETUP.md` and counsel-reviewed Privacy Policy)
 - `docs/secret_boundary_audit.md`, `docs/production_env_matrix.md`, `docs/legal/README.md`, `docs/release/PRIVACY-DATA-INVENTORY.md`
 - `expo-app/docs/IOS_LAUNCH_AUDIT.md`, `expo-app/docs/ENV_SETUP.md`
-- `expo-app/RELEASE_CHECKLIST.md`, `app_store_release/release_checklist.md`, `release_management_plan.md`, `rollback_runbook.md`
+- `expo-app/docs/RELEASE_CHECKLIST.md`, `app_store_release/release_checklist.md`, `docs/release/release_management_plan.md`, `docs/release/rollback_runbook.md`
 
 **Migration follow-up (done):** Legal/engineering docs now reference **`expo-app/docs/MONITORING_SETUP.md`**. Privacy Policy should describe **Google/Firebase** crash processing where required by counsel.
 

@@ -74,7 +74,7 @@ Welcome to PropFolio.
 
 • Add properties by address—get rent estimates and save them to your portfolio
 • 2 free property imports; upgrade to Pro for unlimited
-• Sign in with email or Apple to sync your account
+• Sign in with email and password to sync your account
 • Restore purchases and manage subscription in Settings
 
 We’d love your feedback. Contact support from the app if you have questions.
@@ -94,9 +94,9 @@ Replace these with your live URLs before submission. They must work when opened 
 
 | Field | Placeholder | Example / Notes |
 |-------|-------------|------------------|
-| **Support URL** | `https://propfolio.app/support` or `mailto:support@propfolio.app` | Required by Apple. Must match in-app Contact support link. |
-| **Marketing URL** | `https://propfolio.app` | Optional. Your website or landing page. |
-| **Privacy Policy URL** | `https://propfolio.app/privacy` | Required. Must match in-app Privacy Policy link. |
+| **Support URL** | `https://prop-folio.vercel.app/support` or `mailto:support@propfolio.app` | Required by Apple. Must match in-app Contact support link. |
+| **Marketing URL** | `https://prop-folio.vercel.app` | Optional. Your website or landing page. |
+| **Privacy Policy URL** | `https://prop-folio.vercel.app/privacy` | Required. Must match in-app Privacy Policy link. |
 
 **In-app (env):** Set `EXPO_PUBLIC_SUPPORT_URL`, `EXPO_PUBLIC_PRIVACY_POLICY_URL`, and `EXPO_PUBLIC_TERMS_URL` so the app opens the same URLs. Terms are not a separate field in Connect but are required in-app (e.g. sign-up, paywall).
 

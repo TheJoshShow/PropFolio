@@ -47,7 +47,7 @@ This guide describes **exactly** how the current PropFolio codebase implements a
 | | `expo-app/src/services/subscriptionCache.ts` | Persist/restore subscription snapshot for offline and error resilience. |
 | | `expo-app/src/services/subscriptionStatusDisplay.ts` | UI-safe subscription status (plan name, renewal). |
 | | `expo-app/src/services/restorePurchases.ts` | Restore outcome types and getRestoreOutcome for paywall/settings. |
-| | `expo-app/src/dev/subscriptionDebugOverrides.ts` | Dev-only: “Simulate at limit” flag for QA (no-op in production). |
+| | `expo-app/src/features/subscriptions/entitlementPolicy.ts` | Entitlement bootstrap policy (used by `SubscriptionContext`; no dev “simulate limit” module — QA uses `EXPO_PUBLIC_ENABLE_QA_DIAGNOSTICS` / Settings diagnostics where applicable). |
 | | `expo-app/src/config/legalUrls.ts` | getPrivacyPolicyUrl, getTermsUrl, getBillingHelpUrl (env overrides). |
 
 ---
@@ -61,8 +61,8 @@ All client-side variables must be prefixed with `EXPO_PUBLIC_`. Set in `expo-app
 | `EXPO_PUBLIC_SUPABASE_URL` | Real auth and DB | Supabase Dashboard → Project Settings → API → Project URL |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Real auth and DB | Supabase Dashboard → Project Settings → API → anon public key |
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | iOS subscriptions | RevenueCat Dashboard → Project → API Keys → Public (iOS) |
-| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Optional (Settings link) | Default: https://propfolio.app/privacy |
-| `EXPO_PUBLIC_TERMS_URL` | Optional (Settings link) | Default: https://propfolio.app/terms |
+| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Optional (Settings link) | Default: https://prop-folio.vercel.app/privacy |
+| `EXPO_PUBLIC_TERMS_URL` | Optional (Settings link) | Default: https://prop-folio.vercel.app/terms |
 | `EXPO_PUBLIC_BILLING_HELP_URL` | Optional (Settings Billing Help) | Your FAQ or support URL |
 
 If both Supabase vars are missing, the app uses a demo user and no real auth. RevenueCat keys are platform-specific; on web, subscriptions are not configured (app still runs).
@@ -187,14 +187,14 @@ This section lists files that are **part of** the auth, free-tier, paywall, and 
 | `expo-app/app/(auth)/sign-up.tsx` | Sign up; profile created via ensureProfile. |
 | `expo-app/app/(auth)/forgot-password.tsx` | Forgot password flow. |
 | `expo-app/app/(tabs)/import.tsx` | Import UI; paywall when blocked; resume pending import. |
-| `expo-app/app/(tabs)/settings.tsx` | Account, subscription status, Manage Subscription, Restore, Billing Help, Sign out; dev “Simulate at limit.” |
+| `expo-app/app/(tabs)/settings.tsx` | Account, subscription status, Manage Subscription, Restore, Billing Help, Sign out; optional QA diagnostics when `EXPO_PUBLIC_ENABLE_QA_DIAGNOSTICS=true`. |
 | `expo-app/app/paywall.tsx` | Paywall screen; usePaywallState + PaywallContent. |
 | **Features / utils** | |
 | `expo-app/src/features/paywall/PaywallContent.tsx` | Paywall UI (headline, benefits, plans, restore, footer). |
 | `expo-app/src/features/paywall/paywallCopy.ts` | Copy for paywall. |
 | `expo-app/src/utils/subscriptionManagement.ts` | openSubscriptionManagement; fallback messages. |
 | `expo-app/src/utils/authRedirect.ts` | OAuth/magic link redirect and session from URL. |
-| `expo-app/src/dev/subscriptionDebugOverrides.ts` | Dev-only “Simulate at limit” (no-op in production). |
+| `expo-app/src/features/subscriptions/` | Entitlement policy + tests; `src/dev/` removed (empty). |
 | **Backend** | |
 | `supabase/migrations/00016_propfolio_free_tier_tables.sql` | property_imports, subscription_status (and profiles if missing). |
 | `supabase/migrations/00017_propfolio_free_tier_rls_and_guard.sql` | RLS and check_property_import_limit trigger. |

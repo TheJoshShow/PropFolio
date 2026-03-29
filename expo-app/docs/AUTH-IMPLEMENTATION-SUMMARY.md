@@ -20,7 +20,7 @@ This document lists **every file changed or added** for production-ready email/p
 | File | Changes |
 |------|--------|
 | **`expo-app/src/utils/authErrors.ts`** | Introduced `AuthErrorContext` type including `'resetPassword'`. `getAuthErrorMessage(error, context)` now supports `context === 'resetPassword'` (rate limit and generic reset message). |
-| **`expo-app/src/contexts/AuthContext.tsx`** | (1) Import `ensureProfile`, `validateAuthEnv`, `ProfileMetadata`. (2) `ensureProfileForUser()` helper. (3) After signUp (when session exists) and in `onAuthStateChange` / `createSessionFromUrl`, call `ensureProfileForUser(supabase, user.id, user.user_metadata)` so a profiles row exists. (4) New `resetPassword(email)` returning `Promise<ResetPasswordResult>`. (5) Context value now includes `resetPassword` and `isAuthConfigured` (from `validateAuthEnv().isValid`). |
+| **`expo-app/src/contexts/AuthContext.tsx`** | (1) Import `ensureProfile`, `validateAuthEnv`, `ProfileMetadata`. (2) `ensureProfileForUser()` helper. (3) After signUp (when session exists) and in `onAuthStateChange` / email-link deep link completion, call `ensureProfileForUser(supabase, user.id, user.user_metadata)` so a profiles row exists. (4) New `resetPassword(email)` returning `Promise<ResetPasswordResult>`. (5) Context value now includes `resetPassword` and `isAuthConfigured` (from `validateAuthEnv().isValid`). |
 | **`expo-app/src/services/supabase.ts`** | Trim URL and anon key when reading env. Comment updated to reference `config/env.ts` for validation. |
 | **`expo-app/app/(auth)/_layout.tsx`** | Registered `Stack.Screen name="forgot-password"`. |
 | **`expo-app/app/(auth)/login.tsx`** | (1) “Forgot password?” link (navigates to `/(auth)/forgot-password`). (2) On error: show error message plus “Try again” button that clears error. (3) Sign in button disabled when email or password is empty. (4) New styles: `forgotRow`, `forgotText`, `errorRow`, `error`, `retryTouchable`, `retryText`. |
@@ -36,7 +36,7 @@ This document lists **every file changed or added** for production-ready email/p
 - **Log In** — Existing login screen; “Forgot password?” link and error + retry added. Session persistence remains Supabase’s responsibility (secure storage via AsyncStorage / localStorage).
 - **Forgot Password** — New screen and `resetPassword` in AuthContext; loading, error, success, and retry states; respects `isAuthConfigured`.
 - **Log Out** — Unchanged; Settings “Sign out” calls `signOut()`.
-- **Profiles** — After signup (when session exists) and on every session load (including OAuth/magic link), `ensureProfile` upserts `public.profiles` so FKs from other tables succeed.
+- **Profiles** — After signup (when session exists) and on every session load (including after PKCE email-link completion), `ensureProfile` upserts `public.profiles` so FKs from other tables succeed.
 - **Auth state** — Single app-wide `AuthProvider` in root layout; `useAuth()` exposes session, loading, and auth methods.
 - **Navigation** — Unauthenticated: redirect to `/(auth)/login`; tab layout shows auth loading when `isLoading && session === null`. Authenticated: tabs. No changes to existing tab/screen content.
 - **Env validation** — `validateAuthEnv()` and `isAuthConfigured` used in AuthContext and forgot-password screen; dev warning when Supabase vars are missing.

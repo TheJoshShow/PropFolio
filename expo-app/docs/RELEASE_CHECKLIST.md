@@ -140,7 +140,7 @@ Run on a **real device** with the TestFlight build installed.
 
 ### App information
 - [ ] **Name**, **Subtitle**, **Privacy Policy URL**, **Category** are correct.
-- [ ] **Support URL** matches what the app uses (e.g. paywall/settings); often `https://propfolio.app/support` or your chosen URL.
+- [ ] **Support URL** matches what the app uses (e.g. paywall/settings); often `https://prop-folio.vercel.app/support` or your chosen URL.
 
 ### In-app purchases / subscriptions
 - [ ] Subscription products (e.g. `com.propfolio.premium.monthly`, `com.propfolio.premium.annual`) exist and are **Approved** in App Store Connect.

@@ -53,6 +53,16 @@ describe('ensureProfile', () => {
     expect(cap.lastUpsert).not.toHaveProperty('phone_number');
   });
 
+  it('treats unique violation (23505) as success for idempotent upsert', async () => {
+    const upsert = jest.fn(async () => ({
+      error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+    }));
+    const from = jest.fn(() => ({ upsert }));
+    const client = { from } as unknown as SupabaseClient;
+    const { error } = await ensureProfile(client, userId, { first_name: 'A', last_name: 'B' });
+    expect(error).toBeNull();
+  });
+
   it('idempotent upsert uses same conflict key', async () => {
     const upsert = jest.fn(async () => ({ error: null }));
     const from = jest.fn(() => ({ upsert }));

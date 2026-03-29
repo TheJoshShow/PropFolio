@@ -2,7 +2,7 @@
 
 Short guide to confirm **Firebase Crashlytics** is working for the Expo app (`expo-app/`). Crash reporting is **iOS-only** in this codebase; it uses **`GoogleService-Info.plist`** and the monitoring layer in **`expo-app/src/services/monitoring/`**.
 
-**Related:** Expo/EAS/Firebase architecture → `expo-app/docs/EXPO_EAS_FIREBASE_IOS.md` · In-app test buttons → `expo-app/docs/MONITORING_VERIFICATION.md` · Plist & EAS → `FIREBASE_CRASHLYTICS_MANUAL_STEPS.md` (repo root).
+**Related:** Expo/EAS/Firebase architecture → `expo-app/docs/EXPO_EAS_FIREBASE_IOS.md` · In-app test buttons → `expo-app/docs/MONITORING_VERIFICATION.md` · Plist & EAS → [`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`](./FIREBASE_CRASHLYTICS_MANUAL_STEPS.md).
 
 ---
 
@@ -45,7 +45,7 @@ On an **iPhone** with a **Release** or **Release-like** build (not Metro-attache
 
 ## 4. TestFlight verification steps
 
-1. Upload a build from **EAS** (or Xcode) that includes the correct **`GoogleService-Info.plist`** (local file or EAS **`GOOGLE_SERVICES_INFO_PLIST`** file variable — see `FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`).
+1. Upload a build from **EAS** (or Xcode) that includes the correct **`GoogleService-Info.plist`** (local file or EAS **`GOOGLE_SERVICES_INFO_PLIST`** file variable — see [`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`](./FIREBASE_CRASHLYTICS_MANUAL_STEPS.md)).
 2. Install from **TestFlight** on a physical iPhone.
 3. Launch the app once (cold start) — Crashlytics often flushes after **next** launch.
 4. If your build has **`EXPO_PUBLIC_ENABLE_QA_DIAGNOSTICS=true`**: **Settings** → **Stability checks** → **Send test signal**.

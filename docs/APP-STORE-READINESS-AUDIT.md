@@ -15,7 +15,7 @@ Audit date: March 2025. Covers iOS production requirements, privacy/legal, delet
 | iOS privacy manifest | **Not configured** (Expo supports `expo.ios.privacyManifests`) | P1 |
 | Placeholder metadata | **Minor** (version 1.0.0, bundle ID set; confirm build number) | P2 |
 | Demo-only code | **Safe** (DEMO_USER only when Supabase unset; __DEV__ guards) | — |
-| Dead links | **Risk** (default legal URLs point to propfolio.app; ensure live before ship) | P2 |
+| Dead links | **Risk** (default legal URLs point to prop-folio.vercel.app; ensure live before ship) | P2 |
 | Crash-prone paths | **Mitigated** (getSupabase() null checks; RevenueCat lazy-loaded) | — |
 
 ---
@@ -32,10 +32,10 @@ Audit date: March 2025. Covers iOS production requirements, privacy/legal, delet
 
 ## 2. Privacy and legal surfaces
 
-- **Privacy Policy:** Linked from Settings → Legal → Privacy Policy. URL from `getPrivacyPolicyUrl()` (env `EXPO_PUBLIC_PRIVACY_POLICY_URL` or default `https://propfolio.app/privacy`). ✓  
+- **Privacy Policy:** Linked from Settings → Legal → Privacy Policy. URL from `getPrivacyPolicyUrl()` (env `EXPO_PUBLIC_PRIVACY_POLICY_URL` or default `https://prop-folio.vercel.app/privacy`). ✓  
 - **Terms of Service:** Linked from Settings → Legal → Terms of Service. URL from `getTermsUrl()`. ✓  
 - **In-app disclosure:** Paywall footer describes billing and cancellation. ✓  
-- **Gaps:** (1) Ensure default URLs (propfolio.app) are live and correct before release. (2) Add explicit Terms and Privacy links on the paywall screen (below footer) for subscription compliance.
+- **Gaps:** (1) Ensure default URLs (prop-folio.vercel.app) are live and correct before release. (2) Add explicit Terms and Privacy links on the paywall screen (below footer) for subscription compliance.
 
 ---
 
@@ -68,7 +68,7 @@ Apple requires that apps that support account creation **allow users to initiate
 ## 6. Placeholder metadata and links
 
 - **app.json:** `name: "PropFolio"`, `slug: "propfolio"`, `version: "1.0.0"`, `bundleIdentifier: "com.propfolio.app"`. No obvious test placeholders.  
-- **Legal URLs:** Defaults `https://propfolio.app/privacy` and `https://propfolio.app/terms`. **Action:** Before release, ensure these URLs are live and that production env overrides are set if different.  
+- **Legal URLs:** Defaults `https://prop-folio.vercel.app/privacy` and `https://prop-folio.vercel.app/terms`. **Action:** Before release, ensure these URLs are live and that production env overrides are set if different.  
 - **Billing help:** `getBillingHelpUrl()` returns empty if env unset; Settings shows inline help. ✓  
 - **Product IDs:** `billing.ts` uses placeholder IDs (`com.propfolio.premium.monthly`, etc.). Replace with real App Store / Play product IDs when creating products.
 
@@ -76,7 +76,7 @@ Apple requires that apps that support account creation **allow users to initiate
 
 ## 7. Dead links and hardcoded test values
 
-- **Dead links:** No hardcoded test URLs in app code. Risk is default legal URLs (propfolio.app) returning 404 if not yet published.  
+- **Dead links:** No hardcoded test URLs in app code. Risk is default legal URLs (prop-folio.vercel.app) returning 404 if not yet published.  
 - **Hardcoded test values:** None found. Demo user (`demo@propfolio.app`) is only used when Supabase env is unset; production should have env set.  
 - **Simulate at limit:** Dev-only (__DEV__); toggle handler exists but the Switch UI may be missing from the Debug card in Settings (state/handler present, no Switch in current render). Low impact; dev-only.
 

@@ -1,27 +1,43 @@
 /**
- * Feature row: icon in rounded square + description text (welcome / onboarding).
+ * Feature row: premium surface + icon well + headline (welcome / onboarding).
  */
 
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SymbolView } from 'expo-symbols';
-import { spacing, radius, fontSizes, fontWeights, lineHeights } from '../theme';
+import { spacing, radius, fontSizes, fontWeights, lineHeights, surfaceSubtle } from '../theme';
 import { useThemeColors } from './useThemeColors';
 
 export interface FeatureRowProps {
   icon: string;
-  description: string;
+  /** Short headline (welcome / onboarding). String or nested Text for emphasis. */
+  description: ReactNode;
 }
 
 export function FeatureRow({ icon, description }: FeatureRowProps) {
   const colors = useThemeColors();
 
   return (
-    <View style={styles.row}>
-      <View style={[styles.iconWrap, { borderColor: colors.border }]}>
-        <SymbolView name={icon as any} tintColor={colors.primary} size={20} />
+    <View
+      style={[
+        styles.row,
+        {
+          backgroundColor: colors.surfaceSecondary,
+          borderColor: colors.border,
+        },
+        surfaceSubtle,
+      ]}
+    >
+      <View style={[styles.iconWell, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <SymbolView name={icon as any} tintColor={colors.primary} size={21} />
       </View>
-      <Text style={[styles.text, { color: colors.text }]}>{description}</Text>
+      <Text
+        style={[styles.text, { color: colors.text }]}
+        allowFontScaling
+        maxFontSizeMultiplier={1.35}
+      >
+        {description}
+      </Text>
     </View>
   );
 }
@@ -30,21 +46,27 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.m,
+    borderRadius: radius.m,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: spacing.m,
+    paddingHorizontal: spacing.m,
+    paddingLeft: spacing.s,
   },
-  iconWrap: {
+  iconWell: {
     width: 40,
     height: 40,
     borderRadius: radius.s,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.s,
+    marginRight: spacing.m,
   },
   text: {
     flex: 1,
+    flexShrink: 1,
     fontSize: fontSizes.base,
     fontWeight: fontWeights.medium,
-    lineHeight: lineHeights.base,
+    lineHeight: lineHeights.lg,
+    letterSpacing: -0.15,
   },
 });

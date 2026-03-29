@@ -2,7 +2,7 @@
 
 Targeted **non-fatal** signals use `recordFlowIssue` / `recordFlowException` from `src/services/monitoring/flowInstrumentation.ts`. Each payload includes `env` (dev/prod) and `v` (app version) where applicable.
 
-**Stages & recovery:** Many events include **`stage`** (e.g. `parse`, `enrich`, `persist`, `oauth_callback`, `startup`) and **`recoverable`** (user can retry / fix without reinstall). **`recordFlowException`** also adds **`client_kind`** (`timeout`, `network`, `unauthorized`, …) via `clientErrorClassification.ts` unless you override it in `detail`.
+**Stages & recovery:** Many events include **`stage`** (e.g. `parse`, `enrich`, `persist`, `auth_callback`, `startup`) and **`recoverable`** (user can retry / fix without reinstall). **`recordFlowException`** also adds **`client_kind`** (`timeout`, `network`, `unauthorized`, …) via `clientErrorClassification.ts` unless you override it in `detail`.
 
 **Deduping:** identical exception fingerprints within ~2.5s are suppressed (`reportDedupe`). Message-only flow lines dedupe the same way.
 
@@ -14,7 +14,7 @@ Targeted **non-fatal** signals use `recordFlowIssue` / `recordFlowException` fro
 
 | Area | Where | What gets reported |
 |------|--------|---------------------|
-| **Auth** | `AuthContext` | Session invalid after `getUser`, missing token on deep link, callback `setSession` failure, sign-in/up/out failures, OAuth/magic link/reset/update password failures, profile setup incomplete (signup + phone), account delete edge failures |
+| **Auth** | `AuthContext` | Session invalid after `getUser`, email-link callback errors or missing PKCE code, callback `exchangeCodeForSession` failure, sign-in/up/out failures, reset/update password failures, profile setup incomplete (signup + phone), account delete edge failures |
 | **Import** | `listingImportParser` (async), `propertyImportOrchestrator`, `useExecutePropertyImport` | Listing parse failed (reason only), manual enrich blocked codes, pipeline blocked / failed statuses |
 | **API** | `edgeFunctions` `invoke` / `invokeWithTimeout` | Supabase function name + failure kind + `stage: edge_invoke` + `recoverable` (false only for `no_client`) |
 | **Billing** | `revenueCat`, `SubscriptionContext` | Missing key (`rc_configure`), offerings fetch, customer info, purchase/restore, subscription load/refresh (`stage` on each) |
@@ -28,12 +28,11 @@ Targeted **non-fatal** signals use `recordFlowIssue` / `recordFlowException` fro
 | Name | Type |
 |------|------|
 | `auth_session_invalid` | issue |
-| `auth_callback_missing_token` | issue |
+| `auth_callback_redirect_error` | issue |
+| `auth_callback_missing_code` | issue |
 | `auth_callback_set_session_failed` | exception |
 | `auth_sign_in_failed` | exception |
 | `auth_sign_up_failed` | exception |
-| `auth_oauth_failed` | exception (+ `provider`) |
-| `auth_magic_link_failed` | exception |
 | `auth_reset_password_failed` | exception |
 | `auth_update_password_failed` | exception |
 | `auth_sign_out_failed` | exception |

@@ -175,7 +175,7 @@ Step-by-step setup for each third-party service: links, APIs/keys, PropFolio usa
 
 **PropFolio** uses **`expo-app/src/services/monitoring`** as the only entry point; the native SDK is **`@react-native-firebase/crashlytics`** on iOS.
 
-**Operational guide:** **`expo-app/docs/MONITORING_SETUP.md`** (initialization, plist, EAS, troubleshooting). **Manual plist / EAS file env:** repo root **`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**. **Historical migration audit:** **`MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`** (repo root).
+**Operational guide:** **`expo-app/docs/MONITORING_SETUP.md`** (initialization, plist, EAS, troubleshooting). **Manual plist / EAS file env:** **`docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**. **Historical migration audit:** **`docs/archive/migrations/MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`**.
 
 **Do not** add paid API keys for crash reporting to the client beyond what Firebase documents for your integration pattern. The **`GoogleService-Info.plist`** identifies the Firebase app — it is not a secret server key, but treat repo policy as for any client config file.
 

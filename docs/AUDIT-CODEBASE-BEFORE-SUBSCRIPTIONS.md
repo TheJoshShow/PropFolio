@@ -179,10 +179,11 @@
 
 ### 3.6 Obsolete / Duplicate / Dead Code
 
-- **Empty barrels:** `src/features/auth/index.ts`, `src/features/subscriptions/index.ts` (and possibly others under `features/`) only contain `export type {}`. They are not dead code that breaks anything; they are placeholders. Safe to leave or later replace with real exports.
+- **`src/features/auth/`:** **Removed** (empty folder after auth cleanup). Auth UI remains under **`app/(auth)/`**.
+- **`src/features/subscriptions/index.ts`:** Now exports **`isEntitlementBootstrapPending`** from `entitlementPolicy.ts` (not an empty barrel).
 - **Portfolio screen:** Does not yet load from Supabase; comment says “Phase 6 will wire Supabase.” No conflict with subscriptions.
 - **PropFolio (Swift):** Separate iOS app in `PropFolio/`; not used by the Expo app. No interaction with expo-app subscription logic.
-- **`_archive_review/`:** Contains a `web/` package; likely old or experimental. Do not delete without explicit confirmation; list as “archive” in any cleanup list.
+- **`_archive_review/`:** Not present in the current tree (if it reappears, treat as archive — do not delete without confirmation).
 
 ---
 

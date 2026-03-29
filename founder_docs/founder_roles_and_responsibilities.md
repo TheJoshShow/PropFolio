@@ -32,7 +32,7 @@ Customize for your team. Example structure for a small founding team:
 |------|--------|------------------|--------|
 | **Strategy & roadmap** | CEO | CTO | Align with product and fundraising |
 | **Fundraising** | CEO | All | Materials in [fundraising_narrative_outline.md](fundraising_narrative_outline.md) |
-| **Product & engineering** | CTO | CEO | Per [release_blocker_report.md](../expo-app/release_blocker_report.md) and app roadmap |
+| **Product & engineering** | CTO | CEO | Per [release_blocker_report.md](../expo-app/docs/archive/ios-audit/release_blocker_report.md) and app roadmap |
 | **App Store & compliance** | CTO / CEO | — | [app_store_launch_governance_checklist.md](app_store_launch_governance_checklist.md) |
 | **Privacy & data** | CTO / designated | CEO | [privacy_and_data_governance_checklist.md](privacy_and_data_governance_checklist.md) |
 | **Legal & corporate** | CEO or COO | All | [corporate_records_checklist.md](corporate_records_checklist.md); attorney for contracts |

@@ -1,6 +1,6 @@
 # Backend configuration and setup
 
-PropFolio loads Supabase URL and anon key from **environment variables** or **Info.plist**. Secrets are never committed. This section covers local development, production, and auth (email + Apple Sign In placeholder).
+PropFolio loads Supabase URL and anon key from **environment variables** or **Info.plist**. Secrets are never committed. This section covers local development, production, and **email/password auth** for the native Swift app path. (The **Expo** client in `expo-app/` uses `EXPO_PUBLIC_SUPABASE_*` only — no Apple/Google OAuth client IDs in the client.)
 
 ---
 
@@ -76,9 +76,7 @@ You can merge from `PropFolio/Resources/Info-Config-Example.plist` as a template
 
 ---
 
-## 5. Auth: email and Apple Sign In
-
-### Email (supported)
+## 5. Auth: email and password (MVP)
 
 - **Sign up:** `SupabaseAuthProviding().signUp(email:password:)`
 - **Sign in:** `SupabaseAuthProviding().signIn(email:password:)`
@@ -87,16 +85,7 @@ You can merge from `PropFolio/Resources/Info-Config-Example.plist` as a template
 
 Use these from **Services/Sync** (or your auth VM); do not put business logic in the Supabase folder.
 
-### Apple Sign In (placeholder)
-
-- **Supabase:** In Dashboard → **Authentication → Providers**, enable **Apple** and configure (Services ID, key, etc.).
-- **Xcode:** Add the **Sign in with Apple** capability to the app target.
-- **Code:** The client is prepared for native Apple Sign In. When you implement it:
-  1. Use `ASAuthorizationController` to get the user’s identity token (and full name on first sign-in).
-  2. Call `SupabaseAuthProviding().signInWithApple(idToken:nonce:)` with that token.
-  3. Optionally update the user’s display name with `client.auth.update(user:)` when Apple returns a name.
-
-Until then, the Apple provider is a placeholder and can be hidden or disabled in the UI.
+**Social / OAuth sign-in** is not part of the current Expo MVP (`expo-app/`). If you add Sign in with Apple or Google later, configure providers in Supabase Dashboard and add the native SDK flow — do not add provider client secrets to `EXPO_PUBLIC_*` env vars.
 
 ---
 
@@ -116,4 +105,4 @@ Use `SupabaseClientManager.instance?.client` when you need the Supabase client (
 - [ ] `SUPABASE_URL` and `SUPABASE_ANON_KEY` set via scheme, Info.plist, or Secrets.xcconfig (not committed).
 - [ ] Run the app: if config is valid, `SupabaseClientManager.instance` is non-nil; otherwise check debug console for the redacted message.
 - [ ] Email auth: use `SupabaseAuthProviding()` for sign-in/sign-up/sign-out.
-- [ ] Apple: enable in Supabase and add capability in Xcode when ready; then implement native flow and `signInWithApple(idToken:nonce:)`.
+- [ ] Optional later: social providers in Supabase + native SDKs if product requires them (not required for MVP email/password).

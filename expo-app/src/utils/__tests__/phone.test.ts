@@ -1,4 +1,4 @@
-import { getOptionalPhoneFieldError, getPhoneValidationError, normalizePhoneNumber } from '../phone';
+import { getPhoneValidationError, normalizePhoneNumber } from '../phone';
 
 describe('phone utils', () => {
   test('normalizes US dashed number', () => {
@@ -34,22 +34,4 @@ describe('phone utils', () => {
   test('rejects non-1 leading 11 digits (US assumption)', () => {
     expect(normalizePhoneNumber('55555555555')).toBeNull();
   });
-
-  describe('getOptionalPhoneFieldError', () => {
-    test('blank and whitespace are valid', () => {
-      expect(getOptionalPhoneFieldError('')).toBeNull();
-      expect(getOptionalPhoneFieldError('   ')).toBeNull();
-    });
-
-    test('accepts formatted US number', () => {
-      expect(getOptionalPhoneFieldError('(312) 555-1212')).toBeNull();
-    });
-
-    test('rejects invalid partial input', () => {
-      expect(getOptionalPhoneFieldError('123')).toBe(
-        'Enter a valid phone number or leave this field blank.'
-      );
-    });
-  });
 });
-

@@ -1,8 +1,8 @@
 /**
- * Login screen. Email/password, Google, Apple, and magic link.
+ * Sign in — email and password. Forgot password when Supabase is configured.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,25 +13,20 @@ import { useThemeColors } from '../../src/components/useThemeColors';
 import { responsiveContentContainer } from '../../src/utils/responsive';
 import { getAuthErrorMessage, isValidEmail } from '../../src/utils/authErrors';
 
+const SCROLL_BOTTOM_PADDING = spacing.xxxl * 2 + 24;
+
 export default function LoginScreen() {
   const router = useRouter();
-  const {
-    session,
-    signIn,
-    signInWithOAuth,
-    signInWithMagicLink,
-    isLoading,
-    lastAuthError,
-    clearLastAuthError,
-  } = useAuth();
+  const { session, signIn, isLoading, lastAuthError, clearLastAuthError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [magicLinkExpanded, setMagicLinkExpanded] = useState(false);
-  const [magicLinkEmail, setMagicLinkEmail] = useState('');
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
   const colors = useThemeColors();
+
+  const emailTrimmed = email.trim().toLowerCase();
+  const emailInlineError =
+    email.length > 0 && !isValidEmail(emailTrimmed) ? 'Enter a valid email address' : undefined;
 
   useEffect(() => {
     if (!isLoading && session) {
@@ -46,7 +41,8 @@ export default function LoginScreen() {
     }
   }, [lastAuthError, clearLastAuthError]);
 
-  const handleSignIn = async () => {
+  const handleSignIn = useCallback(async () => {
+    if (isLoading) return;
     setError(null);
     if (!email.trim()) {
       setError('Enter your email');
@@ -66,207 +62,136 @@ export default function LoginScreen() {
     } catch (e) {
       setError(getAuthErrorMessage(e, 'signIn'));
     }
-  };
-
-  const handleOAuth = async (provider: 'google' | 'apple') => {
-    setError(null);
-    try {
-      await signInWithOAuth(provider);
-    } catch (e) {
-      setError(getAuthErrorMessage(e, 'oauth'));
-    }
-  };
-
-  const handleMagicLink = async () => {
-    setMagicLinkError(null);
-    const trimmed = magicLinkEmail.trim().toLowerCase();
-    if (!trimmed) {
-      setMagicLinkError('Enter your email');
-      return;
-    }
-    if (!isValidEmail(trimmed)) {
-      setMagicLinkError('Enter a valid email address');
-      return;
-    }
-    try {
-      await signInWithMagicLink(trimmed);
-      setMagicLinkSent(true);
-    } catch (e) {
-      setMagicLinkError(getAuthErrorMessage(e, 'magicLink'));
-    }
-  };
+  }, [email, password, isLoading, signIn]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
         <ScrollView
           contentContainerStyle={[styles.scroll, responsiveContentContainer]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="automatic"
         >
-        <Pressable
-          onPress={() => router.push('/(auth)')}
-          style={styles.backRow}
-          accessibilityRole="button"
-          accessibilityLabel="Back to welcome"
-        >
-          <Text style={[styles.backText, { color: colors.textSecondary }]}>← Welcome</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.text }]}>Sign in</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Sign in to sync your portfolio
-        </Text>
-        <TextInput
-          label="Email"
-          value={email}
-          onChangeText={(v) => { setEmail(v); setError(null); }}
-          placeholder="you@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          maxLength={255}
-          accessibilityLabel="Email"
-        />
-        <TextInput
-          label="Password"
-          value={password}
-          onChangeText={(v) => { setPassword(v); setError(null); }}
-          placeholder="••••••••"
-          secureTextEntry
-          accessibilityLabel="Password"
-        />
-        <Pressable
-          onPress={() => { setError(null); router.push('/(auth)/forgot-password'); }}
-          style={styles.forgotRow}
-          accessibilityRole="link"
-          accessibilityLabel="Forgot password?"
-        >
-          <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot password?</Text>
-        </Pressable>
-        {error ? (
-          <View style={styles.errorRow}>
-            <Text
-              style={[styles.error, { color: colors.error }]}
-              accessibilityLiveRegion="polite"
-              accessibilityRole="alert"
-            >
-              {error}
+          <Pressable
+            onPress={() => router.push('/(auth)')}
+            style={styles.backRow}
+            accessibilityRole="button"
+            accessibilityLabel="Back to welcome"
+          >
+            <Text style={[styles.backText, { color: colors.textSecondary }]}>← Welcome</Text>
+          </Pressable>
+          <Text style={[styles.title, { color: colors.text }]}>Welcome back</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            Sign in with the email and password for your account.
+          </Text>
+          <TextInput
+            label="Email"
+            value={email}
+            onChangeText={(v) => {
+              setEmail(v);
+              setError(null);
+            }}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={255}
+            textContentType="username"
+            autoComplete="email"
+            accessibilityLabel="Email"
+            error={emailInlineError}
+            returnKeyType="next"
+          />
+          <TextInput
+            label="Password"
+            value={password}
+            onChangeText={(v) => {
+              setPassword(v);
+              setError(null);
+            }}
+            placeholder="Your password"
+            secureTextEntry={!showPassword}
+            textContentType="password"
+            autoComplete="password"
+            accessibilityLabel="Password"
+            returnKeyType="go"
+            onSubmitEditing={() => {
+              if (!isLoading && emailTrimmed && password && isValidEmail(emailTrimmed)) {
+                void handleSignIn();
+              }
+            }}
+          />
+          <Pressable
+            onPress={() => setShowPassword((p) => !p)}
+            style={styles.showPasswordRow}
+            accessibilityRole="checkbox"
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            accessibilityState={{ checked: showPassword }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.showPasswordLabel, { color: colors.textSecondary }]}>
+              {showPassword ? 'Hide password' : 'Show password'}
             </Text>
-            <Pressable
-              onPress={() => setError(null)}
-              style={styles.retryTouchable}
-              accessibilityRole="button"
-              accessibilityLabel="Try again"
-            >
-              <Text style={[styles.retryText, { color: colors.primary }]}>Try again</Text>
-            </Pressable>
-          </View>
-        ) : null}
-        <Button
-          title={isLoading ? 'Signing in…' : 'Sign in'}
-          onPress={handleSignIn}
-          disabled={isLoading || (!email.trim() || !password)}
-          fullWidth
-          variant="primary"
-          pill
-          glow
-        />
-
-        <View style={styles.dividerRow}>
-          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-          <Text style={[styles.dividerText, { color: colors.textMuted }]}>Or continue with</Text>
-          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-        </View>
-
-        <Button
-          title="Continue with Google"
-          onPress={() => handleOAuth('google')}
-          disabled={isLoading}
-          variant="outline"
-          fullWidth
-          pill={false}
-          style={styles.oauthButton}
-        />
-        <Button
-          title="Continue with Apple"
-          onPress={() => handleOAuth('apple')}
-          disabled={isLoading}
-          variant="outline"
-          fullWidth
-          pill={false}
-          style={styles.oauthButton}
-        />
-
-        <View style={styles.magicLinkSection}>
+          </Pressable>
           <Pressable
             onPress={() => {
-              setMagicLinkExpanded((v) => !v);
-              setMagicLinkError(null);
-              setMagicLinkSent(false);
+              setError(null);
+              router.push('/(auth)/forgot-password');
             }}
-            style={styles.magicLinkTrigger}
-            accessibilityRole="button"
-            accessibilityLabel="Email me a sign-in link"
-          >
-            <Text style={[styles.magicLinkTriggerText, { color: colors.primary }]}>
-              Email me a sign-in link
-            </Text>
-          </Pressable>
-          {magicLinkExpanded && (
-            <View style={styles.magicLinkForm}>
-              {magicLinkSent ? (
-                <Text style={[styles.magicLinkSuccess, { color: colors.textSecondary }]}>
-                  Check your email for the sign-in link. Click the link to sign in.
-                </Text>
-              ) : (
-                <>
-                  <TextInput
-                    label="Email"
-                    value={magicLinkEmail}
-                    onChangeText={(v) => {
-                      setMagicLinkEmail(v);
-                      setMagicLinkError(null);
-                    }}
-                    placeholder="you@example.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    maxLength={255}
-                    accessibilityLabel="Email for magic link"
-                  />
-                  {magicLinkError ? (
-                    <Text style={[styles.magicLinkError, { color: colors.error }]}>{magicLinkError}</Text>
-                  ) : null}
-                  <Button
-                    title="Send link"
-                    onPress={handleMagicLink}
-                    disabled={isLoading}
-                    variant="secondary"
-                    fullWidth
-                  />
-                </>
-              )}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.signUpRow}>
-          <Text style={[styles.signUpPrompt, { color: colors.textSecondary }]}>
-            Don&apos;t have an account?{' '}
-          </Text>
-          <Pressable
-            onPress={() => router.push('/(auth)/sign-up')}
+            style={styles.forgotRow}
             accessibilityRole="link"
-            accessibilityLabel="Sign up"
-            style={styles.signUpLinkTouchable}
-            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            accessibilityLabel="Forgot password?"
           >
-            <Text style={[styles.signUpLink, { color: colors.primary }]}>Sign up</Text>
+            <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot password?</Text>
           </Pressable>
-        </View>
+          {error ? (
+            <View style={styles.errorRow}>
+              <Text
+                style={[styles.error, { color: colors.error }]}
+                accessibilityLiveRegion="polite"
+                accessibilityRole="alert"
+              >
+                {error}
+              </Text>
+              <Pressable
+                onPress={() => setError(null)}
+                style={styles.retryTouchable}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss error"
+              >
+                <Text style={[styles.retryText, { color: colors.primary }]}>Dismiss</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <Button
+            title={isLoading ? 'Signing in…' : 'Sign in'}
+            onPress={handleSignIn}
+            disabled={isLoading || !email.trim() || !password || Boolean(emailInlineError)}
+            fullWidth
+            variant="primary"
+            pill
+            glow
+            style={styles.primaryCta}
+          />
+
+          <View style={styles.signUpRow}>
+            <Text style={[styles.signUpPrompt, { color: colors.textSecondary }]}>New here? </Text>
+            <Pressable
+              onPress={() => router.push('/(auth)/sign-up')}
+              accessibilityRole="link"
+              accessibilityLabel="Create account"
+              style={styles.signUpLinkTouchable}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            >
+              <Text style={[styles.signUpLink, { color: colors.primary }]}>Create an account</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -279,7 +204,7 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     padding: spacing.xl,
-    paddingBottom: spacing.xxxl * 2,
+    paddingBottom: SCROLL_BOTTOM_PADDING,
     justifyContent: 'center',
     minHeight: 400,
   },
@@ -294,10 +219,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     lineHeight: lineHeights.base,
   },
+  showPasswordRow: {
+    marginTop: -spacing.xs,
+    marginBottom: spacing.xs,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: spacing.xs,
+  },
+  showPasswordLabel: { fontSize: fontSizes.sm },
   forgotRow: {
     alignSelf: 'flex-end',
-    marginTop: spacing.xxs,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.m,
     minHeight: 44,
     justifyContent: 'center',
   },
@@ -322,41 +254,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     fontWeight: fontWeights.semibold,
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xl,
-    marginBottom: spacing.m,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontSize: fontSizes.sm,
-    marginHorizontal: spacing.s,
-  },
-  oauthButton: { marginBottom: spacing.s },
-  magicLinkSection: { marginTop: spacing.m },
-  magicLinkTrigger: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingVertical: spacing.xs,
-  },
-  magicLinkTriggerText: {
-    fontSize: fontSizes.base,
-    fontWeight: fontWeights.semibold,
-  },
-  magicLinkForm: { marginTop: spacing.s },
-  magicLinkSuccess: {
-    fontSize: fontSizes.sm,
-    marginBottom: spacing.m,
-    lineHeight: lineHeights.sm,
-  },
-  magicLinkError: {
-    fontSize: fontSizes.sm,
-    marginBottom: spacing.s,
-  },
+  primaryCta: { marginTop: spacing.xxs },
   backRow: {
     marginBottom: spacing.m,
     minHeight: 44,
@@ -371,7 +269,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    marginTop: spacing.xl,
+    marginTop: spacing.xxl,
     gap: spacing.xxs,
   },
   signUpPrompt: { fontSize: fontSizes.base },

@@ -49,8 +49,8 @@
 
 | Item | Status | Notes |
 |------|--------|------|
-| **Privacy Policy URL** | OK | In-app (Settings, Paywall) and config: `getPrivacyPolicyUrl()`; fallback `https://propfolio.app/privacy`. Set `EXPO_PUBLIC_PRIVACY_POLICY_URL` for production. |
-| **Terms of Service URL** | OK | In-app (Settings, Paywall, Sign-up); fallback `https://propfolio.app/terms`. Set `EXPO_PUBLIC_TERMS_URL` for production. |
+| **Privacy Policy URL** | OK | In-app (Settings, Paywall) and config: `getPrivacyPolicyUrl()`; fallback `https://prop-folio.vercel.app/privacy`. Set `EXPO_PUBLIC_PRIVACY_POLICY_URL` for production. |
+| **Terms of Service URL** | OK | In-app (Settings, Paywall, Sign-up); fallback `https://prop-folio.vercel.app/terms`. Set `EXPO_PUBLIC_TERMS_URL` for production. |
 | **In-app disclosure** | OK | Settings includes disclaimer: "PropFolio is for informational use only and does not provide investment, tax, or legal advice." |
 | **App Store Connect** | ⚠️ Before submit | Privacy Policy URL field must be set and must match (or redirect to) the in-app link. |
 
@@ -62,13 +62,13 @@
 
 | Link | Used in | Config / Fallback | Status |
 |------|---------|-------------------|--------|
-| Privacy Policy | Settings, Paywall | `legalUrls.ts`: env or `https://propfolio.app/privacy` | ⚠️ Placeholder domain |
-| Terms | Settings, Paywall, Sign-up | `legalUrls.ts`: env or `https://propfolio.app/terms` | ⚠️ Placeholder domain |
-| Support | Settings | `legalUrls.ts`: env or `https://propfolio.app/support` | ⚠️ Placeholder domain |
+| Privacy Policy | Settings, Paywall | `legalUrls.ts`: env or `https://prop-folio.vercel.app/privacy` | ⚠️ Placeholder domain |
+| Terms | Settings, Paywall, Sign-up | `legalUrls.ts`: env or `https://prop-folio.vercel.app/terms` | ⚠️ Placeholder domain |
+| Support | Settings | `legalUrls.ts`: env or `https://prop-folio.vercel.app/support` | ⚠️ Placeholder domain |
 | Billing help | Settings (if URL set) | `EXPO_PUBLIC_BILLING_HELP_URL` or empty | Optional |
 | Subscription management | Settings, Paywall | System URL (Apple) or fallback message | OK |
 
-**Broken links:** The fallback domain `https://propfolio.app` is a placeholder. If that domain is not yet live, either (1) set env vars to your real hosted URLs, or (2) deploy a simple site at propfolio.app with `/privacy`, `/terms`, and `/support` (or redirects). In-app links use safe open (try/catch + Alert) in Settings and Paywall; Sign-up uses `Linking.openURL` directly—consider wrapping in the same safe-open helper for consistency.
+**Broken links:** If `https://prop-folio.vercel.app` is not yet deployed or paths 404, either (1) set `EXPO_PUBLIC_*` legal URLs to your live pages, or (2) deploy the `website/` static build to Vercel with `/privacy`, `/terms`, and add `/support` (or redirect). In-app links use safe open (try/catch + Alert) in Settings and Paywall; Sign-up uses `Linking.openURL` directly—consider wrapping in the same safe-open helper for consistency.
 
 **Action:** Before submission, set production env so all three (Privacy, Terms, Support) point to live, working URLs. Verify in Safari. No broken links during review.
 

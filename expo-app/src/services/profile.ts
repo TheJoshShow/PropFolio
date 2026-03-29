@@ -6,11 +6,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizePhoneNumber } from '../utils/phone';
 
+/** Postgres unique_violation — row already exists; treat upsert as satisfied. */
+function isUniqueViolation(error: unknown): boolean {
+  const e = error as { code?: string };
+  return e?.code === '23505';
+}
+
 export interface ProfileMetadata {
   first_name?: string | null;
   last_name?: string | null;
   /**
-   * Canonical phone storage format in auth + profiles:
+   * Canonical phone storage format in auth + profiles (optional; not collected on sign-up in MVP):
    * - E.164 with leading `+` (e.g. `+15555555555`)
    */
   phone_number?: string | null;
@@ -53,6 +59,9 @@ export async function ensureProfile(
 
   const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
   if (error) {
+    if (isUniqueViolation(error)) {
+      return { error: null };
+    }
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
       console.warn('[Profile] ensureProfile failed:', error.message);
     }
@@ -77,6 +86,9 @@ export async function ensureProfileMinimal(
     { onConflict: 'id' }
   );
   if (error) {
+    if (isUniqueViolation(error)) {
+      return { error: null };
+    }
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
       console.warn('[Profile] ensureProfileMinimal failed:', error.message);
     }

@@ -7,7 +7,7 @@
 ### Internal summary (non-public)
 
 - **Core risk controls:** No investment/financial/tax/legal advice; outputs are informational; user must verify all listing and financial assumptions; third-party listing/API data may be wrong; no performance guarantee.
-- **Product hooks:** Optional phone at signup; free import limit (currently **2** free imports per codebase—confirm before publish); Pro via **RevenueCat** / app stores; account deletion in Settings.
+- **Product hooks:** No phone number at account creation (MVP); free import limit (currently **2** free imports per codebase—confirm before publish); Pro via **RevenueCat** / app stores; account deletion in Settings.
 - **Counsel should tune:** Governing law, venue, arbitration, liability cap, and entity details.
 
 ---
@@ -226,7 +226,7 @@ We may modify these Terms by posting an updated version with a new effective dat
 
 **Email:** [INSERT SUPPORT EMAIL]
 
-**Website:** [INSERT PUBLIC WEBSITE URL, e.g. https://propfolio.app]
+**Website:** [INSERT PUBLIC WEBSITE URL, e.g. https://prop-folio.vercel.app]
 
 ---
 

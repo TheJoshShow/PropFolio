@@ -1,6 +1,6 @@
 # Crashlytics verification (internal)
 
-**Setup and architecture:** [`MONITORING_SETUP.md`](./MONITORING_SETUP.md) · **TestFlight / App Store checks:** [`../../CRASHLYTICS_RELEASE_VERIFICATION.md`](../../CRASHLYTICS_RELEASE_VERIFICATION.md) (repo root)
+**Setup and architecture:** [`MONITORING_SETUP.md`](./MONITORING_SETUP.md) · **TestFlight / App Store checks:** [`../../docs/monitoring/CRASHLYTICS_RELEASE_VERIFICATION.md`](../../docs/monitoring/CRASHLYTICS_RELEASE_VERIFICATION.md)
 
 PropFolio includes **optional in-app controls** to confirm Firebase Crashlytics is wired correctly. They are **not** shown to normal App Store users.
 

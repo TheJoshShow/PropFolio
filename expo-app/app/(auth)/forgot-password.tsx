@@ -21,6 +21,7 @@ import { spacing, fontSizes, fontWeights, lineHeights } from '../../src/theme';
 import { useThemeColors } from '../../src/components/useThemeColors';
 import { responsiveContentContainer } from '../../src/utils/responsive';
 import { getAuthErrorMessage, isValidEmail } from '../../src/utils/authErrors';
+import { getAccountServicesUnavailableBannerMessage } from '../../src/config';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -44,7 +45,9 @@ export default function ForgotPasswordScreen() {
   const handleSubmit = useCallback(async () => {
     setError(null);
     if (!isAuthConfigured) {
-      setError('Password reset is not available. Please try again later.');
+      setError(
+        getAccountServicesUnavailableBannerMessage() ?? 'Password reset is not available. Please try again later.'
+      );
       return;
     }
     if (!trimmedEmail) {
@@ -115,9 +118,9 @@ export default function ForgotPasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={[styles.title, { color: colors.text }]}>Forgot password?</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Reset your password</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Enter your email and we’ll send you a link to reset your password.
+            Enter the email for your account. We’ll send a link to choose a new password.
           </Text>
 
           <TextInput

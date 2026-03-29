@@ -14,12 +14,12 @@ All client-visible values **must** use the `EXPO_PUBLIC_` prefix and are bundled
 | **EXPO_PUBLIC_SUPABASE_URL** | Yes (for real auth) | supabase.ts, env.ts | Yes | Supabase project URL; anon key is separate. |
 | **EXPO_PUBLIC_SUPABASE_ANON_KEY** | Yes (for real auth) | supabase.ts, env.ts | Yes | Anon (public) key only. **Never** service role key. |
 | **EXPO_PUBLIC_REVENUECAT_API_KEY_IOS** | Yes (for IAP) | billing.ts | Yes | RevenueCat **public** app-specific key (iOS). From dashboard → API Keys. |
-| **EXPO_PUBLIC_PRIVACY_POLICY_URL** | Recommended | legalUrls.ts | Yes | Defaults to https://propfolio.app/privacy if unset. |
-| **EXPO_PUBLIC_TERMS_URL** | Recommended | legalUrls.ts | Yes | Defaults to https://propfolio.app/terms if unset. |
-| **EXPO_PUBLIC_SUPPORT_URL** | Recommended (App Store) | legalUrls.ts | Yes | Defaults to https://propfolio.app/support if unset. Match App Store Connect. |
+| **EXPO_PUBLIC_PRIVACY_POLICY_URL** | Recommended | legalUrls.ts | Yes | Defaults to https://prop-folio.vercel.app/privacy if unset. |
+| **EXPO_PUBLIC_TERMS_URL** | Recommended | legalUrls.ts | Yes | Defaults to https://prop-folio.vercel.app/terms if unset. |
+| **EXPO_PUBLIC_SUPPORT_URL** | Recommended (App Store) | legalUrls.ts | Yes | Defaults to https://prop-folio.vercel.app/support if unset. Match App Store Connect. |
 | **EXPO_PUBLIC_BILLING_HELP_URL** | Optional | legalUrls.ts | Yes | Empty = no Billing help link; inline copy only. |
 
-**Crash reporting:** Firebase Crashlytics uses **`GoogleService-Info.plist`** (or EAS file env `GOOGLE_SERVICES_INFO_PLIST`), not `EXPO_PUBLIC_*` keys. See **`expo-app/docs/MONITORING_SETUP.md`** and repo root **`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**.
+**Crash reporting:** Firebase Crashlytics uses **`GoogleService-Info.plist`** (or EAS file env `GOOGLE_SERVICES_INFO_PLIST`), not `EXPO_PUBLIC_*` keys. See **`expo-app/docs/MONITORING_SETUP.md`** and **`docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**.
 
 **Where to set for iOS release:** EAS/Expo build (e.g. `eas.json` env or EAS Secrets) or `.env` at build time. Do not commit `.env`; use `.env.example` as template.
 

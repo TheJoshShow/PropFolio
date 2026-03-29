@@ -1,28 +1,31 @@
 /**
- * Welcome screen. Premium hero, value props, Get Started / Sign In.
+ * Welcome screen. Premium landing-style hero, proof points, and account CTAs.
  */
 
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import { Button, PillBadge, FeatureRow } from '../../src/components';
-import { spacing, fontSizes, fontWeights, lineHeights, radius } from '../../src/theme';
+import { spacing, fontSizes, fontWeights, lineHeights, radius, surfaceSubtle } from '../../src/theme';
 import { useThemeColors } from '../../src/components/useThemeColors';
 import { responsiveContentContainer } from '../../src/utils/responsive';
 import { useAuth } from '../../src/contexts/AuthContext';
 
-const BADGE_LABEL = '● AI DRIVEN REAL ESTATE INTELLIGENCE';
+const BADGE_LABEL = 'AI-powered real estate intelligence';
 const HERO_LINE_1 = 'Find the deals';
 const HERO_LINE_2 = 'others miss.';
-const SUBHEAD_1 = 'Track, analyze & grow your portfolio.';
-const SUBHEAD_2 = 'Your edge in real estate investing.';
+const SUBHEAD_LINE = 'Build conviction before you buy.';
+const SECTION_LABEL = 'Get started';
+const ACCOUNT_HINT =
+  'Already with us? Sign in — or create a free account in under a minute.';
 
-const FEATURES: { icon: string; description: string }[] = [
-  { icon: 'bolt.fill', description: 'Uncover hidden deals before the market does' },
-  { icon: 'chart.bar.fill', description: 'Analyze cap rate, cash flow & ARV in seconds' },
-  { icon: 'arrow.up.right', description: 'Track your portfolio like a pro investor' },
+/** Bold segment + remainder — CAP / Cash Flow / ARV emphasized only. */
+const WELCOME_FEATURES: { icon: string; bold: string; suffix: string }[] = [
+  { icon: 'percent', bold: 'CAP', suffix: ' rate, instantly' },
+  { icon: 'banknote.fill', bold: 'Cash Flow', suffix: ' made clear' },
+  { icon: 'chart.line.uptrend.xyaxis', bold: 'ARV', suffix: ' at a glance' },
 ];
 
 export default function WelcomeScreen() {
@@ -30,7 +33,6 @@ export default function WelcomeScreen() {
   const colors = useThemeColors();
   const { session, isLoading } = useAuth();
 
-  // Only leave welcome after bootstrap confirms a validated session (avoids racing past login).
   useEffect(() => {
     if (!isLoading && session) {
       router.replace('/(tabs)');
@@ -44,54 +46,86 @@ export default function WelcomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Brand lockup */}
-        <View style={styles.brandRow}>
-          <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
-            <SymbolView name="building.2.fill" tintColor={colors.onPrimary} size={28} />
+        <View style={styles.heroBlock}>
+          <View style={styles.brandRow}>
+            <View style={[styles.logoIcon, { backgroundColor: colors.primary }, surfaceSubtle]}>
+              <SymbolView name="building.2.fill" tintColor={colors.onPrimary} size={34} />
+            </View>
+            <View style={styles.wordmarkBlock}>
+              <Text
+                style={[styles.wordmark, { color: colors.text }]}
+                numberOfLines={1}
+                allowFontScaling
+                maxFontSizeMultiplier={1.25}
+                {...(Platform.OS === 'ios'
+                  ? { adjustsFontSizeToFit: true, minimumFontScale: 0.68 }
+                  : {})}
+              >
+                PropFolio
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.wordmark, { color: colors.text }]}>PropFolio</Text>
+
+          <View style={styles.badgeWrap}>
+            <PillBadge label={BADGE_LABEL} />
+          </View>
+
+          <Text style={[styles.heroLine1, { color: colors.text }]}>{HERO_LINE_1}</Text>
+          <Text style={[styles.heroLine2, { color: colors.primary }]}>{HERO_LINE_2}</Text>
+
+          <View style={styles.subheadBlock}>
+            <Text style={[styles.subhead, { color: colors.textSecondary }]}>{SUBHEAD_LINE}</Text>
+          </View>
+
+          <View style={styles.featureList}>
+            {WELCOME_FEATURES.map((f) => (
+              <FeatureRow
+                key={f.bold}
+                icon={f.icon}
+                description={
+                  <>
+                    <Text style={styles.featureEmphasis}>{f.bold}</Text>
+                    <Text style={styles.featureRest}>{f.suffix}</Text>
+                  </>
+                }
+              />
+            ))}
+          </View>
         </View>
 
-        <PillBadge label={BADGE_LABEL} />
+        <View style={styles.sectionSpacer} />
 
-        {/* Hero */}
-        <Text style={[styles.heroLine1, { color: colors.text }]}>{HERO_LINE_1}</Text>
-        <Text style={[styles.heroLine2, { color: colors.primary }]}>{HERO_LINE_2}</Text>
-
-        <Text style={[styles.subhead, { color: colors.textSecondary }]}>
-          {SUBHEAD_1}{'\n'}{SUBHEAD_2}
-        </Text>
-
-        {/* Feature list */}
-        <View style={styles.featureList}>
-          {FEATURES.map((f, i) => (
-            <FeatureRow key={i} icon={f.icon} description={f.description} />
-          ))}
-        </View>
-
-        {/* CTAs */}
-        <View style={styles.ctaArea}>
-          <Button
-            title="Get Started For Free"
-            onPress={() => router.push('/(auth)/sign-up')}
-            fullWidth
-            variant="primary"
-            pill
-            glow
-            accessibilityLabel="Get started for free"
-          />
-          <Pressable
-            onPress={() => router.push('/(auth)/login')}
-            style={({ pressed }) => [
-              styles.signInButton,
-              { borderColor: colors.text },
-              pressed && styles.signInPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Sign in"
-          >
-            <Text style={[styles.signInLabel, { color: colors.text }]}>Sign In</Text>
-          </Pressable>
+        <View style={styles.accountSection}>
+          <View style={[styles.sectionRule, { backgroundColor: colors.border }]} />
+          <Text style={[styles.accountLabel, { color: colors.textSecondary }]}>{SECTION_LABEL}</Text>
+          <Text style={[styles.accountHint, { color: colors.textMuted }]}>{ACCOUNT_HINT}</Text>
+          <View style={styles.ctaArea}>
+            <Button
+              title="Sign in"
+              onPress={() => router.push('/(auth)/login')}
+              fullWidth
+              variant="primary"
+              pill
+              glow
+              style={styles.primaryCta}
+              accessibilityLabel="Sign in with email and password"
+            />
+            <Pressable
+              onPress={() => router.push('/(auth)/sign-up')}
+              style={({ pressed }) => [
+                styles.secondaryCta,
+                {
+                  backgroundColor: colors.surfaceSecondary,
+                  borderColor: colors.border,
+                },
+                pressed && styles.secondaryCtaPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Create account"
+            >
+              <Text style={[styles.secondaryCtaLabel, { color: colors.text }]}>Create account</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -103,8 +137,11 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.l,
-    paddingBottom: spacing.xxxl + 24,
+    paddingTop: spacing.s,
+    paddingBottom: spacing.xxxl,
+  },
+  heroBlock: {
+    flexShrink: 0,
   },
   brandRow: {
     flexDirection: 'row',
@@ -112,54 +149,107 @@ const styles = StyleSheet.create({
     marginBottom: spacing.m,
   },
   logoIcon: {
-    width: 44,
-    height: 44,
+    width: 54,
+    height: 54,
     borderRadius: radius.m,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.s,
+    marginRight: spacing.m,
   },
+  wordmarkBlock: {
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 54,
+  },
+  /** ~2× prior title (28) visual weight; iOS scales down on narrow widths via adjustsFontSizeToFit. */
   wordmark: {
-    fontSize: fontSizes.xxl,
+    fontSize: 52,
     fontWeight: fontWeights.bold,
+    letterSpacing: -1.2,
+    lineHeight: 56,
+  },
+  badgeWrap: {
+    marginBottom: spacing.m,
   },
   heroLine1: {
     fontSize: fontSizes.hero,
     fontWeight: fontWeights.bold,
     lineHeight: lineHeights.hero,
-    marginTop: spacing.xl,
     marginBottom: spacing.xxs,
-    letterSpacing: -0.5,
+    letterSpacing: -1,
   },
   heroLine2: {
     fontSize: fontSizes.hero,
     fontWeight: fontWeights.bold,
     lineHeight: lineHeights.hero,
     marginBottom: spacing.m,
-    letterSpacing: -0.5,
+    letterSpacing: -0.75,
+  },
+  subheadBlock: {
+    marginBottom: spacing.m,
   },
   subhead: {
-    fontSize: fontSizes.base,
-    lineHeight: lineHeights.lg,
-    marginBottom: spacing.xl,
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.regular,
+    lineHeight: lineHeights.xl,
+    letterSpacing: -0.2,
   },
   featureList: {
-    marginBottom: spacing.xxl,
+    gap: spacing.s,
+    marginBottom: 0,
+  },
+  featureEmphasis: {
+    fontWeight: fontWeights.bold,
+  },
+  featureRest: {
+    fontWeight: fontWeights.medium,
+  },
+  sectionSpacer: {
+    flexGrow: 1,
+    minHeight: spacing.l,
+  },
+  accountSection: {
+    flexShrink: 0,
+    paddingBottom: spacing.xs,
+  },
+  sectionRule: {
+    height: StyleSheet.hairlineWidth * 2,
+    borderRadius: radius.xs,
+    opacity: 0.45,
+    marginBottom: spacing.l,
+    alignSelf: 'stretch',
+  },
+  accountLabel: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.semibold,
+    letterSpacing: -0.15,
+    marginBottom: spacing.xs,
+  },
+  accountHint: {
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.lg,
+    marginBottom: spacing.l,
+    letterSpacing: -0.1,
   },
   ctaArea: {
     gap: spacing.m,
   },
-  signInButton: {
-    borderWidth: 2,
+  primaryCta: {
+    minHeight: 54,
+    paddingVertical: spacing.m,
+  },
+  secondaryCta: {
+    borderWidth: StyleSheet.hairlineWidth * 2,
     borderRadius: radius.pill,
-    paddingVertical: spacing.s,
-    minHeight: 52,
+    paddingVertical: spacing.m,
+    minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  signInPressed: { opacity: 0.85 },
-  signInLabel: {
+  secondaryCtaPressed: { opacity: 0.88 },
+  secondaryCtaLabel: {
     fontSize: fontSizes.base,
     fontWeight: fontWeights.bold,
+    letterSpacing: -0.2,
   },
 });

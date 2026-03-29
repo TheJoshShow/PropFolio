@@ -3,7 +3,7 @@
 ## Completed items
 
 - **Supabase client** — `src/services/supabase.ts`: `getSupabase()` and `supabase` export. Uses `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Returns `null` when either is missing so the app runs without config.
-- **Session storage** — Auth uses AsyncStorage on native and `window.localStorage` on web; `detectSessionInUrl` only on web for OAuth/callback.
+- **Session storage** — Auth uses AsyncStorage on native and `window.localStorage` on web; `detectSessionInUrl` only on web so email confirmation / reset links can complete the session in the browser.
 - **Auth wired to Supabase** — `AuthContext` calls `getSupabase()`: when configured, subscribes to `onAuthStateChange`, restores session from `getSession()`, `signIn` → `signInWithPassword`, `signOut` → `signOut`. When not configured, keeps demo user and stub sign-in/out.
 - **Redirect only when not loading** — Tabs layout redirects to login only when `!isLoading && session === null` so Supabase session restore doesn’t flash login.
 - **Dependencies** — `@supabase/supabase-js` and `@react-native-async-storage/async-storage` added to `package.json`.

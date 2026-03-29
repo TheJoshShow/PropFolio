@@ -24,7 +24,7 @@
 | `src/config/billing.ts` | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` (and Android) | RevenueCat SDK `configure({ apiKey })` | ✅ Yes. Public app-specific key from RevenueCat; safe for client. |
 | `app/_layout.tsx` | `initMonitoring()` (stubs) | No third-party crash SDK keys in client env. | ✅ Yes. |
 | `src/config/legalUrls.ts` | `EXPO_PUBLIC_PRIVACY_POLICY_URL`, `TERMS_URL`, `BILLING_HELP_URL`, `SUPPORT_URL` | In-app links | ✅ Yes. URLs only; no secrets. |
-| `src/contexts/AuthContext.tsx` | `access_token`, `refresh_token` from OAuth callback URL | Parsed from URL fragment; passed to `setSession()` | ✅ Yes. User’s own session tokens; not hardcoded. |
+| `src/contexts/AuthContext.tsx` | PKCE `code` from email confirmation / password-reset deep link | `exchangeCodeForSession(code)` after user taps link | ✅ Yes. User’s own auth flow; not hardcoded. |
 | `src/contexts/AuthContext.tsx` | `DEMO_USER` (`id: 'demo', email: 'demo@propfolio.app'`) | Used only when `getSupabase() === null` (no env) | ✅ Yes. Demo mode only; never used when Supabase env is set. |
 
 ### Server (Supabase Edge Functions) — privileged, env-only
@@ -47,7 +47,7 @@ None of these server env vars are read in the client. No `EXPO_PUBLIC_` in `supa
 
 - **Test credentials:** No hardcoded test email/password in app code. `DEMO_USER` is a synthetic identity used only when Supabase is not configured (`getSupabase() === null`); with production env set, it is never used.
 - **Local URLs:** No `localhost` or `127.0.0.1` in expo-app or supabase function code. Supabase URL comes from env (`EXPO_PUBLIC_SUPABASE_URL` or function env `SUPABASE_URL`).
-- **Fallback URLs:** `legalUrls.ts` uses `https://propfolio.app/privacy`, `/terms`, `/support` when env is unset. These are public URLs, not secrets; must be replaced with real URLs for production.
+- **Fallback URLs:** `legalUrls.ts` uses `https://prop-folio.vercel.app/privacy`, `/terms`, `/support` when env is unset. These are public URLs, not secrets; override with `EXPO_PUBLIC_*` if you use a custom domain.
 
 ---
 
@@ -79,7 +79,7 @@ None of these server env vars are read in the client. No `EXPO_PUBLIC_` in `supa
 - [x] No `EXPO_PUBLIC_` usage for server secrets.
 - [x] No hardcoded test credentials used when production env is set.
 - [x] No localhost/local URLs in production code paths.
-- [x] Session tokens only from auth flow (OAuth callback or Supabase auth); not hardcoded.
+- [x] Session established only via Supabase auth (email/password, PKCE email links); not hardcoded.
 - [x] Demo user only when Supabase is unconfigured; documented and commented in code.
 - [x] Edge Functions use `Deno.env.get()` only; no secrets from request body or client.
 

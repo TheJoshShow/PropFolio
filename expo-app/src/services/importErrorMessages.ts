@@ -7,7 +7,7 @@ export const IMPORT_USER_MESSAGES = {
   sessionExpired: 'Your session expired. Please sign in again.',
   sessionMismatch: 'Your session changed. Please sign out and sign back in.',
   notSignedIn: 'You must be signed in to save a property.',
-  /** Auth provider still hydrating session from storage — avoid import until ready */
+  /** Session still restoring from storage — avoid import until ready */
   authenticationInProgress: 'Please wait a moment while we finish signing you in.',
   supabaseNotConfigured: 'Your app is not connected to the server. Please try again after updating the app.',
   unsupportedListingUrl:

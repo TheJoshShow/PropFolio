@@ -29,13 +29,13 @@
 | **expo-app/src/services/** | supabase, edgeFunctions, revenueCat, importLimits, profile, analytics, subscriptionStatusDisplay, subscriptionCache, offeringsMapper, restorePurchases, diagnostics; deleteAccount via edgeFunctions. |
 | **expo-app/src/hooks/** | useExecutePropertyImport, useImportLimit, usePaywallState. |
 | **expo-app/src/lib/** | scoring (dealScoringEngine, types, dealScoreExplanations, dealScoreInputsFromSimulation), confidence (confidenceMeterEngine, confidenceMeterCopy, types), underwriting, simulation, parsers (zillow, redfin, address), renovation; __tests__ under scoring and underwriting. |
-| **expo-app/src/features/** | paywall, property-import, property-analysis, scoring, confidence, future-value, renovation, portfolio, settings, onboarding, auth. |
+| **expo-app/src/features/** | paywall, **subscriptions** (entitlement policy), property-import, property-analysis, scoring, confidence, future-value, renovation, portfolio, settings, onboarding. Auth routes live under **`app/(auth)/`** (no `features/auth` folder). |
 | **expo-app/src/components/** | Button, Card, TextInput, Chip, FreeImportsIndicator, SubscriptionStatusCard, useThemeColors, useColorScheme, useClientOnlyValue, Themed. |
 | **expo-app/src/config/** | billing.ts, env.ts, legalUrls.ts. |
 | **expo-app/src/utils/** | authRedirect, authErrors, subscriptionManagement, responsive. |
 | **expo-app/src/theme/** | index, colors, typography. |
 | **expo-app/src/store/** | index.ts (currently only `export type {}` – placeholder). |
-| **expo-app/src/dev/** | subscriptionDebugOverrides.ts (__DEV__ only), README. |
+| **expo-app/src/dev/** | **Removed** (was empty after repo cleanup). Older guides mentioned `subscriptionDebugOverrides.ts`; that path is gone — use **`EXPO_PUBLIC_ENABLE_QA_DIAGNOSTICS`** and Settings diagnostics / `MONITORING_VERIFICATION.md` for internal QA. |
 | **expo-app/src/test/** | setup.ts (Jest). |
 | **expo-app/assets/** | Referenced in app.json: images (icon.png, splash-icon.png, favicon.png, android-icon-foreground/background/monochrome), fonts (SpaceMono-Regular.ttf). |
 | **expo-app/_quarantine/** | Previously quarantined unused files: modal.tsx, EditScreenInfo, StyledText, ExternalLink. See docs/release/AUDIT-OBSOLETE-UNUSED.md. |
@@ -47,7 +47,7 @@
 
 ### 4. Build system
 
-- **expo-app:** npm scripts: `start`, `ios`, `android`, `web`, `test`, `typecheck`, `lint`, `validate`. No `eas.json` in repository; EAS Build typically uses project secrets and profile env. Build entry: `expo-router/entry` (package.json `main`).
+- **expo-app:** npm scripts: `start`, `ios`, `android`, `web`, `test`, `typecheck`, `lint`, `validate`. **`expo-app/eas.json`** defines EAS build/submit profiles; dashboard secrets supply env. Build entry: `expo-router/entry` (package.json `main`).
 - **Supabase:** Supabase CLI for migrations and Edge Function deploy.
 
 ### 5. Backend / services

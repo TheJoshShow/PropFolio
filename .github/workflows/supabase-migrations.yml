@@ -1,0 +1,36 @@
+# Apply supabase/migrations/*.sql to the linked Supabase project when you run this
+# workflow manually: GitHub → Actions → "Supabase database migrations" → Run workflow.
+# (Intentionally not triggered on push — merge to main, review, then apply when ready.)
+# To auto-apply on every migration change to main, add back:
+#   push: { branches: [main], paths: ['supabase/migrations/**'] }
+#
+# Required GitHub repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN  — https://supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF   — Dashboard project URL: .../project/<this-ref>
+#   SUPABASE_DB_PASSWORD   — Project Settings → Database → Database password
+#
+# This does not deploy Edge Functions; use `supabase functions deploy` locally or add a separate workflow.
+
+name: Supabase database migrations
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project (ephemeral; does not modify the repo)
+        run: |
+          supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+
+      - name: Push pending migrations
+        run: supabase db push --yes

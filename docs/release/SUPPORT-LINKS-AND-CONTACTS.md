@@ -5,16 +5,16 @@ Use this as the single source of truth when filling out App Store metadata and i
 ### 1. Required public URLs
 
 - **Marketing site**
-  - Canonical: `https://propfolio.app`
+  - Canonical: `https://prop-folio.vercel.app`
   - Used in: App Store listing, website field.
 - **Privacy Policy**
-  - URL: `https://propfolio.app/privacy` (or value of `EXPO_PUBLIC_PRIVACY_POLICY_URL`).
+  - URL: `https://prop-folio.vercel.app/privacy` (or value of `EXPO_PUBLIC_PRIVACY_POLICY_URL`).
   - Used in:
     - App Store “Privacy Policy URL”.
     - In‑app Settings → Legal → Privacy Policy.
     - Paywall legal links.
 - **Terms of Service**
-  - URL: `https://propfolio.app/terms` (or value of `EXPO_PUBLIC_TERMS_URL`).
+  - URL: `https://prop-folio.vercel.app/terms` (or value of `EXPO_PUBLIC_TERMS_URL`).
   - Used in:
     - App Store “Terms / EULA” references if requested.
     - In‑app Settings → Legal → Terms of Service.

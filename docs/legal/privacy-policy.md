@@ -7,7 +7,7 @@
 ### Internal summary (non-public)
 
 - **What PropFolio does:** Real estate analysis app: accounts, property import (address/URL), stored properties, scores, summaries, and optional paid features.
-- **Sensitive points for review:** Optional phone; property addresses and listing-derived data; geocoding via Google; rent data via RentCast; plain-language summaries via OpenAI (user/property context may be included in prompts—see policy); product events in Supabase; crash reporting on iOS; subscriptions via RevenueCat and app stores.
+- **Sensitive points for review:** Phone is not collected at account creation (MVP); legacy/synced profile phone may appear in Settings; property addresses and listing-derived data; geocoding via Google; rent data via RentCast; plain-language summaries via OpenAI (user/property context may be included in prompts—see policy); product events in Supabase; crash reporting on iOS; subscriptions via RevenueCat and app stores.
 - **Not in current client paths audited:** Continuous GPS/background location in `expo-app/app` (map uses coordinates from user content/geocoding).
 
 ---
@@ -45,7 +45,7 @@ We collect information in the following categories, depending on how you use the
 ### 3.1 Information you provide
 
 - **Account credentials and profile:** When you create an account, we collect information such as email address and password (processed by our authentication provider). We may collect name and similar profile details you choose to provide.
-- **Optional phone number:** You may optionally provide a phone number (for example, during sign-up). If provided, we may store and use it as described in this policy.
+- **Phone number:** Account creation does not require or collect a phone number. If a phone number appears in your profile (for example, from a legacy account or a future optional Settings field), we may store it in E.164 format and use it as described in this policy.
 - **Communications:** If you contact us (for example, via **[INSERT SUPPORT EMAIL]** or a support form), we collect the content of your message and related metadata needed to respond.
 
 ### 3.2 Property, listing, and analysis information
@@ -191,7 +191,7 @@ We may update this Privacy Policy from time to time. We will post the updated po
 
 **Email:** [INSERT SUPPORT EMAIL]
 
-**Website:** [INSERT PUBLIC WEBSITE URL, e.g. https://propfolio.app]
+**Website:** [INSERT PUBLIC WEBSITE URL, e.g. https://prop-folio.vercel.app]
 
 For App Store or platform-required support URLs, use the same contact channel or the support page linked from the app settings, consistent with **[INSERT SUPPORT URL IF HOSTED SEPARATELY]**.
 

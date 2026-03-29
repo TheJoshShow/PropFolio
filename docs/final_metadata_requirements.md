@@ -12,8 +12,8 @@
 |-------|-------------|---------------------------|
 | **App name** | Required | PropFolio |
 | **Subtitle** | Optional, recommended | e.g. "Property investment analysis" (≤30 chars). Must not overpromise; align with shipped features. |
-| **Privacy Policy URL** | Required | Must match in-app: set `EXPO_PUBLIC_PRIVACY_POLICY_URL` or use default `https://propfolio.app/privacy`. URL must resolve. |
-| **Support URL** | Required | Must match in-app Contact support: set `EXPO_PUBLIC_SUPPORT_URL` or use default `https://propfolio.app/support`. Can be support page or mailto. Must resolve. |
+| **Privacy Policy URL** | Required | Must match in-app: set `EXPO_PUBLIC_PRIVACY_POLICY_URL` or use default `https://prop-folio.vercel.app/privacy`. URL must resolve. |
+| **Support URL** | Required | Must match in-app Contact support: set `EXPO_PUBLIC_SUPPORT_URL` or use default `https://prop-folio.vercel.app/support`. Can be support page or mailto. Must resolve. |
 | **Category** | Required | e.g. Finance or Productivity; choose primary and optional secondary. |
 | **Age rating** | Required | Complete questionnaire; no restricted content expected. |
 | **Version** | Required | Match app.json version (e.g. 1.0.0). |

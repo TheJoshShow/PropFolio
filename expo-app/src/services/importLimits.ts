@@ -30,6 +30,12 @@ export interface PropertyImportData {
   bedrooms?: number;
   bathrooms?: number;
   sqft?: number;
+  lotSqft?: number;
+  yearBuilt?: number;
+  propertyType?: string;
+  normalizedSnapshot?: Record<string, unknown>;
+  /** Optional importer aggregate confidence (0-1). */
+  overallConfidence?: number;
   rent?: number;
   /** WGS84 from geocode (import); persisted for map pins */
   latitude?: number;
@@ -197,6 +203,20 @@ function toPropertyRow(
     bedrooms: data.bedrooms ?? null,
     bathrooms: data.bathrooms ?? null,
     sqft: data.sqft ?? null,
+    lot_sqft: data.lotSqft ?? null,
+    year_built: data.yearBuilt ?? null,
+    property_type: data.propertyType ?? null,
+    normalized_snapshot:
+      data.normalizedSnapshot && typeof data.normalizedSnapshot === 'object'
+        ? data.normalizedSnapshot
+        : null,
+    overall_confidence:
+      typeof data.overallConfidence === 'number' &&
+      Number.isFinite(data.overallConfidence) &&
+      data.overallConfidence >= 0 &&
+      data.overallConfidence <= 1
+        ? data.overallConfidence
+        : null,
     rent: data.rent ?? null,
     full_address: [data.streetAddress, data.unit, data.city, data.state, data.postalCode]
       .filter(Boolean)

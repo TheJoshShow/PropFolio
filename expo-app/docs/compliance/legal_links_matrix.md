@@ -6,13 +6,13 @@ Where each link is used and how it is configured.
 
 ## Source of URLs
 
-All URLs come from **`src/config/legalUrls.ts`**. Values are read from env at build time; empty env falls back to `https://propfolio.app/…` (replace with your live URLs for production).
+All URLs come from **`src/config/legalUrls.ts`**. Values are read from env at build time; empty env falls back to `https://prop-folio.vercel.app/…` (override with `EXPO_PUBLIC_*` if you use a custom domain).
 
 | Env variable | Fallback | Used for |
 |--------------|----------|----------|
-| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | `https://propfolio.app/privacy` | Privacy Policy |
-| `EXPO_PUBLIC_TERMS_URL` | `https://propfolio.app/terms` | Terms of Use / Terms of Service |
-| `EXPO_PUBLIC_SUPPORT_URL` | `https://propfolio.app/support` | Contact support |
+| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | `https://prop-folio.vercel.app/privacy` | Privacy Policy |
+| `EXPO_PUBLIC_TERMS_URL` | `https://prop-folio.vercel.app/terms` | Terms of Use / Terms of Service |
+| `EXPO_PUBLIC_SUPPORT_URL` | `https://prop-folio.vercel.app/support` | Contact support |
 | `EXPO_PUBLIC_BILLING_HELP_URL` | (none) | Billing help / FAQ (optional) |
 
 ---
@@ -48,7 +48,7 @@ All URLs come from **`src/config/legalUrls.ts`**. Values are read from env at bu
 
 ## Checklist before release
 
-- [ ] `EXPO_PUBLIC_PRIVACY_POLICY_URL` and `EXPO_PUBLIC_TERMS_URL` point to live pages (or propfolio.app is live).
+- [ ] `EXPO_PUBLIC_PRIVACY_POLICY_URL` and `EXPO_PUBLIC_TERMS_URL` point to live pages (or prop-folio.vercel.app is live).
 - [ ] `EXPO_PUBLIC_SUPPORT_URL` matches App Store Connect Support URL (or mailto).
 - [ ] Tap each link in Settings and confirm it opens; confirm failure path shows Alert when URL is invalid or unopenable.
 

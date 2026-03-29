@@ -19,7 +19,7 @@ The app previously used **`@sentry/react-native`**. It was removed to:
 - Drop **Sentry-specific** env vars, plugins, and `Sentry.wrap` / navigation integrations from the root layout.
 - Reduce vendor surface area and simplify EAS configuration.
 
-**Historical detail** (pre-removal file inventory, env names): repo root **`MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`**. Do **not** reintroduce Sentry DSNs or packages without an explicit product decision.
+**Historical detail** (pre-removal file inventory, env names): **`../../docs/archive/migrations/MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md`**. Do **not** reintroduce Sentry DSNs or packages without an explicit product decision.
 
 ---
 
@@ -73,7 +73,7 @@ flowchart LR
 
 1. **Firebase Console:** Create or select a project → add an **iOS** app with bundle id **`com.propfolio.mobile`** (must match `app.config.ts`).
 2. **Download `GoogleService-Info.plist`** from Project settings → Your apps.
-3. **Place the plist** in **`expo-app/GoogleService-Info.plist`**, **or** inject via EAS file env **`GOOGLE_SERVICES_INFO_PLIST`** (see repo root **`FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**).
+3. **Place the plist** in **`expo-app/GoogleService-Info.plist`**, **or** inject via EAS file env **`GOOGLE_SERVICES_INFO_PLIST`** (see **`../../docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**).
 4. **Expo config** (`app.config.ts`) already includes:
    - `ios.googleServicesFile` → `./GoogleService-Info.plist` or `process.env.GOOGLE_SERVICES_INFO_PLIST`
    - Plugins: **`@react-native-firebase/app`**, **`@react-native-firebase/crashlytics`** (order fixed: app before crashlytics)
@@ -89,8 +89,8 @@ flowchart LR
 | `expo-app/GoogleService-Info.plist` | Firebase iOS app config (local or CI/EAS-injected) |
 | `GOOGLE_SERVICES_INFO_PLIST` | Optional EAS **file** env pointing at plist for cloud builds |
 | `expo-app/src/services/monitoring/**` | Facade + Crashlytics adapter |
-| `FIREBASE_CRASHLYTICS_MANUAL_STEPS.md` (repo root) | Step-by-step Firebase + EAS |
-| `FIREBASE_CRASHLYTICS_SETUP_PLAN.md` (repo root) | Broader rollout notes |
+| `docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md` | Step-by-step Firebase + EAS |
+| `docs/monitoring/FIREBASE_CRASHLYTICS_SETUP_PLAN.md` | Broader rollout notes |
 
 There are **no `EXPO_PUBLIC_*` keys** for Crashlytics — the plist is the client identifier. Do not paste server secrets or service account JSON into the app.
 
@@ -133,7 +133,7 @@ Summary:
 | No reports after sending test | Wait **several minutes**; confirm correct Firebase **project** and iOS app; confirm **`GoogleService-Info.plist`** matches bundle id `com.propfolio.mobile`. |
 | Native crash test missing | Xcode **debugger** can intercept crashes — disconnect or disable “break on all exceptions”; see **MONITORING_VERIFICATION.md**. |
 | `getCrashlytics()` returns null | Expected on **web** and **Android** in current wiring; adapter no-ops safely. |
-| Build fails on `googleServicesFile` | Ensure plist path exists locally, or set **`GOOGLE_SERVICES_INFO_PLIST`** in EAS; see **FIREBASE_CRASHLYTICS_MANUAL_STEPS.md**. |
+| Build fails on `googleServicesFile` | Ensure plist path exists locally, or set **`GOOGLE_SERVICES_INFO_PLIST`** in EAS; see **`docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md`**. |
 | Jest failures related to Firebase | Native module is not loaded in tests; monitoring calls should remain defensive (no throw). |
 
 ---
@@ -152,13 +152,13 @@ Summary:
 
 | Doc | Content |
 |-----|---------|
-| Repo root `CRASHLYTICS_RELEASE_VERIFICATION.md` | TestFlight / production verification (founder-friendly) |
+| `docs/monitoring/CRASHLYTICS_RELEASE_VERIFICATION.md` | TestFlight / production verification (founder-friendly) |
 | `MONITORING_VERIFICATION.md` | In-app test signals, Firebase console checks |
 | `MONITORING_CONTEXT.md` | Custom keys, auth/session sync |
 | `FLOW_MONITORING.md` | Flow / funnel instrumentation |
 | `EXPO_EAS_FIREBASE_IOS.md` | Expo prebuild, EAS, plugins, plist (canonical for this repo) |
-| Repo root `FIREBASE_CRASHLYTICS_MANUAL_STEPS.md` | Plist + EAS file env (step-by-step) |
-| Repo root `MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md` | **Historical** Sentry removal audit only |
+| `docs/monitoring/FIREBASE_CRASHLYTICS_MANUAL_STEPS.md` | Plist + EAS file env (step-by-step) |
+| `docs/archive/migrations/MIGRATION_SENTRY_TO_CRASHLYTICS_AUDIT.md` | **Historical** Sentry removal audit only |
 
 ---
 
