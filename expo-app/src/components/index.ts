@@ -24,4 +24,6 @@ export type { PropFolioBrandHeaderProps } from './PropFolioBrandHeader';
 export { PortfolioPropertyMap } from './PortfolioPropertyMap';
 export type { PortfolioPropertyMapProps } from './PortfolioPropertyMap';
 export { ImportFab } from './ImportFab';
+export { SupabaseAuthEnvDevPanel } from './SupabaseAuthEnvDevPanel';
+export type { SupabaseAuthEnvDevPanelProps } from './SupabaseAuthEnvDevPanel';
 export { useThemeColors } from './useThemeColors';

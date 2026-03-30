@@ -1,9 +1,9 @@
 /**
- * Supabase client. Returns null when env vars are missing so app stays runnable.
- * Env validation: `validateAuthEnv()` from `../config`.
+ * Supabase client (single module for the Expo app). Returns null when env is invalid.
+ * URL and anon key are read only via `getRuntimeConfig()` → `process.env.EXPO_PUBLIC_SUPABASE_*`.
+ * Stricter rules live in `../config/env.ts` (`validateAuthEnv`).
  *
- * SECURITY: Only the anon (public) key is used here. Never use the service role
- * key in the client; it bypasses RLS and must only exist in Edge Functions.
+ * SECURITY: Only the anon (public) key. Never use the service role key in the client.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';

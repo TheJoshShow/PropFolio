@@ -68,21 +68,28 @@ From **Command Prompt** in `expo-app`, you can also run `run-expo.cmd config --j
 
 ## Environment & required setup
 
-1. **Local:** From `expo-app/`, copy `.env.example` → `.env` and fill values you need.
-2. **EAS / TestFlight / App Store:** Set the same `EXPO_PUBLIC_*` variables in the Expo project (EAS Environment variables); `eas.json` production profile forwards them into the build.
-3. **Code rule:** Read client configuration only via **`import { getRuntimeConfig, … } from '~/config'`** or **`from '../config'`** (barrel: `src/config/index.ts`). The only `process.env` touches for public vars live in **`src/config/runtimeConfig.ts`** (plus `app.config.ts` for `GOOGLE_SERVICES_INFO_PLIST`).
+1. **Local:** From `expo-app/`, copy `.env.example` → `.env` and set the variables below (no template URLs or keys in committed files).
+2. **EAS / TestFlight / App Store:** In Expo → **Environment variables**, set the same `EXPO_PUBLIC_*` names for the environment your profile uses; `eas.json` forwards them at **build** time. Changing vars requires a **new EAS build** — they are not fetched at runtime. Do not ship literal `${EXPO_PUBLIC_…}` in a value (EAS must substitute real URL and anon key).
+3. **Code rule:** Read client configuration only via **`import { getRuntimeConfig, … } from '~/config'`** or **`from '../config'`** (barrel: `src/config/index.ts`). The only `process.env` reads for Supabase public vars are in **`src/config/runtimeConfig.ts`** (plus `app.config.ts` for `GOOGLE_SERVICES_INFO_PLIST`). Validation and user-facing auth errors are centralized in **`src/config/env.ts`**.
+
+**Supabase (exact names — client uses anon key only, never service role):**
+
+| Variable | Value source |
+|----------|----------------|
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase Dashboard → Project Settings → API → **Project URL** (`https://…supabase.co` for store builds; local dev may use `http://127.0.0.1:54321` for Supabase CLI) |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Same screen → **anon public** JWT |
 
 **Minimum for a real signed-in app (typical):**
 
 | Variable | Purpose |
 |----------|---------|
-| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL (validated: https + `.supabase.co` in release) |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key |
 | `EXPO_PUBLIC_REVENUECAT_API_KEY_IOS` | RevenueCat public SDK key (iOS) |
 
-Optional: legal/support URLs (`EXPO_PUBLIC_PRIVACY_POLICY_URL`, etc.), `EXPO_PUBLIC_ENABLE_QA_DIAGNOSTICS`. Without Supabase/RevenueCat keys the app still **opens**; auth, sync, and purchases degrade gracefully.
+Optional: legal/support URLs (`EXPO_PUBLIC_PRIVACY_POLICY_URL`, etc.), `EXPO_PUBLIC_ENABLE_QA_DIAGNOSTICS`. Without valid Supabase env, auth screens show a configuration message instead of failing silently; without RevenueCat the app still **opens**; purchases degrade gracefully.
 
-Full tables: **[docs/ENV.md](docs/ENV.md)**, **[docs/ENV_SETUP.md](docs/ENV_SETUP.md)**.
+Full tables and validation rules: **[docs/ENV.md](docs/ENV.md)**, **[docs/ENV_SETUP.md](docs/ENV_SETUP.md)**.
 
 ## Monitoring (crash reporting)
 

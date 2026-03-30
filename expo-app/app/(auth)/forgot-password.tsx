@@ -16,12 +16,15 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { Button, TextInput } from '../../src/components';
+import { Button, SupabaseAuthEnvDevPanel, TextInput } from '../../src/components';
 import { spacing, fontSizes, fontWeights, lineHeights } from '../../src/theme';
 import { useThemeColors } from '../../src/components/useThemeColors';
 import { responsiveContentContainer } from '../../src/utils/responsive';
 import { getAuthErrorMessage, isValidEmail } from '../../src/utils/authErrors';
-import { getAccountServicesUnavailableBannerMessage } from '../../src/config';
+import {
+  getAccountServicesUnavailableBannerMessage,
+  getSupabaseAuthEnvPublicDiagnostics,
+} from '../../src/config';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -37,6 +40,7 @@ export default function ForgotPasswordScreen() {
   const emailValid = trimmedEmail.length > 0 && isValidEmail(trimmedEmail);
   const isSubmitting = loading || authLoading;
   const canSubmit = isAuthConfigured && emailValid && !isSubmitting;
+  const authConfigBanner = !isAuthConfigured ? getAccountServicesUnavailableBannerMessage() : null;
 
   const clearError = useCallback(() => {
     setError(null);
@@ -122,6 +126,26 @@ export default function ForgotPasswordScreen() {
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Enter the email for your account. We’ll send a link to choose a new password.
           </Text>
+
+          {authConfigBanner ? (
+            <>
+              <View
+                style={[styles.configBanner, { borderColor: colors.error, backgroundColor: colors.surface }]}
+                accessibilityRole="alert"
+              >
+                <Text style={[styles.configBannerText, { color: colors.error }]}>{authConfigBanner}</Text>
+              </View>
+              {typeof __DEV__ !== 'undefined' && __DEV__ ? (
+                <SupabaseAuthEnvDevPanel
+                  diagnostics={getSupabaseAuthEnvPublicDiagnostics()}
+                  textColor={colors.text}
+                  mutedColor={colors.textSecondary}
+                  borderColor={colors.textSecondary}
+                  surfaceColor={colors.surface}
+                />
+              ) : null}
+            </>
+          ) : null}
 
           <TextInput
             label="Email"
@@ -220,6 +244,16 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.base,
     marginBottom: spacing.xl,
     lineHeight: lineHeights.base,
+  },
+  configBanner: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: spacing.m,
+    marginBottom: spacing.m,
+  },
+  configBannerText: {
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
   },
   errorRow: {
     marginTop: spacing.xxs,

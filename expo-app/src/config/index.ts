@@ -23,7 +23,10 @@ export {
   validateAuthEnv,
   isAuthEnvConfigured,
   getAuthConfigurationUserMessage,
+  getSupabaseAuthEnvPublicDiagnostics,
+  logSupabaseAuthEnvDiagnostics,
   type AuthEnvResult,
+  type SupabaseAuthEnvPublicDiagnostics,
 } from './env';
 
 export { getAccountServicesUnavailableBannerMessage } from './accountServicesAvailability';

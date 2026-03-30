@@ -5,13 +5,14 @@
 
 import { useEffect, useRef } from 'react';
 
-import { validateRuntimeConfigForDev, validateRuntimeConfigForRelease } from '../config';
+import { logSupabaseAuthEnvDiagnostics, validateRuntimeConfigForDev, validateRuntimeConfigForRelease } from '../config';
 import { recordFlowIssue } from '../services/monitoring';
 
 export function useStartupEnvGate(): void {
   const loggedRef = useRef(false);
 
   useEffect(() => {
+    logSupabaseAuthEnvDiagnostics();
     const devValidation = validateRuntimeConfigForDev();
     const releaseValidation = validateRuntimeConfigForRelease();
     const hasAnyIssue = !devValidation.ok || !releaseValidation.ok || releaseValidation.missingRecommended.length > 0;

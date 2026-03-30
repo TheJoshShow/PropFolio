@@ -7,17 +7,18 @@ import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pre
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { Button, TextInput } from '../../src/components';
+import { Button, SupabaseAuthEnvDevPanel, TextInput } from '../../src/components';
 import { spacing, fontSizes, fontWeights, lineHeights } from '../../src/theme';
 import { useThemeColors } from '../../src/components/useThemeColors';
 import { responsiveContentContainer } from '../../src/utils/responsive';
 import { getAuthErrorMessage, isValidEmail } from '../../src/utils/authErrors';
+import { getAccountServicesUnavailableBannerMessage, getSupabaseAuthEnvPublicDiagnostics } from '../../src/config';
 
 const SCROLL_BOTTOM_PADDING = spacing.xxxl * 2 + 24;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { session, signIn, isLoading, lastAuthError, clearLastAuthError } = useAuth();
+  const { session, signIn, isLoading, lastAuthError, clearLastAuthError, isAuthConfigured } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -41,9 +42,17 @@ export default function LoginScreen() {
     }
   }, [lastAuthError, clearLastAuthError]);
 
+  const authConfigBanner = !isAuthConfigured ? getAccountServicesUnavailableBannerMessage() : null;
+
   const handleSignIn = useCallback(async () => {
     if (isLoading) return;
     setError(null);
+    if (!isAuthConfigured) {
+      setError(
+        getAccountServicesUnavailableBannerMessage() ?? 'Sign-in isn’t available in this build.'
+      );
+      return;
+    }
     if (!email.trim()) {
       setError('Enter your email');
       return;
@@ -62,7 +71,7 @@ export default function LoginScreen() {
     } catch (e) {
       setError(getAuthErrorMessage(e, 'signIn'));
     }
-  }, [email, password, isLoading, signIn]);
+  }, [email, password, isLoading, signIn, isAuthConfigured]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -90,6 +99,25 @@ export default function LoginScreen() {
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Sign in with the email and password for your account.
           </Text>
+          {authConfigBanner ? (
+            <>
+              <View
+                style={[styles.configBanner, { borderColor: colors.error, backgroundColor: colors.surface }]}
+                accessibilityRole="alert"
+              >
+                <Text style={[styles.configBannerText, { color: colors.error }]}>{authConfigBanner}</Text>
+              </View>
+              {typeof __DEV__ !== 'undefined' && __DEV__ ? (
+                <SupabaseAuthEnvDevPanel
+                  diagnostics={getSupabaseAuthEnvPublicDiagnostics()}
+                  textColor={colors.text}
+                  mutedColor={colors.textSecondary}
+                  borderColor={colors.textSecondary}
+                  surfaceColor={colors.surface}
+                />
+              ) : null}
+            </>
+          ) : null}
           <TextInput
             label="Email"
             value={email}
@@ -172,7 +200,13 @@ export default function LoginScreen() {
           <Button
             title={isLoading ? 'Signing in…' : 'Sign in'}
             onPress={handleSignIn}
-            disabled={isLoading || !email.trim() || !password || Boolean(emailInlineError)}
+            disabled={
+              !isAuthConfigured ||
+              isLoading ||
+              !email.trim() ||
+              !password ||
+              Boolean(emailInlineError)
+            }
             fullWidth
             variant="primary"
             pill
@@ -218,6 +252,16 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.base,
     marginBottom: spacing.xl,
     lineHeight: lineHeights.base,
+  },
+  configBanner: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: spacing.m,
+    marginBottom: spacing.m,
+  },
+  configBannerText: {
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
   },
   showPasswordRow: {
     marginTop: -spacing.xs,

@@ -23,13 +23,17 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { Button, TextInput } from '../../src/components';
+import { Button, SupabaseAuthEnvDevPanel, TextInput } from '../../src/components';
 import { spacing, fontSizes, fontWeights, lineHeights } from '../../src/theme';
 import { useThemeColors } from '../../src/components/useThemeColors';
 import { responsiveContentContainer } from '../../src/utils/responsive';
 import { getAuthErrorMessage } from '../../src/utils/authErrors';
 import { validateSignUpForm } from '../../src/utils/signupValidation';
-import { getAccountServicesUnavailableBannerMessage, validateAuthEnv } from '../../src/config';
+import {
+  getAccountServicesUnavailableBannerMessage,
+  getSupabaseAuthEnvPublicDiagnostics,
+  validateAuthEnv,
+} from '../../src/config';
 import { openLegalDocument } from '../../src/utils/openLink';
 import { trackEvent } from '../../src/services/analytics';
 
@@ -178,12 +182,23 @@ export default function SignUpScreen() {
           </Text>
 
           {authConfigBanner ? (
-            <View
-              style={[styles.configBanner, { borderColor: colors.error, backgroundColor: colors.surface }]}
-              accessibilityRole="alert"
-            >
-              <Text style={[styles.configBannerText, { color: colors.error }]}>{authConfigBanner}</Text>
-            </View>
+            <>
+              <View
+                style={[styles.configBanner, { borderColor: colors.error, backgroundColor: colors.surface }]}
+                accessibilityRole="alert"
+              >
+                <Text style={[styles.configBannerText, { color: colors.error }]}>{authConfigBanner}</Text>
+              </View>
+              {typeof __DEV__ !== 'undefined' && __DEV__ ? (
+                <SupabaseAuthEnvDevPanel
+                  diagnostics={getSupabaseAuthEnvPublicDiagnostics()}
+                  textColor={colors.text}
+                  mutedColor={colors.textSecondary}
+                  borderColor={colors.textSecondary}
+                  surfaceColor={colors.surface}
+                />
+              ) : null}
+            </>
           ) : null}
 
           <TextInput
