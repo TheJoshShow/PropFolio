@@ -1,5 +1,8 @@
 import type { ExpoConfig } from 'expo/config';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Node resolves at config eval time
+const iosPrivacyPurposeStrings = require('./plugins/iosPrivacyStrings') as Record<string, string>;
+
 /**
  * Include expo-dev-client native plugin only when building a **development** EAS profile,
  * or for local workflows (no EAS_BUILD). Store / preview cloud builds omit it so production
@@ -32,6 +35,10 @@ function includeExpoDevClientPlugin(): boolean {
  * **Google Maps (iOS native SDK):** `react-native-maps` needs `IOS_GOOGLE_MAPS_API_KEY` at **prebuild**
  * (EAS secret → `eas.json` env → `iosGoogleMapsApiKey` below). This is not an `EXPO_PUBLIC_*` key and is
  * not listed in `CLIENT_EXPO_PUBLIC_ENV_KEYS`. Without it, Google-backed maps often show empty tiles.
+ *
+ * **Location privacy:** Maps link Core Location; App Store requires `NSLocationWhenInUseUsageDescription`
+ * in the bundle `Info.plist`. It is set in `ios.infoPlist` and reinforced last by
+ * `plugins/withIosLocationWhenInUse.js` so prebuild always writes it.
  */
 export default (): ExpoConfig => ({
   name: 'PropFolio',
@@ -55,6 +62,7 @@ export default (): ExpoConfig => ({
     supportsTablet: true,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      ...iosPrivacyPurposeStrings,
     },
     privacyManifests: {
       NSPrivacyAccessedAPITypes: [
@@ -89,6 +97,8 @@ export default (): ExpoConfig => ({
         },
       },
     ],
+    // Last: ensure location usage string is in Info.plist (App Store + react-native-maps / CoreLocation).
+    './plugins/withIosLocationWhenInUse',
   ],
   experiments: {
     typedRoutes: true,

@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "PropFolio uses your location to show nearby properties and improve map-based property discovery while you are using the app."
+      }
+    }
+  }
+}
