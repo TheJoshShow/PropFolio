@@ -289,7 +289,11 @@ export default function ImportScreen() {
             mapped.userMessage || 'Suggestions unavailable. You can still type an address and tap Use address.'
           );
           if (__DEV__) {
-            logImportStep('autocomplete_edge_error', { errLen: String(error).length });
+            logImportStep('autocomplete_edge_error', {
+              fn: 'places-autocomplete',
+              queryLen: query.length,
+              errorPreview: String(error).slice(0, 160),
+            });
           }
           return;
         }

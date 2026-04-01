@@ -58,6 +58,19 @@ export function normalizeListingUrl(input: string): string | null {
   if (!raw) return null;
 
   let s = raw;
+
+  // Handle mobile/deep-link style Redfin URLs like "redfin://..." from the app.
+  // These are semantically the same as https web URLs, but with a custom scheme.
+  if (/^redfin:\/\//i.test(s)) {
+    const withoutScheme = s.replace(/^redfin:\/\//i, '');
+    if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(withoutScheme)) {
+      // Already includes a host, just add https://
+      s = `https://${withoutScheme}`;
+    } else {
+      // Treat as a path on www.redfin.com
+      s = `https://www.redfin.com/${withoutScheme}`;
+    }
+  }
   if (!/^https?:\/\//i.test(s)) {
     if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(s) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s.split('/')[0] ?? '')) {
       s = `https://${s}`;

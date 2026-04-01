@@ -57,11 +57,62 @@ export function mapAutocompleteEdgeError(error: string | null | undefined): {
     };
   }
 
+  if (e.includes('non-2xx') || e.includes('edge function returned')) {
+    return {
+      userMessage:
+        'Address suggestions hit a server error. Pull to refresh or try again shortly; you can still type the full address and tap Use address.',
+      kind: 'autocomplete_network',
+    };
+  }
+
+  if (e.includes('over_query_limit') || e.includes('resource_exhausted')) {
+    return {
+      userMessage:
+        'Address suggestions are rate-limited right now. Try again in a minute, or type the address manually and tap Use address.',
+      kind: 'autocomplete_network',
+    };
+  }
+
   return {
     userMessage:
       'Suggestions unavailable right now. You can still type an address and tap Use address.',
     kind: 'autocomplete_generic',
   };
+}
+
+/**
+ * Turn persisted geocode_error strings into short, actionable copy for analysis warnings.
+ */
+export function mapGeocodeErrorForDisplay(raw: string | null | undefined): string {
+  if (!raw || !raw.trim()) {
+    return 'We could not verify coordinates for this address yet.';
+  }
+  const r = raw.trim();
+  const lower = r.toLowerCase();
+
+  if (lower.includes('google_maps_api_key') || r.includes('GOOGLE_MAPS_API_KEY')) {
+    return 'Maps geocoding is not configured on the server (missing API key). Ask your admin to set GOOGLE_MAPS_API_KEY for Supabase Edge Functions.';
+  }
+  if (lower.includes('non-2xx') || lower.includes('edge function returned')) {
+    return 'The geocoding service returned an error. Try again; if it persists, confirm Edge Functions are deployed and the Maps API key is valid.';
+  }
+  if (lower.includes('request_denied') || lower.includes('access denied')) {
+    return 'Google rejected the geocoding request (API key restrictions or billing). Check the Maps API key and enabled APIs in Google Cloud.';
+  }
+  if (lower.includes('over_query_limit') || lower.includes('quota')) {
+    return 'Geocoding quota exceeded. Try again later or ask your admin to raise Google Maps usage limits.';
+  }
+  if (lower.includes('missing address') || lower.includes('missing address fields')) {
+    return 'Address fields were incomplete, so we could not geocode. Edit the property and add street, city, state, and ZIP.';
+  }
+  if (lower.includes('no coordinates')) {
+    return 'The geocoder had no coordinates for this address line. Check spelling and ZIP, then save again.';
+  }
+  if (lower.includes('zero_results')) {
+    return 'No match for this address from the geocoder. Confirm the full street, city, state, and ZIP.';
+  }
+
+  return r.length > 220 ? `${r.slice(0, 217)}…` : r;
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   estimateListPriceFromMonthlyRent,
   estimateMonthlyRentFromListPrice,
 } from '../../services/importLimits';
+import { mapGeocodeErrorForDisplay } from '../../services/importPipelineErrors';
 import { logAnalysisStep } from '../../services/diagnostics';
 import { recordFlowException } from '../../services/monitoring/flowInstrumentation';
 import type {
@@ -501,7 +502,7 @@ function runPropertyDetailAnalysisCore(
   if (mergedInput.listPrice == null) warnings.push('Listing price missing; inferred from rent when possible.');
   if (mergedInput.rent == null) warnings.push('Rent estimate missing; inferred from price when possible.');
   if (input.geocodeStatus === 'failed') {
-    warnings.push(`Geocoding failed${input.geocodeError ? `: ${input.geocodeError}` : ''}.`);
+    warnings.push(`Geocoding issue: ${mapGeocodeErrorForDisplay(input.geocodeError)}`);
   } else if (input.geocodeStatus === 'pending' || input.geocodeStatus === 'in_progress') {
     warnings.push('Address geocoding still in progress.');
   }

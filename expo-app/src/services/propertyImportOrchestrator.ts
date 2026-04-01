@@ -80,8 +80,14 @@ export async function enrichAddressForImport(params: {
       featureImpact: isManual ? 'partial' : 'none',
     });
 
-    if (geocodeRes.error && __DEV__) {
-      logImportStep('geocode_warning', { stage: 'import_enrich', hasError: true, manual: isManual });
+    if (__DEV__) {
+      logImportStep('import_enrich_geocode', {
+        stage: 'import_enrich',
+        manual: isManual,
+        hasError: Boolean(geocodeRes.error),
+        hasCoords: geocodeRes.data?.lat != null && geocodeRes.data?.lng != null,
+        hasFormatted: Boolean(geocodeRes.data?.formatted_address),
+      });
     }
 
     const structural = isUsAddressLineLikelyComplete(trimmedAddressLine);
@@ -113,6 +119,14 @@ export async function enrichAddressForImport(params: {
     const raw = rentRes.data?.rent ?? (rentRes.data as { monthlyRent?: unknown; rentAmount?: unknown })?.monthlyRent ?? (rentRes.data as { rentAmount?: unknown })?.rentAmount;
     rent = coerceMonthlyRent(raw);
     rentUnavailable = Boolean(rentRes.error && rent == null);
+    if (__DEV__) {
+      logImportStep('import_enrich_rent', {
+        stage: 'import_enrich',
+        rent: rent ?? null,
+        rentUnavailable,
+        hasEdgeError: Boolean(rentRes.error),
+      });
+    }
     reportIntegrationStatus({
       integration: 'rentcast',
       configured: hasSupabase,

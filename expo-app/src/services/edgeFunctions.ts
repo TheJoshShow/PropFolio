@@ -5,6 +5,7 @@
  * All invokes are wrapped so unexpected throws become structured errors (production-safe).
  */
 
+import { FunctionsHttpError } from '@supabase/functions-js';
 import { getSupabase } from './supabase';
 import { edgeFunctionToIntegrationName } from '../config/services';
 import {
@@ -44,6 +45,36 @@ export interface CensusDataResult {
 export interface InvokeWithTimeoutOptions {
   timeoutMs?: number;
   retries?: number;
+}
+
+/**
+ * When the Edge Function returns non-2xx, Supabase surfaces FunctionsHttpError with a generic message.
+ * The real detail is usually in the response body as JSON { error } or { message }.
+ */
+export async function tryReadFunctionsHttpErrorBody(error: unknown): Promise<string | null> {
+  if (!(error instanceof FunctionsHttpError)) return null;
+  const res = error.context as Response | undefined;
+  if (!res || typeof res.clone !== 'function') return null;
+  try {
+    const text = (await res.clone().text()).trim();
+    if (!text) return null;
+    try {
+      const j = JSON.parse(text) as { error?: unknown; message?: unknown };
+      if (j.error != null) return String(j.error);
+      if (j.message != null) return String(j.message);
+    } catch {
+      return text.slice(0, 500);
+    }
+    return text.slice(0, 500);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveInvokeErrorMessage(error: unknown): Promise<string> {
+  const fallback = error instanceof Error ? error.message : String(error);
+  const fromBody = await tryReadFunctionsHttpErrorBody(error);
+  return fromBody && fromBody.trim() !== '' ? fromBody : fallback;
 }
 
 function recoverableForEdgeKind(
@@ -98,16 +129,17 @@ async function invoke<T>(name: string, body: object): Promise<{ data: T | null; 
   try {
     const { data, error } = await supabase.functions.invoke(name, { body });
     if (error) {
+      const msg = await resolveInvokeErrorMessage(error);
       reportIntegrationStatus({
         integration: 'supabase',
         configured: true,
         requestSuccess: false,
-        lastFailureReason: error.message,
+        lastFailureReason: msg,
         fallbackUsed: false,
         featureImpact: 'partial',
       });
-      reportApiSupabaseFnFailure(name, 'invoke_err', error.message);
-      return { data: null, error: error.message };
+      reportApiSupabaseFnFailure(name, 'invoke_err', msg);
+      return { data: null, error: msg };
     }
     if (data && typeof data === 'object' && 'error' in data && (data as { error?: unknown }).error != null) {
       const msg = String((data as { error: unknown }).error);
@@ -177,8 +209,12 @@ async function invokeWithTimeout<T>(
     try {
       const { data, error } = await supabase.functions.invoke(name, invokeOptions);
       if (error) {
-        const msg = error?.message ?? String(error);
+        const msg = await resolveInvokeErrorMessage(error);
         lastError = msg;
+        if (__DEV__) {
+          const res = error instanceof FunctionsHttpError ? (error.context as Response | undefined) : undefined;
+          console.warn(`[Edge] ${name} invoke error`, { message: msg, httpStatus: res?.status });
+        }
         const isRetryable =
           attempt < retries &&
           (msg.toLowerCase().includes('fetch') ||
