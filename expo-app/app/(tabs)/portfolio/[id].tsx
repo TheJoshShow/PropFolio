@@ -245,6 +245,7 @@ export default function PropertyDetailScreen() {
   const [whatIfDraft, setWhatIfDraft] = useState<PropertyWhatIfDraft | null>(null);
   const [debouncedDraft, setDebouncedDraft] = useState<PropertyWhatIfDraft | null>(null);
   const [whatIfSaveMessage, setWhatIfSaveMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'financials' | 'market' | 'renovation'>('financials');
 
   const fetchProperty = useCallback(async () => {
     if (!id) {
@@ -711,216 +712,417 @@ export default function PropertyDetailScreen() {
           )}
         </View>
 
-        {/* What If assumptions: editable inputs with live recalculation */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>What If</Text>
-        <Card style={styles.card}>
+        {/* Segmented tabs for detail sections */}
+        <View style={styles.tabsRow}>
           <Pressable
-            onPress={() => setShowWhatIf((v) => !v)}
-            style={({ pressed }) => [styles.factorBreakdownHeader, pressed && { opacity: 0.8 }]}
-            accessibilityRole="button"
-            accessibilityLabel={showWhatIf ? 'Collapse What If assumptions' : 'Expand What If assumptions'}
+            onPress={() => setActiveTab('financials')}
+            style={({ pressed }) => [
+              styles.tabPill,
+              activeTab === 'financials' && styles.tabPillActive,
+              pressed && { opacity: 0.9 },
+            ]}
           >
-            <Text style={[styles.factorBreakdownTitle, { color: colors.text }]} allowFontScaling>
-              Edit assumptions and recalculate
-            </Text>
-            <Text style={[styles.chevron, { color: colors.textSecondary }]} allowFontScaling>
-              {showWhatIf ? '▲' : '▼'}
+            <Text
+              style={[
+                styles.tabLabel,
+                { color: activeTab === 'financials' ? colors.onPrimary : colors.textSecondary },
+              ]}
+              allowFontScaling
+            >
+              Financials
             </Text>
           </Pressable>
-          {showWhatIf && (
-            <View style={styles.whatIfGrid}>
-              <Text style={[styles.factorDesc, { color: colors.textMuted }]} allowFontScaling>
-                Imported values are prefilled. Edited fields become user overrides.
-              </Text>
-              <TextInput
-                label="Purchase price (USD)"
-                keyboardType="numeric"
-                value={whatIfDraft?.listPrice != null ? String(Math.round(whatIfDraft.listPrice)) : ''}
-                onChangeText={(v) => updateWhatIfField('listPrice', v)}
-              />
-              <Button title="Reset purchase price" onPress={() => resetWhatIfField('listPrice')} variant="secondary" fullWidth pill={false} />
-              <TextInput
-                label="Monthly rent (USD)"
-                keyboardType="numeric"
-                value={whatIfDraft?.rent != null ? String(Math.round(whatIfDraft.rent)) : ''}
-                onChangeText={(v) => updateWhatIfField('rent', v)}
-              />
-              <Button title="Reset rent" onPress={() => resetWhatIfField('rent')} variant="secondary" fullWidth pill={false} />
-              <TextInput
-                label="Down payment (%)"
-                keyboardType="numeric"
-                value={whatIfDraft?.downPaymentPercent != null ? String(whatIfDraft.downPaymentPercent) : ''}
-                onChangeText={(v) => updateWhatIfField('downPaymentPercent', v)}
-              />
-              <TextInput
-                label="Interest rate (%)"
-                keyboardType="numeric"
-                value={whatIfDraft?.interestRatePercent != null ? String(whatIfDraft.interestRatePercent) : ''}
-                onChangeText={(v) => updateWhatIfField('interestRatePercent', v)}
-              />
-              <TextInput
-                label="Loan term (years)"
-                keyboardType="numeric"
-                value={whatIfDraft?.amortizationTermYears != null ? String(whatIfDraft.amortizationTermYears) : ''}
-                onChangeText={(v) => updateWhatIfField('amortizationTermYears', v)}
-              />
-              <TextInput
-                label="Vacancy (%)"
-                keyboardType="numeric"
-                value={whatIfDraft?.vacancyRatePercent != null ? String(whatIfDraft.vacancyRatePercent) : ''}
-                onChangeText={(v) => updateWhatIfField('vacancyRatePercent', v)}
-              />
-              <TextInput
-                label="Operating expense ratio (%)"
-                keyboardType="numeric"
-                value={
-                  whatIfDraft?.operatingExpenseRatioPercent != null
-                    ? String(whatIfDraft.operatingExpenseRatioPercent)
-                    : ''
-                }
-                onChangeText={(v) => updateWhatIfField('operatingExpenseRatioPercent', v)}
-              />
-              <TextInput
-                label="Operating expenses (annual USD)"
-                keyboardType="numeric"
-                value={
-                  whatIfDraft?.operatingExpensesAnnual != null
-                    ? String(Math.round(whatIfDraft.operatingExpensesAnnual))
-                    : ''
-                }
-                onChangeText={(v) => updateWhatIfField('operatingExpensesAnnual', v)}
-              />
-              <TextInput
-                label="Taxes (annual USD)"
-                keyboardType="numeric"
-                value={whatIfDraft?.taxesAnnual != null ? String(Math.round(whatIfDraft.taxesAnnual)) : ''}
-                onChangeText={(v) => updateWhatIfField('taxesAnnual', v)}
-              />
-              <TextInput
-                label="Insurance (annual USD)"
-                keyboardType="numeric"
-                value={whatIfDraft?.insuranceAnnual != null ? String(Math.round(whatIfDraft.insuranceAnnual)) : ''}
-                onChangeText={(v) => updateWhatIfField('insuranceAnnual', v)}
-              />
-              <TextInput
-                label="Closing costs (USD)"
-                keyboardType="numeric"
-                value={whatIfDraft?.closingCosts != null ? String(Math.round(whatIfDraft.closingCosts)) : ''}
-                onChangeText={(v) => updateWhatIfField('closingCosts', v)}
-              />
-              <Button
-                title={whatIfDraft?.useOverrides ? 'Use imported defaults' : 'Use What If overrides'}
-                onPress={() => setWhatIfDraft((prev) => (prev ? { ...prev, useOverrides: !prev.useOverrides } : prev))}
-                variant="secondary"
-                fullWidth
-                pill={false}
-              />
-              <Button title="Save scenario" onPress={() => void saveWhatIfScenario()} fullWidth pill={false} />
-              <Button
-                title="Reset assumptions"
-                onPress={() => void resetWhatIfAll()}
-                variant="secondary"
-                fullWidth
-                pill={false}
-              />
-              {whatIfSaveMessage ? (
-                <Text style={[styles.factorDesc, { color: colors.success }]} allowFontScaling>
-                  {whatIfSaveMessage}
-                </Text>
-              ) : null}
-            </View>
-          )}
-        </Card>
-
-        {/* Key metrics grid */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>Key metrics</Text>
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCell}>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>Purchase price</Text>
-            <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>{formatCurrency(purchasePrice)}</Text>
-          </View>
-          <View style={styles.metricCell}>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>Est. rent</Text>
-            <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>{formatCurrency(estimatedRent)}</Text>
-          </View>
-          <View style={styles.metricCell}>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>Monthly cash flow</Text>
-            <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>{formatCurrency(m.monthlyCashFlow)}</Text>
-          </View>
-          <View style={styles.metricCell}>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>Cap rate</Text>
-            <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>{formatPercent(m.capRate)}</Text>
-          </View>
-          <View style={styles.metricCell}>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>Cash-on-cash</Text>
-            <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>{formatPercent(m.cashOnCashReturn)}</Text>
-          </View>
-          <View style={styles.metricCell}>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>DSCR</Text>
-            <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>
-              {m.dscr != null ? `${m.dscr.toFixed(2)}×` : '—'}
+          <Pressable
+            onPress={() => setActiveTab('market')}
+            style={({ pressed }) => [
+              styles.tabPill,
+              activeTab === 'market' && styles.tabPillActive,
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.tabLabel,
+                { color: activeTab === 'market' ? colors.onPrimary : colors.textSecondary },
+              ]}
+              allowFontScaling
+            >
+              Market Data
             </Text>
-          </View>
+          </Pressable>
+          <Pressable
+            onPress={() => setActiveTab('renovation')}
+            style={({ pressed }) => [
+              styles.tabPill,
+              activeTab === 'renovation' && styles.tabPillActive,
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.tabLabel,
+                { color: activeTab === 'renovation' ? colors.onPrimary : colors.textSecondary },
+              ]}
+              allowFontScaling
+            >
+              Renovation
+            </Text>
+          </Pressable>
         </View>
 
-        {/* Strengths */}
-        {topStrengths.length > 0 && (
+        {/* Financials tab content: What If + key metrics */}
+        {activeTab === 'financials' && (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>Strengths</Text>
+            {/* What If assumptions: editable inputs with live recalculation */}
+            <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>
+              What If
+            </Text>
             <Card style={styles.card}>
-              {topStrengths.map((s) => (
-                <View key={s.id} style={styles.factorRow}>
-                  <Text style={[styles.factorBullet, { color: colors.success }]}>•</Text>
-                  <View style={styles.factorContent}>
-                    <Text style={[styles.factorLabel, { color: colors.text }]} allowFontScaling>{s.label}</Text>
-                    {s.description ? (
-                      <Text style={[styles.factorDesc, { color: colors.textSecondary }]} allowFontScaling>{s.description}</Text>
-                    ) : null}
-                  </View>
+              <Pressable
+                onPress={() => setShowWhatIf((v) => !v)}
+                style={({ pressed }) => [styles.factorBreakdownHeader, pressed && { opacity: 0.8 }]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showWhatIf ? 'Collapse What If assumptions' : 'Expand What If assumptions'
+                }
+              >
+                <Text style={[styles.factorBreakdownTitle, { color: colors.text }]} allowFontScaling>
+                  Edit assumptions and recalculate
+                </Text>
+                <Text style={[styles.chevron, { color: colors.textSecondary }]} allowFontScaling>
+                  {showWhatIf ? '▲' : '▼'}
+                </Text>
+              </Pressable>
+              {showWhatIf && (
+                <View style={styles.whatIfGrid}>
+                  <Text style={[styles.factorDesc, { color: colors.textMuted }]} allowFontScaling>
+                    Imported values are prefilled. Edited fields become user overrides.
+                  </Text>
+                  <TextInput
+                    label="Purchase price (USD)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.listPrice != null ? String(Math.round(whatIfDraft.listPrice)) : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('listPrice', v)}
+                  />
+                  <Button
+                    title="Reset purchase price"
+                    onPress={() => resetWhatIfField('listPrice')}
+                    variant="secondary"
+                    fullWidth
+                    pill={false}
+                  />
+                  <TextInput
+                    label="Monthly rent (USD)"
+                    keyboardType="numeric"
+                    value={whatIfDraft?.rent != null ? String(Math.round(whatIfDraft.rent)) : ''}
+                    onChangeText={(v) => updateWhatIfField('rent', v)}
+                  />
+                  <Button
+                    title="Reset rent"
+                    onPress={() => resetWhatIfField('rent')}
+                    variant="secondary"
+                    fullWidth
+                    pill={false}
+                  />
+                  <TextInput
+                    label="Down payment (%)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.downPaymentPercent != null
+                        ? String(whatIfDraft.downPaymentPercent)
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('downPaymentPercent', v)}
+                  />
+                  <TextInput
+                    label="Interest rate (%)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.interestRatePercent != null
+                        ? String(whatIfDraft.interestRatePercent)
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('interestRatePercent', v)}
+                  />
+                  <TextInput
+                    label="Loan term (years)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.amortizationTermYears != null
+                        ? String(whatIfDraft.amortizationTermYears)
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('amortizationTermYears', v)}
+                  />
+                  <TextInput
+                    label="Vacancy (%)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.vacancyRatePercent != null
+                        ? String(whatIfDraft.vacancyRatePercent)
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('vacancyRatePercent', v)}
+                  />
+                  <TextInput
+                    label="Operating expense ratio (%)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.operatingExpenseRatioPercent != null
+                        ? String(whatIfDraft.operatingExpenseRatioPercent)
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('operatingExpenseRatioPercent', v)}
+                  />
+                  <TextInput
+                    label="Operating expenses (annual USD)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.operatingExpensesAnnual != null
+                        ? String(Math.round(whatIfDraft.operatingExpensesAnnual))
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('operatingExpensesAnnual', v)}
+                  />
+                  <TextInput
+                    label="Taxes (annual USD)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.taxesAnnual != null
+                        ? String(Math.round(whatIfDraft.taxesAnnual))
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('taxesAnnual', v)}
+                  />
+                  <TextInput
+                    label="Insurance (annual USD)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.insuranceAnnual != null
+                        ? String(Math.round(whatIfDraft.insuranceAnnual))
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('insuranceAnnual', v)}
+                  />
+                  <TextInput
+                    label="Closing costs (USD)"
+                    keyboardType="numeric"
+                    value={
+                      whatIfDraft?.closingCosts != null
+                        ? String(Math.round(whatIfDraft.closingCosts))
+                        : ''
+                    }
+                    onChangeText={(v) => updateWhatIfField('closingCosts', v)}
+                  />
+                  <Button
+                    title={whatIfDraft?.useOverrides ? 'Use imported defaults' : 'Use What If overrides'}
+                    onPress={() =>
+                      setWhatIfDraft((prev) =>
+                        prev ? { ...prev, useOverrides: !prev.useOverrides } : prev,
+                      )
+                    }
+                    variant="secondary"
+                    fullWidth
+                    pill={false}
+                  />
+                  <Button
+                    title="Save scenario"
+                    onPress={() => void saveWhatIfScenario()}
+                    fullWidth
+                    pill={false}
+                  />
+                  <Button
+                    title="Reset assumptions"
+                    onPress={() => void resetWhatIfAll()}
+                    variant="secondary"
+                    fullWidth
+                    pill={false}
+                  />
+                  {whatIfSaveMessage ? (
+                    <Text style={[styles.factorDesc, { color: colors.success }]} allowFontScaling>
+                      {whatIfSaveMessage}
+                    </Text>
+                  ) : null}
                 </View>
-              ))}
+              )}
             </Card>
+
+            {/* Key metrics grid */}
+            <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>
+              Key metrics
+            </Text>
+            <View style={styles.metricsGrid}>
+              <View style={styles.metricCell}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>
+                  Purchase price
+                </Text>
+                <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>
+                  {formatCurrency(purchasePrice)}
+                </Text>
+              </View>
+              <View style={styles.metricCell}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>
+                  Est. rent
+                </Text>
+                <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>
+                  {formatCurrency(estimatedRent)}
+                </Text>
+              </View>
+              <View style={styles.metricCell}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>
+                  Monthly cash flow
+                </Text>
+                <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>
+                  {formatCurrency(m.monthlyCashFlow)}
+                </Text>
+              </View>
+              <View style={styles.metricCell}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>
+                  Cap rate
+                </Text>
+                <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>
+                  {formatPercent(m.capRate)}
+                </Text>
+              </View>
+              <View style={styles.metricCell}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>
+                  Cash-on-cash
+                </Text>
+                <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>
+                  {formatPercent(m.cashOnCashReturn)}
+                </Text>
+              </View>
+              <View style={styles.metricCell}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]} allowFontScaling>
+                  DSCR
+                </Text>
+                <Text style={[styles.metricValue, { color: colors.text }]} allowFontScaling>
+                  {m.dscr != null ? `${m.dscr.toFixed(2)}×` : '—'}
+                </Text>
+              </View>
+            </View>
           </>
         )}
 
-        {/* Risks / watch items */}
-        {topRisks.length > 0 && (
+        {/* Market tab content: strengths, risks, assumptions */}
+        {activeTab === 'market' && (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>Risks & watch items</Text>
-            <Card style={styles.card}>
-              {topRisks.map((r) => (
-                <View key={r.id} style={styles.factorRow}>
-                  <Text style={[styles.factorBullet, { color: r.severity === 'high' ? colors.error : colors.warning }]}>•</Text>
-                  <View style={styles.factorContent}>
-                    <Text style={[styles.factorLabel, { color: colors.text }]} allowFontScaling>{r.label}</Text>
-                    {r.description ? (
-                      <Text style={[styles.factorDesc, { color: colors.textSecondary }]} allowFontScaling>{r.description}</Text>
-                    ) : null}
-                  </View>
-                </View>
-              ))}
-            </Card>
-          </>
-        )}
+            {/* Strengths */}
+            {topStrengths.length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>
+                  Strengths
+                </Text>
+                <Card style={styles.card}>
+                  {topStrengths.map((s) => (
+                    <View key={s.id} style={styles.factorRow}>
+                      <Text style={[styles.factorBullet, { color: colors.success }]}>•</Text>
+                      <View style={styles.factorContent}>
+                        <Text style={[styles.factorLabel, { color: colors.text }]} allowFontScaling>
+                          {s.label}
+                        </Text>
+                        {s.description ? (
+                          <Text
+                            style={[styles.factorDesc, { color: colors.textSecondary }]}
+                            allowFontScaling
+                          >
+                            {s.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </Card>
+              </>
+            )}
 
-        {/* Assumptions */}
-        {a.assumptions.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>Assumptions</Text>
-            <Card style={styles.card}>
-              {a.assumptions.map((x) => (
-                <View key={x.id} style={styles.assumptionRow}>
-                  <Text style={[styles.assumptionLabel, { color: colors.text }]} allowFontScaling>{x.label}</Text>
-                  <View style={styles.assumptionRight}>
-                    <Text style={[styles.assumptionValue, { color: colors.textSecondary }]} allowFontScaling>{x.value}</Text>
-                    {x.source === 'default' || x.source === 'inferred' ? (
-                      <Text style={[styles.assumptionSource, { color: colors.textMuted }]} allowFontScaling>
-                        {x.source === 'inferred' ? ' (estimated)' : ' (default)'}
+            {/* Risks / watch items */}
+            {topRisks.length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>
+                  Risks & watch items
+                </Text>
+                <Card style={styles.card}>
+                  {topRisks.map((r) => (
+                    <View key={r.id} style={styles.factorRow}>
+                      <Text
+                        style={[
+                          styles.factorBullet,
+                          { color: r.severity === 'high' ? colors.error : colors.warning },
+                        ]}
+                      >
+                        •
                       </Text>
-                    ) : null}
-                  </View>
-                </View>
-              ))}
+                      <View style={styles.factorContent}>
+                        <Text style={[styles.factorLabel, { color: colors.text }]} allowFontScaling>
+                          {r.label}
+                        </Text>
+                        {r.description ? (
+                          <Text
+                            style={[styles.factorDesc, { color: colors.textSecondary }]}
+                            allowFontScaling
+                          >
+                            {r.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </Card>
+              </>
+            )}
+
+            {/* Assumptions */}
+            {a.assumptions.length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>
+                  Assumptions
+                </Text>
+                <Card style={styles.card}>
+                  {a.assumptions.map((x) => (
+                    <View key={x.id} style={styles.assumptionRow}>
+                      <Text style={[styles.assumptionLabel, { color: colors.text }]} allowFontScaling>
+                        {x.label}
+                      </Text>
+                      <View style={styles.assumptionRight}>
+                        <Text
+                          style={[styles.assumptionValue, { color: colors.textSecondary }]}
+                          allowFontScaling
+                        >
+                          {x.value}
+                        </Text>
+                        {(x.source === 'default' || x.source === 'inferred') && (
+                          <Text
+                            style={[styles.assumptionSource, { color: colors.textMuted }]}
+                            allowFontScaling
+                          >
+                            {x.source === 'inferred' ? ' (estimated)' : ' (default)'}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </Card>
+              </>
+            )}
+          </>
+        )}
+
+        {/* Renovation tab content: simple explanatory panel */}
+        {activeTab === 'renovation' && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.text }]} allowFontScaling>
+              Renovation impact
+            </Text>
+            <Card style={styles.card}>
+              <Text style={[styles.factorDesc, { color: colors.textSecondary }]} allowFontScaling>
+                Renovation scenarios are evaluated using the same deterministic engine that powers your
+                deal score and cash flow metrics. Use the What If controls under the Financials tab to
+                explore different renovation budgets, rent changes, and timelines without relying on AI
+                for any calculations.
+              </Text>
             </Card>
           </>
         )}
@@ -1123,6 +1325,28 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     fontWeight: '600',
     marginBottom: spacing.s,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    borderRadius: radius.pill,
+    padding: spacing.xxxs,
+    marginTop: spacing.l,
+    marginBottom: spacing.m,
+    backgroundColor: '#00000020',
+  },
+  tabPill: {
+    flex: 1,
+    height: 32,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabPillActive: {
+    backgroundColor: '#ffffff30',
+  },
+  tabLabel: {
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.medium,
   },
   metricsGrid: {
     flexDirection: 'row',

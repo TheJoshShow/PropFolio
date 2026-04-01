@@ -11,17 +11,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { Button, SupabaseAuthEnvDevPanel, TextInput } from '../../src/components';
 import { spacing, fontSizes, fontWeights, lineHeights } from '../../src/theme';
@@ -36,6 +27,8 @@ import {
 } from '../../src/config';
 import { openLegalDocument } from '../../src/utils/openLink';
 import { trackEvent } from '../../src/services/analytics';
+import { ScreenContainer } from '../../src/components/ScreenContainer';
+import { ModalCard } from '../../src/components/ModalCard';
 
 const SCROLL_BOTTOM_PADDING = spacing.xxxl * 2 + 48;
 
@@ -127,25 +120,29 @@ export default function SignUpScreen() {
 
   if (successState === 'email_confirm') {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+      <ScreenContainer>
         <ScrollView
           contentContainerStyle={[styles.successScroll, responsiveContentContainer]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={[styles.title, { color: colors.text }]}>Check your inbox</Text>
-          <Text style={[styles.successBody, { color: colors.textSecondary }]}>
-            We sent a link to {email.trim().toLowerCase()}. Open it to confirm your email, then come back and sign in.
-          </Text>
-          <Button
-            title="Back to sign in"
-            onPress={() => router.replace('/(auth)/login')}
-            variant="primary"
-            fullWidth
-            pill
-          />
+          <View style={styles.cardWrapper}>
+            <ModalCard>
+              <Text style={[styles.title, { color: colors.text }]}>Check your inbox</Text>
+              <Text style={[styles.successBody, { color: colors.textSecondary }]}>
+                We sent a link to {email.trim().toLowerCase()}. Open it to confirm your email, then come back and sign in.
+              </Text>
+              <Button
+                title="Back to sign in"
+                onPress={() => router.replace('/(auth)/login')}
+                variant="primary"
+                fullWidth
+                pill
+              />
+            </ModalCard>
+          </View>
         </ScrollView>
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
@@ -154,7 +151,7 @@ export default function SignUpScreen() {
   const canPressSubmit = isAuthConfigured && !busy;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+    <ScreenContainer>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -166,42 +163,43 @@ export default function SignUpScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
-          contentInsetAdjustmentBehavior="automatic"
         >
-          <Pressable
-            onPress={() => router.push('/(auth)')}
-            style={styles.backToWelcomeRow}
-            accessibilityRole="button"
-            accessibilityLabel="Back to welcome"
-          >
-            <Text style={[styles.backToWelcomeText, { color: colors.textSecondary }]}>← Welcome</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.text }]}>Create your account</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Add your name, email, and a secure password.
-          </Text>
-
-          {authConfigBanner ? (
-            <>
-              <View
-                style={[styles.configBanner, { borderColor: colors.error, backgroundColor: colors.surface }]}
-                accessibilityRole="alert"
+          <View style={styles.cardWrapper}>
+            <ModalCard>
+              <Pressable
+                onPress={() => router.push('/(auth)')}
+                style={styles.backToWelcomeRow}
+                accessibilityRole="button"
+                accessibilityLabel="Back to welcome"
               >
-                <Text style={[styles.configBannerText, { color: colors.error }]}>{authConfigBanner}</Text>
-              </View>
-              {typeof __DEV__ !== 'undefined' && __DEV__ ? (
-                <SupabaseAuthEnvDevPanel
-                  diagnostics={getSupabaseAuthEnvPublicDiagnostics()}
-                  textColor={colors.text}
-                  mutedColor={colors.textSecondary}
-                  borderColor={colors.textSecondary}
-                  surfaceColor={colors.surface}
-                />
-              ) : null}
-            </>
-          ) : null}
+                <Text style={[styles.backToWelcomeText, { color: colors.textSecondary }]}>← Welcome</Text>
+              </Pressable>
+              <Text style={[styles.title, { color: colors.text }]}>Create your account</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                Add your name, email, and a secure password.
+              </Text>
 
-          <TextInput
+              {authConfigBanner ? (
+                <>
+                  <View
+                    style={[styles.configBanner, { borderColor: colors.error, backgroundColor: colors.surface }]}
+                    accessibilityRole="alert"
+                  >
+                    <Text style={[styles.configBannerText, { color: colors.error }]}>{authConfigBanner}</Text>
+                  </View>
+                  {typeof __DEV__ !== 'undefined' && __DEV__ ? (
+                    <SupabaseAuthEnvDevPanel
+                      diagnostics={getSupabaseAuthEnvPublicDiagnostics()}
+                      textColor={colors.text}
+                      mutedColor={colors.textSecondary}
+                      borderColor={colors.textSecondary}
+                      surfaceColor={colors.surface}
+                    />
+                  ) : null}
+                </>
+              ) : null}
+
+              <TextInput
             label="First name"
             value={firstName}
             onChangeText={(v) => {
@@ -215,7 +213,7 @@ export default function SignUpScreen() {
             maxLength={100}
             error={fieldErrors.firstName}
           />
-          <TextInput
+              <TextInput
             label="Last name"
             value={lastName}
             onChangeText={(v) => {
@@ -229,7 +227,7 @@ export default function SignUpScreen() {
             maxLength={100}
             error={fieldErrors.lastName}
           />
-          <TextInput
+              <TextInput
             label="Email"
             value={email}
             onChangeText={(v) => {
@@ -244,7 +242,7 @@ export default function SignUpScreen() {
             maxLength={255}
             error={fieldErrors.email}
           />
-          <TextInput
+              <TextInput
             label="Password"
             value={password}
             onChangeText={(v) => {
@@ -256,7 +254,7 @@ export default function SignUpScreen() {
             accessibilityLabel="Password"
             error={fieldErrors.password}
           />
-          <Pressable
+              <Pressable
             onPress={() => setShowPassword((p) => !p)}
             style={styles.showPasswordRow}
             accessibilityRole="checkbox"
@@ -268,7 +266,7 @@ export default function SignUpScreen() {
               {showPassword ? 'Hide password' : 'Show password'}
             </Text>
           </Pressable>
-          <TextInput
+              <TextInput
             label="Confirm password"
             value={confirmPassword}
             onChangeText={(v) => {
@@ -284,80 +282,89 @@ export default function SignUpScreen() {
             returnKeyType="go"
           />
 
-          {error ? (
-            <View style={styles.errorRow}>
-              <Text
-                style={[styles.error, { color: colors.error }]}
-                accessibilityLiveRegion="polite"
-                accessibilityRole="alert"
-              >
-                {error}
+              {error ? (
+                <View style={styles.errorRow}>
+                  <Text
+                    style={[styles.error, { color: colors.error }]}
+                    accessibilityLiveRegion="polite"
+                    accessibilityRole="alert"
+                  >
+                    {error}
+                  </Text>
+                  <Pressable
+                    onPress={clearError}
+                    style={styles.retryTouchable}
+                    accessibilityRole="button"
+                    accessibilityLabel="Dismiss error"
+                  >
+                    <Text style={[styles.retryText, { color: colors.primary }]}>Dismiss</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              <Text style={[styles.agreement, { color: colors.textSecondary }]}>
+                By continuing you agree to our{' '}
+                <Text
+                  style={[styles.agreementLink, { color: colors.primary }]}
+                  onPress={() => void openLegalDocument('terms')}
+                  accessibilityRole="link"
+                  accessibilityLabel="Terms of Service"
+                >
+                  Terms
+                </Text>
+                {' '}and{' '}
+                <Text
+                  style={[styles.agreementLink, { color: colors.primary }]}
+                  onPress={() => void openLegalDocument('privacy')}
+                  accessibilityRole="link"
+                  accessibilityLabel="Privacy Policy"
+                >
+                  Privacy Policy
+                </Text>
+                .
               </Text>
-              <Pressable
-                onPress={clearError}
-                style={styles.retryTouchable}
-                accessibilityRole="button"
-                accessibilityLabel="Dismiss error"
-              >
-                <Text style={[styles.retryText, { color: colors.primary }]}>Dismiss</Text>
-              </Pressable>
-            </View>
-          ) : null}
 
-          <Text style={[styles.agreement, { color: colors.textSecondary }]}>
-            By continuing you agree to our{' '}
-            <Text
-              style={[styles.agreementLink, { color: colors.primary }]}
-              onPress={() => void openLegalDocument('terms')}
-              accessibilityRole="link"
-              accessibilityLabel="Terms of Service"
-            >
-              Terms
-            </Text>
-            {' '}and{' '}
-            <Text
-              style={[styles.agreementLink, { color: colors.primary }]}
-              onPress={() => void openLegalDocument('privacy')}
-              accessibilityRole="link"
-              accessibilityLabel="Privacy Policy"
-            >
-              Privacy Policy
-            </Text>
-            .
-          </Text>
+              <Button
+                title={busy ? 'Creating account…' : 'Create account'}
+                onPress={handleSubmit}
+                accessibilityLabel={busy ? 'Creating account' : 'Create account'}
+                disabled={!canPressSubmit}
+                fullWidth
+                variant="primary"
+                pill
+                glow
+                style={styles.submitButton}
+              />
 
-          <Button
-            title={busy ? 'Creating account…' : 'Create account'}
-            onPress={handleSubmit}
-            accessibilityLabel={busy ? 'Creating account' : 'Create account'}
-            disabled={!canPressSubmit}
-            fullWidth
-            variant="primary"
-            pill
-            glow
-            style={styles.submitButton}
-          />
-
-          <View style={styles.backRow}>
-            <Text style={[styles.backPrompt, { color: colors.textSecondary }]}>Already have an account? </Text>
-            <Pressable
-              onPress={() => router.replace('/(auth)/login')}
-              accessibilityRole="link"
-              accessibilityLabel="Sign in"
-              style={styles.backLinkTouchable}
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-            >
-              <Text style={[styles.backLink, { color: colors.primary }]}>Sign in</Text>
-            </Pressable>
+              <View style={styles.backRow}>
+                <Text style={[styles.backPrompt, { color: colors.textSecondary }]}>
+                  Already have an account?{' '}
+                </Text>
+                <Pressable
+                  onPress={() => router.replace('/(auth)/login')}
+                  accessibilityRole="link"
+                  accessibilityLabel="Sign in"
+                  style={styles.backLinkTouchable}
+                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                >
+                  <Text style={[styles.backLink, { color: colors.primary }]}>Sign in</Text>
+                </Pressable>
+              </View>
+            </ModalCard>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  cardWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: spacing.xxxl,
+  },
   keyboardView: { flex: 1 },
   configBanner: {
     borderWidth: 1,
