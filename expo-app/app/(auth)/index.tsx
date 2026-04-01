@@ -25,13 +25,21 @@ export default function WelcomeScreen() {
     <ScreenContainer>
       <View style={styles.centerWrapper}>
         <ModalCard>
-          <View style={styles.logoBlock}>
-            <View style={[styles.logoCircle, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.logoText, { color: colors.onPrimary }]}>PF</Text>
+          <View style={[styles.brandPanel, { backgroundColor: colors.surface }]}>
+            <View style={styles.logoBlock}>
+              <View style={[styles.logoCircle, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.logoText, { color: colors.onPrimary }]}>PF</Text>
+              </View>
+              <View style={styles.wordmarkBlock}>
+                <Text style={[styles.wordmark, { color: colors.text }]} numberOfLines={1} allowFontScaling>
+                  PropFolio
+                </Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1} allowFontScaling>
+                  {SUBTITLE}
+                </Text>
+              </View>
             </View>
-            <Text style={[styles.wordmark, { color: colors.text }]}>PropFolio</Text>
           </View>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{SUBTITLE}</Text>
 
           <View style={styles.buttons}>
             <Button
@@ -64,14 +72,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
+  brandPanel: {
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.l,
+    paddingVertical: spacing.l,
+    marginBottom: spacing.xl,
+  },
   logoBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.l,
   },
   logoCircle: {
-    width: 56,
-    height: 56,
+    width: 72,
+    height: 72,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -81,18 +94,20 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.bold,
   },
+  wordmarkBlock: {
+    flex: 1,
+  },
   wordmark: {
-    fontSize: 40,
+    fontSize: fontSizes.hero,
     fontWeight: fontWeights.bold,
     letterSpacing: -0.8,
-    lineHeight: lineHeights.xxl,
+    lineHeight: lineHeights.hero,
   },
   subtitle: {
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.base,
     fontWeight: fontWeights.regular,
-    lineHeight: lineHeights.xl,
-    marginBottom: spacing.xl,
-    textAlign: 'left',
+    lineHeight: lineHeights.base,
+    marginTop: spacing.xs,
   },
   buttons: {
     gap: spacing.m,

@@ -89,15 +89,18 @@ export default function LoginScreen() {
         >
           <View style={styles.cardWrapper}>
             <ModalCard>
-              <Pressable
-                onPress={() => router.push('/(auth)')}
-                style={styles.backRow}
-                accessibilityRole="button"
-                accessibilityLabel="Back to welcome"
-              >
-                <Text style={[styles.backText, { color: colors.textSecondary }]}>← Welcome</Text>
-              </Pressable>
-              <Text style={[styles.title, { color: colors.text }]}>Sign In</Text>
+              <View style={styles.headerRow}>
+                <View style={styles.headerSpacer} />
+                <Text style={[styles.title, { color: colors.text }]}>Sign In</Text>
+                <Pressable
+                  onPress={() => router.push('/(auth)')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close and return to welcome"
+                  style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
+                </Pressable>
+              </View>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                 Sign in with the email and password for your account.
               </Text>
@@ -242,6 +245,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingVertical: spacing.xxxl,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.s,
+  },
+  headerSpacer: {
+    width: 32,
+  },
+  closeButton: {
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs,
+    minWidth: 32,
+    alignItems: 'flex-end',
+  },
+  closeText: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.medium,
   },
   keyboardView: { flex: 1 },
   scroll: {

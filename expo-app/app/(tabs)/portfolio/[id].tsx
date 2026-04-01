@@ -44,7 +44,7 @@ import {
 import type { PropertyDetailAnalysisResult } from '../../../src/features/property-analysis';
 import type { DealScoreBand, DealScoreFactor } from '../../../src/lib/scoring/types';
 import type { ConfidenceMeterBand } from '../../../src/lib/confidence/types';
-import { Button, Card, TextInput } from '../../../src/components';
+import { Button, Card, TextInput, PropertySummaryCard, SegmentedTabs } from '../../../src/components';
 import { useThemeColors } from '../../../src/components/useThemeColors';
 import { spacing, fontSizes, lineHeights, radius, fontWeights } from '../../../src/theme';
 import { responsiveContentContainer } from '../../../src/utils/responsive';
@@ -542,18 +542,20 @@ export default function PropertyDetailScreen() {
         <Text style={[styles.heroSummary, { color: colors.textSecondary }]} numberOfLines={2} allowFontScaling>
           {dealScore.explanationSummary || 'Insufficient data'}
         </Text>
-        <View style={styles.heroBadges}>
-          <View style={[styles.badgePill, { backgroundColor: colors.primaryMuted }]}>
-            <Text style={[styles.badgeText, { color: colors.primary }]} allowFontScaling>
-              Deal {dealScore.totalScore != null ? Math.round(dealScore.totalScore) : '—'}/100
-            </Text>
-          </View>
-          <View style={[styles.badgePill, { backgroundColor: colors.surfaceSecondary }]}>
-            <Text style={[styles.badgeText, { color: colors.text }]} allowFontScaling>
-              {confidenceBandLabel(confidence.band)} confidence
-            </Text>
-          </View>
-        </View>
+
+        {/* Summary card */}
+        <PropertySummaryCard
+          addressLine={address.split('\n')[0] || 'No address'}
+          secondaryLine={address.split('\n')[1] ?? undefined}
+          score={dealScore.totalScore}
+          leftMetricLabel="Rent"
+          leftMetricValue={
+            estimatedRent != null ? `${formatCurrency(estimatedRent)} /mo` : '—'
+          }
+          rightMetricLabel="Price"
+          rightMetricValue={purchasePrice != null ? formatCurrency(purchasePrice) : '—'}
+          style={styles.summaryCard}
+        />
 
         {/* Score section */}
         <View style={styles.scoreRow}>

@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useSubscription } from '../../src/contexts/SubscriptionContext';
 import { useImportLimit } from '../../src/hooks/useImportLimit';
-import { Card, Button, SubscriptionStatusCard, FreeImportsIndicator } from '../../src/components';
+import { Card, Button, SubscriptionStatusCard, FreeImportsIndicator, SettingsGroupCard } from '../../src/components';
 import { useThemeColors } from '../../src/components/useThemeColors';
 import { spacing, fontSizes, fontWeights, lineHeights } from '../../src/theme';
 import { responsiveContentContainer } from '../../src/utils/responsive';
@@ -238,15 +238,37 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
-      <SectionHeader title="Account" colors={colors} />
-      <Card style={styles.card}>
-        <SettingsRow label="Email" value={session?.email ?? '—'} colors={colors} />
-        <SettingsRow
-          label="Phone"
-          value={session?.phone_number ? formatPhoneForDisplay(session.phone_number) : '—'}
-          colors={colors}
-        />
-      </Card>
+      {/* Profile */}
+      <View style={styles.profileBlock}>
+        <View style={[styles.avatar, { backgroundColor: colors.surfaceSecondary }]}>
+          <Text style={[styles.avatarInitials, { color: colors.text }]}>
+            {session?.email?.[0]?.toUpperCase() ?? 'P'}
+          </Text>
+        </View>
+        <View style={styles.profileText}>
+          <Text style={[styles.profileName, { color: colors.text }]}>
+            {session?.email?.split('@')[0] ?? 'PropFolio user'}
+          </Text>
+          <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+            {session?.email ?? '—'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Account group */}
+      <SettingsGroupCard
+        title="Account"
+        rows={[
+          { label: 'Personal Information', onPress: () => {}, accessibilityLabel: 'Personal information' },
+          {
+            label: 'Security',
+            onPress: () => router.push('/update-password'),
+            accessibilityLabel: 'Security settings',
+          },
+          { label: 'Notification Settings', onPress: () => {}, accessibilityLabel: 'Notification settings' },
+        ]}
+        style={styles.groupCard}
+      />
 
       <SectionHeader title="Plan & subscription" colors={colors} />
       <FreeImportsIndicator
@@ -293,65 +315,40 @@ export default function SettingsScreen() {
         />
       </Card>
 
-      <SectionHeader title="Help & support" colors={colors} />
-      <Card style={styles.card}>
-        <Pressable
-          onPress={handleOpenSupportUrl}
-          style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.7 : 1 }]}
-          accessibilityRole="link"
-          accessibilityLabel="Contact support"
-        >
-          <Text style={[styles.linkText, { color: colors.primary }]}>Contact support</Text>
-        </Pressable>
-        {billingHelpUrl ? (
-          <Pressable
-            onPress={() => handleOpenBillingHelpUrl(billingHelpUrl)}
-            style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.7 : 1 }]}
-            accessibilityRole="link"
-            accessibilityLabel="Billing help"
-          >
-            <Text style={[styles.linkText, { color: colors.primary }]}>Billing help & FAQ</Text>
-          </Pressable>
-        ) : (
-          <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-            Questions about your subscription? Use Manage subscription above or Contact support.
-          </Text>
-        )}
-      </Card>
+      {/* Support group */}
+      <SettingsGroupCard
+        title="Support"
+        rows={[
+          {
+            label: 'Help Center',
+            onPress: () => handleOpenBillingHelpUrl(billingHelpUrl || getBillingHelpUrl()),
+            accessibilityLabel: 'Help Center',
+          },
+          {
+            label: 'Contact Support',
+            onPress: handleOpenSupportUrl,
+            accessibilityLabel: 'Contact support',
+          },
+          {
+            label: 'Privacy Policy',
+            onPress: () => void openLegalDocument('privacy'),
+            accessibilityLabel: 'Privacy Policy',
+          },
+        ]}
+        style={styles.groupCard}
+      />
 
-      <SectionHeader title="Account security" colors={colors} />
-      <Card style={styles.card}>
-        <Button
-          title="Update password"
-          onPress={() => router.push('/update-password')}
-          variant="outline"
-          fullWidth
-          style={styles.button}
-          disabled={!isAuthConfigured}
-          accessibilityLabel="Update password"
-        />
+      {/* Logout footer */}
+      <View style={styles.logoutFooter}>
         <Pressable
           onPress={handleSignOut}
           style={({ pressed }) => [styles.signOutRow, { opacity: pressed ? 0.7 : 1 }]}
           accessibilityRole="button"
           accessibilityLabel="Sign out"
         >
-          <Text style={[styles.signOutText, { color: colors.error }]}>Log out</Text>
+          <Text style={[styles.signOutText, { color: colors.error }]}>Log Out</Text>
         </Pressable>
-        {isAuthConfigured && (
-          <Pressable
-            onPress={deleting ? undefined : handleDeleteAccount}
-            style={({ pressed }) => [styles.signOutRow, { opacity: deleting || pressed ? 0.7 : 1 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Delete account"
-            disabled={deleting}
-          >
-            <Text style={[styles.signOutText, { color: colors.error }]}>
-              {deleting ? 'Deleting…' : 'Delete account'}
-            </Text>
-          </Pressable>
-        )}
-      </Card>
+      </View>
 
       <SectionHeader title="Legal" colors={colors} />
       <Card style={styles.card}>
@@ -510,6 +507,37 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
     lineHeight: lineHeights.title,
   },
+  profileBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    gap: spacing.m,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.bold,
+  },
+  profileText: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: fontSizes.lg,
+    fontWeight: fontWeights.semibold,
+  },
+  profileEmail: {
+    fontSize: fontSizes.sm,
+    marginTop: spacing.xxs,
+  },
+  groupCard: {
+    marginBottom: spacing.m,
+  },
   sectionHeader: {
     fontSize: fontSizes.xs,
     fontWeight: fontWeights.semibold,
@@ -556,6 +584,9 @@ const styles = StyleSheet.create({
   hint: { fontSize: fontSizes.xs, marginTop: spacing.xs },
   signOutRow: { paddingVertical: spacing.s },
   signOutText: { fontSize: fontSizes.base, fontWeight: fontWeights.medium },
+  logoutFooter: {
+    marginTop: spacing.xl,
+  },
   linkRow: { paddingVertical: spacing.s },
   linkText: { fontSize: fontSizes.base, fontWeight: fontWeights.medium },
   helpText: { fontSize: fontSizes.sm, lineHeight: lineHeights.base },

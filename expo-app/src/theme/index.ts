@@ -30,3 +30,5 @@ export { lightColors, darkColors } from './colors';
 export type { ColorScheme } from './colors';
 export { fontSizes, fontWeights, lineHeights } from './typography';
 export { primaryButtonGlow, cardShadow, surfaceSubtle } from './shadows';
+export { iconSizes } from './icons';
+export { headerSpacing, modalSpacing } from './layout';

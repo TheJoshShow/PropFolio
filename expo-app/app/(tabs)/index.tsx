@@ -2,7 +2,7 @@ import React, { useCallback, useEffect } from 'react';
 import { Text, StyleSheet, View, FlatList, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FreeImportsIndicator, PropFolioBrandHeader } from '../../src/components';
+import { FreeImportsIndicator, PropFolioBrandHeader, ScoreBadge } from '../../src/components';
 import { spacing, fontSizes, fontWeights, lineHeights, radius } from '../../src/theme';
 import { useThemeColors } from '../../src/components/useThemeColors';
 import { responsiveContentContainer } from '../../src/utils/responsive';
@@ -20,11 +20,6 @@ import { cardShadow } from '../../src/theme/shadows';
 function formatCurrency(n: number | null): string {
   if (n == null) return '—';
   return `$${Math.round(n).toLocaleString()}`;
-}
-
-function scoreLabel(score: number | null, band: string): string {
-  if (score != null) return `${Math.round(score)}`;
-  return band === 'insufficientData' ? '—' : '—';
 }
 
 function PortfolioCard({ item, onPress }: { item: PortfolioListItem; onPress: () => void }) {
@@ -51,11 +46,7 @@ function PortfolioCard({ item, onPress }: { item: PortfolioListItem; onPress: ()
             {[item.city, item.state].filter(Boolean).join(', ')}
           </Text>
         </View>
-        <View style={[styles.scoreBadge, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.scoreValue, { color: colors.onPrimary }]}>
-            {scoreLabel(item.displayedDealScore, item.dealBand)}
-          </Text>
-        </View>
+        <ScoreBadge value={item.displayedDealScore} />
       </View>
 
       <View style={styles.cardMidRow}>
