@@ -218,7 +218,25 @@ export default function SettingsScreen() {
       contentContainerStyle={[styles.content, responsiveContentContainer]}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+      <View style={styles.headerRow}>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Text style={[styles.headerButtonText, { color: colors.primary }]}>←</Text>
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Done"
+        >
+          <Text style={[styles.headerButtonText, { color: colors.primary }]}>Done</Text>
+        </Pressable>
+      </View>
 
       <SectionHeader title="Account" colors={colors} />
       <Card style={styles.card}>
@@ -471,11 +489,26 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
-  title: {
-    fontSize: fontSizes.xxl,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xl,
+  },
+  headerButton: {
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs,
+    minWidth: 60,
+    alignItems: 'flex-start',
+  },
+  headerButtonText: {
+    fontSize: fontSizes.base,
+    fontWeight: fontWeights.medium,
+  },
+  headerTitle: {
+    fontSize: fontSizes.xl,
     fontWeight: fontWeights.bold,
     lineHeight: lineHeights.title,
-    marginBottom: spacing.xl,
   },
   sectionHeader: {
     fontSize: fontSizes.xs,

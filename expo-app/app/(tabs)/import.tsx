@@ -419,11 +419,6 @@ export default function ImportScreen() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[styles.title, { color: colors.text }]}>Add property</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Paste a listing link or enter an address.
-      </Text>
-
       <FreeImportsIndicator
         freeRemaining={freeRemaining}
         limit={FREE_IMPORT_LIMIT}
@@ -469,75 +464,108 @@ export default function ImportScreen() {
       )}
 
       <Card style={styles.card} elevated>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Paste link</Text>
-        <TextInput
-          placeholder="https://www.zillow.com/... or https://www.redfin.com/..."
-          value={linkInput}
-          onChangeText={setLinkInput}
-          containerStyle={styles.inputWrap}
-          accessibilityLabel="Paste Zillow or Redfin link"
-        />
-        <Button
-          title={isSubmitting ? 'Saving…' : linkLoading ? 'Importing…' : 'Import from link'}
-          onPress={handlePasteLink}
-          fullWidth
-          variant="primary"
-          pill
-          glow
-          disabled={atLimit || isSubmitting || linkLoading || addressLoading || authLoading}
-          accessibilityLabel="Import from link"
-        />
-      </Card>
-
-      <Card style={styles.card} elevated>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Or enter address</Text>
-        <View style={styles.inputWrap}>
-          <TextInput
-            placeholder="123 Main St, City, ST 12345"
-            value={addressInput}
-            onChangeText={setAddressInput}
-            containerStyle={styles.inputWrapInner}
-            accessibilityLabel="Property address"
-          />
-          {autocompleteLoading && (
-            <ActivityIndicator size="small" color={colors.primary} style={styles.autocompleteSpinner} />
-          )}
+        <View style={styles.modalHeaderRow}>
+          <Text style={[styles.title, { color: colors.text }]}>Import Property</Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Text style={[styles.closeText, { color: colors.textSecondary }]}>✕</Text>
+          </TouchableOpacity>
         </View>
-        {suggestions.length > 0 && (
-          <View style={[styles.suggestions, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {suggestions.slice(0, 5).map((s, i) => (
-              <TouchableOpacity
-                key={s.place_id || `s-${i}`}
-                style={[styles.suggestionRow, { borderBottomColor: colors.border }]}
-                onPress={() => handleSelectSuggestion(s.description)}
-                accessibilityRole="button"
-                accessibilityLabel={`Address suggestion: ${s.description}`}
-              >
-                <Text style={[styles.suggestionText, { color: colors.text }]} numberOfLines={1}>
-                  {s.description}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-        {autocompleteError && (
-          <Text style={[styles.autocompleteError, { color: colors.textSecondary }]}>
-            {autocompleteError}
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Choose how you’d like to bring a property into PropFolio.
+        </Text>
+
+        {/* Zillow import option + inline input */}
+        <View style={styles.optionCard}>
+          <Text style={[styles.optionTitle, { color: colors.text }]}>Import from Zillow</Text>
+          <Text style={[styles.optionBody, { color: colors.textSecondary }]}>
+            Paste a Zillow listing link and we’ll pull in the details for you.
           </Text>
-        )}
+          <TextInput
+            placeholder="https://www.zillow.com/..."
+            value={linkInput}
+            onChangeText={setLinkInput}
+            containerStyle={styles.inputWrap}
+            accessibilityLabel="Paste Zillow listing link"
+          />
+          <Button
+            title={isSubmitting ? 'Saving…' : linkLoading ? 'Importing…' : 'Import from Zillow'}
+            onPress={handlePasteLink}
+            fullWidth
+            variant="primary"
+            pill
+            glow
+            disabled={atLimit || isSubmitting || linkLoading || addressLoading || authLoading}
+            accessibilityLabel="Import from Zillow"
+          />
+        </View>
+
+        {/* Manual address option + autocomplete */}
+        <View style={styles.optionCard}>
+          <Text style={[styles.optionTitle, { color: colors.text }]}>Enter Address Manually</Text>
+          <Text style={[styles.optionBody, { color: colors.textSecondary }]}>
+            Type in a property address and we’ll look it up and estimate rent.
+          </Text>
+          <View style={styles.inputWrap}>
+            <TextInput
+              placeholder="123 Main St, City, ST 12345"
+              value={addressInput}
+              onChangeText={setAddressInput}
+              containerStyle={styles.inputWrapInner}
+              accessibilityLabel="Property address"
+            />
+            {autocompleteLoading && (
+              <ActivityIndicator size="small" color={colors.primary} style={styles.autocompleteSpinner} />
+            )}
+          </View>
+          {suggestions.length > 0 && (
+            <View style={[styles.suggestions, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {suggestions.slice(0, 5).map((s, i) => (
+                <TouchableOpacity
+                  key={s.place_id || `s-${i}`}
+                  style={[styles.suggestionRow, { borderBottomColor: colors.border }]}
+                  onPress={() => handleSelectSuggestion(s.description)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Address suggestion: ${s.description}`}
+                >
+                  <Text style={[styles.suggestionText, { color: colors.text }]} numberOfLines={1}>
+                    {s.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {autocompleteError && (
+            <Text style={[styles.autocompleteError, { color: colors.textSecondary }]}>
+              {autocompleteError}
+            </Text>
+          )}
+          <Button
+            title={
+              addressLoading
+                ? 'Looking up…'
+                : isSubmitting
+                  ? 'Saving…'
+                  : 'Use address'
+            }
+            onPress={handleAddress}
+            variant="secondary"
+            fullWidth
+            disabled={addressLoading || linkLoading || isSubmitting || atLimit || authLoading}
+            accessibilityLabel={
+              addressLoading ? 'Looking up address' : isSubmitting ? 'Saving property' : 'Use address'
+            }
+          />
+        </View>
+
         <Button
-          title={
-            addressLoading
-              ? 'Looking up…'
-              : isSubmitting
-                ? 'Saving…'
-                : 'Use address'
-          }
-          onPress={handleAddress}
+          title="Cancel"
           variant="secondary"
           fullWidth
-          disabled={addressLoading || linkLoading || isSubmitting || atLimit || authLoading}
-          accessibilityLabel={addressLoading ? 'Looking up address' : isSubmitting ? 'Saving property' : 'Use address'}
+          onPress={() => router.back()}
         />
       </Card>
     </ScrollView>
@@ -553,6 +581,15 @@ const styles = StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   title: { fontSize: fontSizes.xxl, fontWeight: fontWeights.bold, lineHeight: lineHeights.title, marginBottom: spacing.xxs },
   subtitle: { fontSize: fontSizes.base, marginBottom: spacing.xl, lineHeight: lineHeights.base },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.s,
+  },
+  closeText: {
+    fontSize: fontSizes.base,
+  },
   upgradeCard: {
     marginBottom: spacing.l,
     padding: spacing.m,
@@ -585,7 +622,14 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   resumeRetryButton: { marginTop: spacing.xs },
-  card: { marginBottom: spacing.l },
+  card: { marginBottom: spacing.l, borderRadius: radius.l, padding: spacing.l },
+  optionCard: {
+    paddingVertical: spacing.m,
+    borderRadius: radius.m,
+    marginBottom: spacing.m,
+  },
+  optionTitle: { fontSize: fontSizes.base, fontWeight: fontWeights.semibold, marginBottom: spacing.xs },
+  optionBody: { fontSize: fontSizes.sm, lineHeight: lineHeights.sm },
   sectionTitle: { fontSize: fontSizes.lg, fontWeight: fontWeights.semibold, marginBottom: spacing.s },
   inputWrap: { marginBottom: spacing.s, position: 'relative' },
   inputWrapInner: { marginBottom: 0 },

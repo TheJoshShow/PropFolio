@@ -5,7 +5,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { Button, SupabaseAuthEnvDevPanel, TextInput } from '../../src/components';
 import { spacing, fontSizes, fontWeights, lineHeights } from '../../src/theme';
@@ -13,6 +12,8 @@ import { useThemeColors } from '../../src/components/useThemeColors';
 import { responsiveContentContainer } from '../../src/utils/responsive';
 import { getAuthErrorMessage, isValidEmail } from '../../src/utils/authErrors';
 import { getAccountServicesUnavailableBannerMessage, getSupabaseAuthEnvPublicDiagnostics } from '../../src/config';
+import { ScreenContainer } from '../../src/components/ScreenContainer';
+import { ModalCard } from '../../src/components/ModalCard';
 
 const SCROLL_BOTTOM_PADDING = spacing.xxxl * 2 + 24;
 
@@ -74,7 +75,7 @@ export default function LoginScreen() {
   }, [email, password, isLoading, signIn, isAuthConfigured]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+    <ScreenContainer>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -85,20 +86,21 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
-          contentInsetAdjustmentBehavior="automatic"
         >
-          <Pressable
-            onPress={() => router.push('/(auth)')}
-            style={styles.backRow}
-            accessibilityRole="button"
-            accessibilityLabel="Back to welcome"
-          >
-            <Text style={[styles.backText, { color: colors.textSecondary }]}>← Welcome</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.text }]}>Welcome back</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Sign in with the email and password for your account.
-          </Text>
+          <View style={styles.cardWrapper}>
+            <ModalCard>
+              <Pressable
+                onPress={() => router.push('/(auth)')}
+                style={styles.backRow}
+                accessibilityRole="button"
+                accessibilityLabel="Back to welcome"
+              >
+                <Text style={[styles.backText, { color: colors.textSecondary }]}>← Welcome</Text>
+              </Pressable>
+              <Text style={[styles.title, { color: colors.text }]}>Sign In</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                Sign in with the email and password for your account.
+              </Text>
           {authConfigBanner ? (
             <>
               <View
@@ -118,7 +120,7 @@ export default function LoginScreen() {
               ) : null}
             </>
           ) : null}
-          <TextInput
+              <TextInput
             label="Email"
             value={email}
             onChangeText={(v) => {
@@ -136,7 +138,7 @@ export default function LoginScreen() {
             error={emailInlineError}
             returnKeyType="next"
           />
-          <TextInput
+              <TextInput
             label="Password"
             value={password}
             onChangeText={(v) => {
@@ -155,7 +157,7 @@ export default function LoginScreen() {
               }
             }}
           />
-          <Pressable
+              <Pressable
             onPress={() => setShowPassword((p) => !p)}
             style={styles.showPasswordRow}
             accessibilityRole="checkbox"
@@ -167,7 +169,7 @@ export default function LoginScreen() {
               {showPassword ? 'Hide password' : 'Show password'}
             </Text>
           </Pressable>
-          <Pressable
+              <Pressable
             onPress={() => {
               setError(null);
               router.push('/(auth)/forgot-password');
@@ -178,62 +180,69 @@ export default function LoginScreen() {
           >
             <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot password?</Text>
           </Pressable>
-          {error ? (
-            <View style={styles.errorRow}>
-              <Text
-                style={[styles.error, { color: colors.error }]}
-                accessibilityLiveRegion="polite"
-                accessibilityRole="alert"
-              >
-                {error}
-              </Text>
-              <Pressable
-                onPress={() => setError(null)}
-                style={styles.retryTouchable}
-                accessibilityRole="button"
-                accessibilityLabel="Dismiss error"
-              >
-                <Text style={[styles.retryText, { color: colors.primary }]}>Dismiss</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <Button
-            title={isLoading ? 'Signing in…' : 'Sign in'}
-            onPress={handleSignIn}
-            disabled={
-              !isAuthConfigured ||
-              isLoading ||
-              !email.trim() ||
-              !password ||
-              Boolean(emailInlineError)
-            }
-            fullWidth
-            variant="primary"
-            pill
-            glow
-            style={styles.primaryCta}
-          />
+              {error ? (
+                <View style={styles.errorRow}>
+                  <Text
+                    style={[styles.error, { color: colors.error }]}
+                    accessibilityLiveRegion="polite"
+                    accessibilityRole="alert"
+                  >
+                    {error}
+                  </Text>
+                  <Pressable
+                    onPress={() => setError(null)}
+                    style={styles.retryTouchable}
+                    accessibilityRole="button"
+                    accessibilityLabel="Dismiss error"
+                  >
+                    <Text style={[styles.retryText, { color: colors.primary }]}>Dismiss</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              <Button
+                title={isLoading ? 'Signing in…' : 'Sign In'}
+                onPress={handleSignIn}
+                disabled={
+                  !isAuthConfigured ||
+                  isLoading ||
+                  !email.trim() ||
+                  !password ||
+                  Boolean(emailInlineError)
+                }
+                fullWidth
+                variant="primary"
+                pill
+                glow
+                style={styles.primaryCta}
+              />
 
-          <View style={styles.signUpRow}>
-            <Text style={[styles.signUpPrompt, { color: colors.textSecondary }]}>New here? </Text>
-            <Pressable
-              onPress={() => router.push('/(auth)/sign-up')}
-              accessibilityRole="link"
-              accessibilityLabel="Create account"
-              style={styles.signUpLinkTouchable}
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-            >
-              <Text style={[styles.signUpLink, { color: colors.primary }]}>Create an account</Text>
-            </Pressable>
+              <View style={styles.signUpRow}>
+                <Text style={[styles.signUpPrompt, { color: colors.textSecondary }]}>New here? </Text>
+                <Pressable
+                  onPress={() => router.push('/(auth)/sign-up')}
+                  accessibilityRole="link"
+                  accessibilityLabel="Create account"
+                  style={styles.signUpLinkTouchable}
+                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                >
+                  <Text style={[styles.signUpLink, { color: colors.primary }]}>Create an account</Text>
+                </Pressable>
+              </View>
+            </ModalCard>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  cardWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: spacing.xxxl,
+  },
   keyboardView: { flex: 1 },
   scroll: {
     flexGrow: 1,

@@ -18,7 +18,9 @@ export function ScreenContainer({ edges = ['top', 'bottom'], style, children, ..
 
   return (
     <ImageBackground
-      source={require('../../assets/c__Users_JoshS_AppData_Roaming_Cursor_User_workspaceStorage_2b591141666040880b64cfc0f502aad5_images_Renderings-0727e195-9010-4d59-86af-e33b57b2e28e.png')}
+      // NOTE: Place your Chicago-at-dusk background asset at expo-app/assets/propfolio-bg.png
+      // and this require will bundle it for native builds.
+      source={require('../../assets/propfolio-bg.png')}
       style={styles.background}
       resizeMode="cover"
     >
