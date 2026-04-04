@@ -1,0 +1,39 @@
+diff --git a/node_modules/@expo/image-utils/build/Cache.js b/node_modules/@expo/image-utils/build/Cache.js
+index 85adb45..4194a89 100644
+--- a/node_modules/@expo/image-utils/build/Cache.js
++++ b/node_modules/@expo/image-utils/build/Cache.js
+@@ -11,8 +11,15 @@ exports.cacheImageAsync = cacheImageAsync;
+ exports.clearUnusedCachesAsync = clearUnusedCachesAsync;
+ const crypto_1 = __importDefault(require("crypto"));
+ const fs_1 = __importDefault(require("fs"));
++const os_1 = __importDefault(require("os"));
+ const path_1 = require("path");
+-const CACHE_LOCATION = '.expo/web/cache/production/images';
++/** Use tmpdir so EAS/cloud prebuild can write (see eas-cli#3063); optional override for CI. */
++function getImageCacheRoot() {
++    if (process.env.EXPO_IMAGE_UTILS_CACHE_DIR) {
++        return process.env.EXPO_IMAGE_UTILS_CACHE_DIR;
++    }
++    return (0, path_1.join)(os_1.default.tmpdir(), 'expo-image-utils-cache', 'images');
++}
+ const cacheKeys = {};
+ // Calculate SHA256 Checksum value of a file based on its contents
+ function calculateHash(filePath) {
+@@ -36,7 +43,7 @@ async function createCacheKeyWithDirectoryAsync(projectRoot, type, icon) {
+     return cacheKey;
+ }
+ async function ensureCacheDirectory(projectRoot, type, cacheKey) {
+-    const cacheFolder = (0, path_1.join)(projectRoot, CACHE_LOCATION, type, cacheKey);
++    const cacheFolder = (0, path_1.join)(getImageCacheRoot(), type, cacheKey);
+     await fs_1.default.promises.mkdir(cacheFolder, { recursive: true });
+     return cacheFolder;
+ }
+@@ -58,7 +65,7 @@ async function cacheImageAsync(fileName, buffer, cacheKey) {
+ }
+ async function clearUnusedCachesAsync(projectRoot, type) {
+     // Clean up any old caches
+-    const cacheFolder = (0, path_1.join)(projectRoot, CACHE_LOCATION, type);
++    const cacheFolder = (0, path_1.join)(getImageCacheRoot(), type);
+     await fs_1.default.promises.mkdir(cacheFolder, { recursive: true });
+     const currentCaches = await fs_1.default.promises.readdir(cacheFolder);
+     if (!Array.isArray(currentCaches)) {

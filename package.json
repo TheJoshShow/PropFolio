@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
+    "postinstall": "patch-package",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -41,6 +42,7 @@
     "@types/react": "~19.1.10",
     "babel-plugin-module-resolver": "^5.0.3",
     "eas-cli": "^18.5.0",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2",
     "vitest": "^3.2.4"
   },
