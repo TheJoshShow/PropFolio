@@ -1,0 +1,26 @@
+# https://supabase.com/docs/guides/cli/config
+project_id = "propfolio"
+
+[api]
+enabled = true
+
+[functions.places-autocomplete]
+verify_jwt = true
+
+[functions.places-resolve]
+verify_jwt = true
+
+[functions.import-property]
+verify_jwt = true
+
+[functions.normalize-address]
+verify_jwt = true
+
+[functions.rent-estimate]
+verify_jwt = true
+
+[functions.generate-property-summary]
+verify_jwt = true
+
+[functions.revenuecat-webhook]
+verify_jwt = false
