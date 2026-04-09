@@ -51,7 +51,11 @@ export default function AccessRestrictedScreen() {
       </Card>
 
       <View style={styles.actions}>
-        <AppButton label="Start membership" onPress={onSubscribe} testID="propfolio.access.subscribe" />
+        <AppButton
+          label={BILLING_COPY.startMembershipCta}
+          onPress={onSubscribe}
+          testID="propfolio.access.subscribe"
+        />
         <AppButton
           label={sub.isRestoring ? 'Restoring…' : BILLING_COPY.restore}
           variant="secondary"

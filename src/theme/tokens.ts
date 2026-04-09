@@ -5,7 +5,7 @@
 
 export { colors, semantic } from './semantic';
 export type { SemanticColors } from './semantic';
-export { hitSlop, layout, radius, spacing } from './tokensCore';
+export { hitSlop, layout, navigationChrome, radius, spacing } from './tokensCore';
 export { textPresets, typography } from './typographyPresets';
 export {
   cardPadding,

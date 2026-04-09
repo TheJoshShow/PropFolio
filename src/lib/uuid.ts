@@ -13,3 +13,11 @@ export function generateUuid(): string {
     return v.toString(16);
   });
 }
+
+/**
+ * Google Places Autocomplete (New) `sessionToken`: max 36 URL/filename-safe ASCII chars.
+ * Hyphenated UUIDs can trigger INVALID_ARGUMENT; use compact hex (32 chars).
+ */
+export function generatePlacesSessionToken(): string {
+  return generateUuid().replace(/-/g, '');
+}

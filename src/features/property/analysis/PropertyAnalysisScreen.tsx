@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +11,13 @@ import {
   View,
 } from 'react-native';
 
+import {
+  AppBackButton,
+  headerLeadingInset,
+  headerSymmetricCornerSlot,
+  headerTrailingInset,
+  HeaderTextAction,
+} from '@/components/navigation';
 import { Card, ScoreBadge } from '@/components/ui';
 import { AssumptionsEditorModal } from '@/features/property/detail/AssumptionsEditorModal';
 import { investmentStrategyLabel } from '@/lib/investmentStrategy';
@@ -19,8 +27,9 @@ import {
   portfolioScoreTier,
 } from '@/lib/portfolioScorePresentation';
 import { parseMissingFields, type PropertyRow } from '@/types/property';
-import { hitSlop, iconSizes, layout, semantic, spacing, textPresets } from '@/theme';
+import { hitSlop, iconSizes, layout, navigationChrome, semantic, spacing, textPresets } from '@/theme';
 
+import { formatImportNoteMessage } from '../formatImportNoteMessage';
 import { AnalysisSummaryCard } from './AnalysisSummaryCard';
 import { AnalysisTabSwitcher, type AnalysisTabKey } from './AnalysisTabSwitcher';
 import { buildPropertyAnalysisSummary } from './buildPropertyAnalysisSummary';
@@ -36,6 +45,7 @@ type Props = {
 
 export function PropertyAnalysisScreen({ property }: Props) {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<AnalysisTabKey>('financials');
   const [editorOpen, setEditorOpen] = useState(false);
   const [saveHint, setSaveHint] = useState<string | null>(null);
@@ -73,6 +83,11 @@ export function PropertyAnalysisScreen({ property }: Props) {
     const fromDb = missingDb.map((m) => m.replace(/_/g, ' '));
     return [...new Set([...fromDb, ...fromConf])];
   }, [breakdown, missingDb]);
+
+  const importNote = useMemo(
+    () => formatImportNoteMessage(property.last_import_error),
+    [property.last_import_error],
+  );
 
   const tier = breakdown
     ? portfolioScoreTier(breakdown.confidence.score, property.status)
@@ -124,19 +139,26 @@ export function PropertyAnalysisScreen({ property }: Props) {
       headerTitleAlign: 'center',
       headerLargeTitle: false,
       headerShadowVisible: false,
+      headerLeftContainerStyle: headerLeadingInset(insets.left),
+      headerRightContainerStyle: headerTrailingInset(insets.right),
+      headerLeft: () => (
+        <View style={headerSymmetricCornerSlot('leading')}>
+          <AppBackButton onPress={() => navigation.goBack()} testID="propfolio.property.header.back" />
+        </View>
+      ),
       headerRight: () => (
-        <Pressable
-          onPress={openEditor}
-          hitSlop={hitSlop}
-          accessibilityRole="button"
-          accessibilityLabel="Adjust assumptions"
-          style={styles.headerAdjust}
-        >
-          <Text style={styles.headerAdjustText}>Adjust</Text>
-        </Pressable>
+        <View style={headerSymmetricCornerSlot('trailing')}>
+          <HeaderTextAction
+            label="Adjust"
+            onPress={openEditor}
+            accessibilityLabel="Adjust assumptions"
+            testID="propfolio.property.header.adjust"
+            style={styles.headerTrailingTextAction}
+          />
+        </View>
       ),
     });
-  }, [navigation, headerTitleNode, openEditor]);
+  }, [navigation, headerTitleNode, openEditor, insets.left, insets.right]);
 
   const strategyLine =
     invStrategy != null ? investmentStrategyLabel(invStrategy) : 'Strategy not set';
@@ -151,6 +173,33 @@ export function PropertyAnalysisScreen({ property }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.strategyPill}>{strategyLine}</Text>
+
+        {property.status === 'draft' ? (
+          <Card elevation="xs" style={styles.draftCard}>
+            <View style={styles.warnHead}>
+              <Ionicons name="alert-circle-outline" size={22} color={semantic.accentGold} />
+              <Text style={styles.warnTitle}>Incomplete import (draft)</Text>
+            </View>
+            <Text style={styles.warnBody}>
+              Core listing fields are still missing (for example beds, baths, square footage, or rent estimate). Open
+              Adjust to enter assumptions, or confirm the address and try importing again. Metrics below use defaults
+              where the engine does not yet have real values.
+            </Text>
+          </Card>
+        ) : null}
+
+        {property.status === 'error' ? (
+          <Card elevation="xs" style={styles.errorCard}>
+            <View style={styles.warnHead}>
+              <Ionicons name="close-circle-outline" size={22} color={semantic.warning} />
+              <Text style={styles.warnTitle}>Import could not build a full address</Text>
+            </View>
+            <Text style={styles.warnBody}>
+              Re-import after selecting a full street address from search, or paste a listing link that includes
+              enough location detail for the app to resolve the property.
+            </Text>
+          </Card>
+        ) : null}
 
         {!breakdown ? (
           <View style={styles.scoringLoading} testID="propfolio.property.scoring.loading">
@@ -186,9 +235,7 @@ export function PropertyAnalysisScreen({ property }: Props) {
           </Card>
         ) : null}
 
-        {property.last_import_error ? (
-          <Text style={styles.importErr}>Import note: {property.last_import_error}</Text>
-        ) : null}
+        {importNote ? <Text style={styles.importErr}>Import note: {importNote}</Text> : null}
 
         <View style={styles.actionRow}>
           <Pressable
@@ -302,23 +349,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
-  headerAdjust: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  headerAdjustText: {
-    ...textPresets.bodyMedium,
-    color: semantic.accentGold,
-    fontSize: 17,
-  },
   headerTitleText: {
     ...textPresets.bodyMedium,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: semantic.textPrimary,
     textAlign: 'center',
     maxWidth: 220,
     alignSelf: 'center',
+  },
+  headerTrailingTextAction: {
+    paddingHorizontal: 6,
+    minWidth: navigationChrome.headerActionSlotWidth,
+  },
+  draftCard: {
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: semantic.accentGold,
+    backgroundColor: semantic.surface,
+  },
+  errorCard: {
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: semantic.warning,
+    backgroundColor: semantic.surface,
   },
   warnCard: {
     padding: spacing.lg,

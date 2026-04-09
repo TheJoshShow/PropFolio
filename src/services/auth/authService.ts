@@ -46,13 +46,18 @@ export async function signUpWithEmail(
   email: string,
   password: string,
   fullName: string,
+  phone?: string,
 ): Promise<SignUpResult> {
+  const trimmedPhone = phone?.trim() ?? '';
   const { data, error } = await client.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: getEmailConfirmationRedirectUrl(),
-      data: { full_name: fullName },
+      data: {
+        full_name: fullName,
+        ...(trimmedPhone.length > 0 ? { phone: trimmedPhone } : {}),
+      },
     },
   });
   if (error) {

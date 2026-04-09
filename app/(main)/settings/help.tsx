@@ -1,4 +1,5 @@
 import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Screen } from '@/components/ui';
@@ -7,14 +8,22 @@ import { openLegalDocument } from '@/lib/openLegalDocument';
 import { hitSlop, semantic, spacing, textPresets } from '@/theme';
 
 export default function SettingsHelpCenterScreen() {
+  const router = useRouter();
+
   return (
     <Screen scroll safeAreaEdges={['bottom', 'left', 'right']} contentContainerStyle={styles.body}>
-      <Text style={styles.lead}>
-        Get help with PropFolio, billing, and your account. For membership and import credits, use Settings →
-        Membership or email support below.
-      </Text>
-
       <Card elevation="xs" shape="sheet" style={styles.card}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reset password"
+          onPress={() => router.push('/forgot-password')}
+          hitSlop={hitSlop}
+          style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+        >
+          <Text style={styles.linkLabel}>Reset password</Text>
+          <Text style={styles.linkHint}>Email link to sign back in</Text>
+        </Pressable>
+        <View style={styles.sep} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Privacy policy"
@@ -54,14 +63,10 @@ export default function SettingsHelpCenterScreen() {
 
 const styles = StyleSheet.create({
   body: {
-    gap: spacing.lg,
+    gap: spacing.md,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.xxxl,
-  },
-  lead: {
-    ...textPresets.bodySecondary,
-    lineHeight: 24,
-    color: semantic.textSecondary,
+    paddingTop: spacing.sm,
   },
   card: {
     padding: 0,

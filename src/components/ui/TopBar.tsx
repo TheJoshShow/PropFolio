@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
-import { heights, hitSlop, semantic, spacing, textPresets } from '@/theme';
+import { HeaderActionSpacer } from '@/components/navigation';
+import { hitSlop, navigationChrome, semantic, textPresets } from '@/theme';
+
+const SLOT = navigationChrome.headerActionSlotWidth;
 
 type Props = {
   title: string;
-  /** Left control — e.g. back chevron */
+  /** Left control — e.g. `HeaderIconButton` / `AppBackButton` */
   left?: ReactNode;
   right?: ReactNode;
   style?: ViewStyle;
@@ -15,7 +18,7 @@ type Props = {
 };
 
 /**
- * Simple top bar for modals / subflows — not a replacement for native stack headers.
+ * Simple top bar for modals / subflows — balanced slots match `HeaderIconButton` / native stack.
  */
 export function TopBar({
   title,
@@ -42,33 +45,33 @@ export function TopBar({
 
   return (
     <View style={[styles.row, style]}>
-      <View style={styles.side}>{leftNode}</View>
+      <View style={styles.side}>{leftNode ?? <HeaderActionSpacer />}</View>
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
-      <View style={styles.side}>{right}</View>
+      <View style={styles.side}>{right ?? <HeaderActionSpacer />}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
-    minHeight: heights.topBar,
+    minHeight: navigationChrome.headerActionMinHeight,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: navigationChrome.headerBarEdgePadding,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: semantic.border,
     backgroundColor: semantic.surface,
   },
   side: {
-    width: 44,
+    width: SLOT,
     alignItems: 'center',
     justifyContent: 'center',
   },
   leftTap: {
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: SLOT,
+    minHeight: SLOT,
     alignItems: 'center',
     justifyContent: 'center',
   },

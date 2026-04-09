@@ -40,6 +40,7 @@ describe('computeAppAccess', () => {
       serverRow: null,
       storeSummary: store({ status: 'active', activeEntitlements: [RC_ENTITLEMENT] }),
       serverFetchFailed: false,
+      revenueCatEnvironmentBlock: null,
     });
     expect(r).toEqual({ hasAppAccess: false, displayState: 'loading' });
   });
@@ -50,6 +51,7 @@ describe('computeAppAccess', () => {
       serverRow: row({ entitlement_active: true }),
       storeSummary: store({ status: 'not_subscribed', activeEntitlements: [] }),
       serverFetchFailed: false,
+      revenueCatEnvironmentBlock: null,
     });
     expect(r.hasAppAccess).toBe(true);
     expect(r.displayState).toBe('active_paid');
@@ -61,19 +63,32 @@ describe('computeAppAccess', () => {
       serverRow: null,
       storeSummary: store({ status: 'active', activeEntitlements: [RC_ENTITLEMENT] }),
       serverFetchFailed: false,
+      revenueCatEnvironmentBlock: null,
     });
     expect(r.hasAppAccess).toBe(true);
   });
 
-  it('denies store when server row says inactive (server wins)', () => {
+  it('allows RevenueCat pro when server row is still inactive (webhook lag)', () => {
     const r = computeAppAccess({
       accessHydrated: true,
-      serverRow: row({ entitlement_active: false }),
+      serverRow: row({ entitlement_active: false, billing_issue_detected: false }),
       storeSummary: store({ status: 'active', activeEntitlements: [RC_ENTITLEMENT] }),
       serverFetchFailed: false,
+      revenueCatEnvironmentBlock: null,
+    });
+    expect(r.hasAppAccess).toBe(true);
+  });
+
+  it('billing_issue from server blocks even if the SDK still lists the entitlement', () => {
+    const r = computeAppAccess({
+      accessHydrated: true,
+      serverRow: row({ entitlement_active: false, billing_issue_detected: true }),
+      storeSummary: store({ status: 'billing_issue', activeEntitlements: [RC_ENTITLEMENT] }),
+      serverFetchFailed: false,
+      revenueCatEnvironmentBlock: null,
     });
     expect(r.hasAppAccess).toBe(false);
-    expect(r.displayState).toBe('expired');
+    expect(r.displayState).toBe('billing_issue');
   });
 
   it('flags active_trial from store period type', () => {
@@ -86,6 +101,7 @@ describe('computeAppAccess', () => {
         subscriptionPeriodType: 'TRIAL',
       }),
       serverFetchFailed: false,
+      revenueCatEnvironmentBlock: null,
     });
     expect(r.hasAppAccess).toBe(true);
     expect(r.displayState).toBe('active_trial');
@@ -97,6 +113,7 @@ describe('computeAppAccess', () => {
       serverRow: row({ entitlement_active: true }),
       storeSummary: store({ status: 'grace_period', activeEntitlements: [RC_ENTITLEMENT] }),
       serverFetchFailed: false,
+      revenueCatEnvironmentBlock: null,
     });
     expect(r.hasAppAccess).toBe(true);
     expect(r.displayState).toBe('grace_period');
@@ -108,6 +125,7 @@ describe('computeAppAccess', () => {
       serverRow: null,
       storeSummary: store({ status: 'unknown' }),
       serverFetchFailed: true,
+      revenueCatEnvironmentBlock: null,
     });
     expect(r.hasAppAccess).toBe(false);
     expect(r.displayState).toBe('unknown');
@@ -119,8 +137,33 @@ describe('computeAppAccess', () => {
       serverRow: row({ entitlement_active: false, billing_issue_detected: true }),
       storeSummary: store({ status: 'not_subscribed', activeEntitlements: [] }),
       serverFetchFailed: false,
+      revenueCatEnvironmentBlock: null,
     });
     expect(r.hasAppAccess).toBe(false);
     expect(r.displayState).toBe('billing_issue');
+  });
+
+  it('uses rc_misconfigured when SDK environment blocks and user has no access', () => {
+    const r = computeAppAccess({
+      accessHydrated: true,
+      serverRow: null,
+      storeSummary: store({ status: 'unknown', activeEntitlements: [] }),
+      serverFetchFailed: false,
+      revenueCatEnvironmentBlock: 'Expo Go cannot use billing',
+    });
+    expect(r.hasAppAccess).toBe(false);
+    expect(r.displayState).toBe('rc_misconfigured');
+  });
+
+  it('server entitlement still wins when RevenueCat environment is blocked', () => {
+    const r = computeAppAccess({
+      accessHydrated: true,
+      serverRow: row({ entitlement_active: true }),
+      storeSummary: store({ status: 'unknown', activeEntitlements: [] }),
+      serverFetchFailed: false,
+      revenueCatEnvironmentBlock: 'bad key',
+    });
+    expect(r.hasAppAccess).toBe(true);
+    expect(r.displayState).toBe('active_paid');
   });
 });

@@ -6,6 +6,14 @@ export type ResolvedPlace = {
   formattedAddress: string;
   latitude: number | null;
   longitude: number | null;
+  /** Preferred one-line address from Places when formattedAddress is empty. */
+  normalizedOneLine?: string | null;
+  streetNumber?: string | null;
+  route?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
 };
 
 export type SnapshotV1 = {
@@ -32,6 +40,8 @@ export type SnapshotV1 = {
     sqft?: number | null;
     yearBuilt?: number | null;
     propertyType?: string | null;
+    /** RentCast `features.unitCount` when present (multifamily). */
+    unitCount?: number | null;
   };
   financials?: {
     lastSalePrice?: number | null;
@@ -61,7 +71,8 @@ export function buildSnapshotAndMissing(args: {
   const rentMonthly = extractRentMonthly(args.rentcastRent);
 
   const formatted =
-    args.place?.formattedAddress ||
+    args.place?.formattedAddress?.trim() ||
+    (typeof args.place?.normalizedOneLine === 'string' ? args.place.normalizedOneLine.trim() : '') ||
     (typeof rcProp?.formattedAddress === 'string' ? rcProp.formattedAddress : null) ||
     args.addressForRentcast ||
     '';
@@ -70,10 +81,14 @@ export function buildSnapshotAndMissing(args: {
     missing.push('formatted_address');
   }
 
-  const line1 = (rcProp?.addressLine1 as string) ?? null;
-  const city = (rcProp?.city as string) ?? null;
-  const state = (rcProp?.state as string) ?? null;
-  const zip = (rcProp?.zipCode as string) ?? null;
+  const line1FromPlace = [args.place?.streetNumber, args.place?.route]
+    .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    .join(' ')
+    .trim();
+  const line1 = line1FromPlace || (rcProp?.addressLine1 as string) || null;
+  const city = args.place?.city ?? (rcProp?.city as string) ?? null;
+  const state = args.place?.state ?? (rcProp?.state as string) ?? null;
+  const zip = args.place?.postalCode ?? (rcProp?.zipCode as string) ?? null;
 
   const lat =
     args.place?.latitude ??
@@ -88,9 +103,29 @@ export function buildSnapshotAndMissing(args: {
 
   const beds = typeof rcProp?.bedrooms === 'number' ? rcProp.bedrooms : null;
   const baths = typeof rcProp?.bathrooms === 'number' ? rcProp.bathrooms : null;
-  const sqft = typeof rcProp?.squareFootage === 'number' ? rcProp.squareFootage : null;
-  const yearBuilt = typeof rcProp?.yearBuilt === 'number' ? rcProp.yearBuilt : null;
+  /** RentCast may return 0 when unknown; treat non-positive as missing. */
+  const sqftRaw = typeof rcProp?.squareFootage === 'number' ? rcProp.squareFootage : null;
+  const sqft =
+    sqftRaw != null && Number.isFinite(sqftRaw) && sqftRaw > 0 ? Math.round(sqftRaw) : null;
+  const yearBuiltRaw = typeof rcProp?.yearBuilt === 'number' ? rcProp.yearBuilt : null;
+  const maxBuiltYear = new Date().getFullYear() + 2;
+  const yearBuilt =
+    yearBuiltRaw != null &&
+    Number.isFinite(yearBuiltRaw) &&
+    yearBuiltRaw >= 1600 &&
+    yearBuiltRaw <= maxBuiltYear
+      ? Math.round(yearBuiltRaw)
+      : null;
   const propertyType = (rcProp?.propertyType as string) ?? null;
+
+  const features = rcProp?.features as Record<string, unknown> | undefined;
+  const rawUnitCount = features?.unitCount;
+  const unitCount =
+    typeof rawUnitCount === 'number' &&
+    Number.isFinite(rawUnitCount) &&
+    rawUnitCount >= 1
+      ? Math.min(Math.floor(rawUnitCount), 999)
+      : null;
 
   if (beds == null) {
     missing.push('beds');
@@ -149,6 +184,7 @@ export function buildSnapshotAndMissing(args: {
       sqft,
       yearBuilt,
       propertyType,
+      unitCount,
     },
     financials: {
       lastSalePrice,
@@ -161,6 +197,7 @@ export function buildSnapshotAndMissing(args: {
       baths,
       sqft,
       yearBuilt,
+      unitCount,
       rentMonthly,
       lastSalePrice,
       lat,

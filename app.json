@@ -47,7 +47,8 @@
       "router": {},
       "eas": {
         "projectId": "b06b51f1-d0e7-4772-a662-6ad949feb44c"
-      }
+      },
+      "revenueCatApiKeyIos": "appl_ieYWcqzEQyrzQnjYCrdwRRpSBiM"
     },
     "owner": "josh.spears"
   }

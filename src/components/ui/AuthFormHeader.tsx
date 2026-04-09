@@ -1,36 +1,38 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { hitSlop, semantic, spacing, textPresets } from '@/theme';
+import {
+  AppCloseButton,
+  HEADER_NAV_BALANCE_WIDTH,
+  HeaderActionSpacer,
+} from '@/components/navigation';
+import { navigationChrome, semantic, spacing, textPresets } from '@/theme';
 
 type Props = {
   title: string;
   onClose: () => void;
 };
 
-/**
- * Centered title + circular close control — Sign In / Create Account modals.
- */
+/** Centered title + ghost close — Sign In / Create Account modals. */
 export function AuthFormHeader({ title, onClose }: Props) {
+  const insets = useSafeAreaInsets();
   return (
     <>
-      <View style={styles.row}>
-        <View style={styles.side} />
+      <View
+        style={[
+          styles.row,
+          {
+            paddingLeft: Math.max(insets.left, navigationChrome.headerBarEdgePadding),
+            paddingRight: Math.max(insets.right, navigationChrome.headerBarEdgePadding),
+          },
+        ]}
+      >
+        <HeaderActionSpacer />
         <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
           {title}
         </Text>
-        <View style={[styles.side, styles.sideRight]}>
-          <Pressable
-            onPress={onClose}
-            hitSlop={hitSlop}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            style={styles.closeTap}
-          >
-            <View style={styles.closeCircle}>
-              <Ionicons name="close" size={22} color={semantic.textPrimary} />
-            </View>
-          </Pressable>
+        <View style={styles.sideRight}>
+          <AppCloseButton onPress={onClose} testID="propfolio.auth.header.close" />
         </View>
       </View>
       <View style={styles.divider} />
@@ -43,13 +45,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingBottom: spacing.md,
-    minHeight: 52,
-  },
-  side: {
-    width: 44,
+    minHeight: navigationChrome.headerActionMinHeight,
   },
   sideRight: {
+    width: HEADER_NAV_BALANCE_WIDTH,
+    minHeight: navigationChrome.headerActionMinHeight,
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   title: {
     flex: 1,
@@ -59,17 +61,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     fontWeight: '700',
     color: semantic.textPrimary,
-  },
-  closeTap: {
-    padding: spacing.xxs,
-  },
-  closeCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: semantic.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   divider: {
     height: StyleSheet.hairlineWidth,

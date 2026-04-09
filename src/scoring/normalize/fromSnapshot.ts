@@ -14,9 +14,15 @@ export function normalizedInputsFromSnapshot(
   const s = snapshot.structure ?? {};
   const f = snapshot.financials ?? {};
 
+  const unitsFromSnap = finiteOrNull(s.unitCount);
+  const unitCount =
+    unitsFromSnap != null && unitsFromSnap >= 1
+      ? Math.min(Math.floor(unitsFromSnap), 999)
+      : 1;
+
   const normalized: NormalizedPropertyInputs = {
     version: 1,
-    unitCount: 1,
+    unitCount,
     monthlyRentGross: finiteOrNull(f.rentEstimateMonthly),
     purchasePrice: finiteOrNull(f.lastSalePrice),
     arv: null,

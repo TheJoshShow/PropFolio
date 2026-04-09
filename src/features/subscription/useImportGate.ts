@@ -4,25 +4,35 @@ import { useCallback } from 'react';
 import { useSubscription } from './SubscriptionContext';
 
 /**
- * Import gating: active subscription (`hasAppAccess`) first, then server credit wallet ≥ 1.
- * Call `ensureCanImport` before starting an import (refreshes subscription + balance).
+ * Import gating (see `membershipCreditRules.canRunImport`): **membership** then **server credits**.
+ * Credits never unlock the app; without membership we never send the user to buy credits alone.
  */
 export function useImportGate() {
   const router = useRouter();
-  const sub = useSubscription();
+  const {
+    accessHydrated,
+    hasAppAccess,
+    hasImportCredits,
+    canRunImport,
+    refresh,
+  } = useSubscription();
 
   const ensureCanImport = useCallback(async (): Promise<boolean> => {
-    const { hasAppAccess, creditBalance } = await sub.refresh();
-    if (!hasAppAccess) {
+    // Credits are only consumed on the server when import succeeds; this gate reads wallet state.
+    if (accessHydrated && hasAppAccess && hasImportCredits && canRunImport) {
+      return true;
+    }
+    const r = await refresh();
+    if (!r.hasAppAccess) {
       router.replace('/access-restricted');
       return false;
     }
-    if (creditBalance < 1) {
-      router.push('/paywall');
+    if (!r.hasImportCredits) {
+      router.push('/credit-top-up');
       return false;
     }
     return true;
-  }, [router, sub]);
+  }, [router, accessHydrated, hasAppAccess, hasImportCredits, canRunImport, refresh]);
 
   return { ensureCanImport };
 }

@@ -5,9 +5,24 @@ export type ResolvedPlaceDto = {
   formattedAddress: string;
   latitude: number | null;
   longitude: number | null;
+  normalizedOneLine?: string | null;
+  streetNumber?: string | null;
+  route?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
 };
 
-export type AutocompletePrediction = { placeId: string; text: string };
+/** Up to 5 items from `places-autocomplete`; `text` mirrors legacy full-line display. */
+export type AutocompletePrediction = {
+  placeId: string;
+  primaryText: string;
+  secondaryText: string;
+  fullText: string;
+  /** @deprecated prefer fullText */
+  text: string;
+};
 
 export type PlacesAutocompleteResponse = { predictions: AutocompletePrediction[] };
 
@@ -34,6 +49,8 @@ export type PropertyImportSuccess = {
   snapshot: PropertySnapshotV1;
   /** Wallet balance after this import (when server included it). */
   balance_after?: number | null;
+  /** True when the server decremented one import credit (`status === 'ready'`). */
+  credit_consumed?: boolean;
   /** Same correlationId already completed — no duplicate charge or property row. */
   idempotentReplay?: boolean;
 };

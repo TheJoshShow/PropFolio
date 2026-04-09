@@ -13,7 +13,7 @@ import { withRetry } from '../_shared/retry.ts';
 
 type Body = { addressLine?: string; correlationId?: string };
 
-const TIMEOUT_MS = 14_000;
+const TIMEOUT_MS = 22_000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {

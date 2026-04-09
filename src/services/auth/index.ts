@@ -11,3 +11,4 @@ export { mapAuthError } from './mapAuthError';
 export { fetchProfileByUserId } from './profileRepository';
 export { parseAuthTokensFromUrl } from './parseAuthCallbackUrl';
 export type { AuthContextValue, AuthPhase, ProfileRow, ServiceResult } from './types';
+export { resolveUserFullNameForDisplay } from './userDisplayName';

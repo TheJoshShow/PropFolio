@@ -2,19 +2,13 @@ import { RC_ENTITLEMENT_PRO } from '@/services/revenuecat/productIds';
 import type { CustomerInfoSummary } from '@/services/revenuecat/types';
 
 /**
- * RevenueCat-shaped summary → premium access for store-side checks.
+ * RevenueCat / StoreKit view of membership: active `propfolio_pro` only.
+ * For **app navigation** access, use `computeAppAccess` (server + store); for named helpers see
+ * `membershipCreditRules.hasPropfolioProEntitlement` / `hasActiveMembership(hasAppAccess)`.
+ * Mis-attached consumables must not appear here as Pro.
  */
 export function hasPremiumAccess(summary: CustomerInfoSummary): boolean {
-  if (summary.activeEntitlements.includes(RC_ENTITLEMENT_PRO)) {
-    return true;
-  }
-  if (summary.status === 'grace_period') {
-    return true;
-  }
-  if (summary.status === 'active' && summary.activeEntitlements.length > 0) {
-    return true;
-  }
-  return false;
+  return summary.activeEntitlements.includes(RC_ENTITLEMENT_PRO);
 }
 
 export function subscriptionTierLabel(summary: CustomerInfoSummary): string {
@@ -28,7 +22,7 @@ export function subscriptionTierLabel(summary: CustomerInfoSummary): string {
     return 'Not subscribed';
   }
   if (summary.status === 'unknown') {
-    return 'Status unavailable';
+    return 'Could not verify with App Store';
   }
   return 'Not subscribed';
 }
@@ -50,9 +44,10 @@ export function subscriptionStatusDetail(summary: CustomerInfoSummary): string {
     case 'not_subscribed':
       return 'Subscribe for membership ($1.99/mo after a free first month). Credits are separate.';
     case 'unknown':
-      return summary.lastStoreError?.trim()
-        ? `Could not reach the App Store: ${summary.lastStoreError}`
-        : 'Could not reach the App Store. Try Restore purchases.';
+      return (
+        summary.lastStoreError?.trim() ??
+        'Could not reach the App Store. Try Restore purchases or check your connection.'
+      );
     default:
       return '';
   }

@@ -87,11 +87,9 @@
 | Element | Copy |
 |--------|------|
 | Title | Top up credits |
-| Subtitle | Buy more anytime while subscribed. Prices below reflect our standard SKUs; Apple shows the exact price at purchase. |
 | Balance card label | Your balance |
 | Balance value | `{n} available` or `…` while loading |
 | Section | Choose a pack |
-| Reference line | Reference pricing (US): 1 @ $1.99 · 5 @ $8.99 · 10 @ $14.99 · 20 @ $19.99. Apple may show tax or regional pricing at checkout. |
 | Missing product | Connect this product in RevenueCat to purchase. |
 | Buy | Buy |
 | Restore | Restore purchases |

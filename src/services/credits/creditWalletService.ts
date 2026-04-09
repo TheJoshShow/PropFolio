@@ -16,6 +16,7 @@ export type UserCreditStateRpc = {
     updated_at?: string | null;
   };
   subscription?: Record<string, unknown>;
+  /** Optional server hint; client gates use `computeAppAccess` + membership rules, not this field. */
   has_app_access_hint?: boolean;
 };
 

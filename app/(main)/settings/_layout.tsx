@@ -1,32 +1,47 @@
 import { Stack } from 'expo-router';
-import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  AppBackButton,
+  HeaderActionSpacer,
+  headerLeadingInset,
+  headerTrailingInset,
+  stackHeaderBarStyle,
+  stackHeaderTitleStyle,
+} from '@/components/navigation';
 import { semantic } from '@/theme';
 
 export default function SettingsStackLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Stack
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerLargeTitle: false,
-        ...(Platform.OS === 'ios' ? { headerBlurEffect: 'systemMaterial' as const } : {}),
         headerShadowVisible: false,
-        headerStyle: { backgroundColor: semantic.background },
+        headerStyle: stackHeaderBarStyle,
         headerTintColor: semantic.textPrimary,
-        headerTitleStyle: { color: semantic.textPrimary },
+        headerTitleStyle: stackHeaderTitleStyle,
+        headerTitleAlign: 'center',
         contentStyle: { backgroundColor: semantic.background },
-      }}
+        headerBackVisible: false,
+        headerLeftContainerStyle: headerLeadingInset(insets.left),
+        headerRightContainerStyle: headerTrailingInset(insets.right),
+        headerLeft: ({ canGoBack }) =>
+          canGoBack ? (
+            <AppBackButton onPress={() => navigation.goBack()} testID="propfolio.settings.stack.back" />
+          ) : null,
+        headerRight: ({ canGoBack }) => (canGoBack ? <HeaderActionSpacer /> : null),
+      })}
     >
       <Stack.Screen
         name="index"
         options={{ headerShown: true, title: 'Settings', headerTitleAlign: 'center' }}
       />
-      <Stack.Screen name="personal" options={{ title: 'Personal Information' }} />
-      <Stack.Screen name="security" options={{ title: 'Security' }} />
+      <Stack.Screen name="personal" options={{ title: 'Account' }} />
       <Stack.Screen name="notifications" options={{ title: 'Notification Settings' }} />
       <Stack.Screen name="subscription" options={{ title: 'Membership' }} />
-      <Stack.Screen name="currency" options={{ title: 'Currency' }} />
-      <Stack.Screen name="theme" options={{ title: 'Theme' }} />
       <Stack.Screen name="help" options={{ title: 'Help Center' }} />
+      <Stack.Screen name="billing-diagnostics" options={{ title: 'Billing diagnostics' }} />
     </Stack>
   );
 }

@@ -1,5 +1,6 @@
 import type { CustomerInfo } from 'react-native-purchases';
 
+import { userFacingRevenueCatError } from './revenueCatKeyValidation';
 import { RC_ENTITLEMENT_PRO } from './productIds';
 import type { CustomerInfoSummary, SubscriptionStatus } from './types';
 
@@ -46,17 +47,10 @@ export function mapCustomerInfo(info: CustomerInfo): CustomerInfoSummary {
     };
   }
 
-  if (keys.length > 0) {
-    return {
-      status: 'active',
-      activeEntitlements: keys,
-      managementURL: info.managementURL,
-    };
-  }
-
+  /* Non–propfolio_pro entitlements (e.g. misconfigured consumables) must NOT unlock membership. */
   return {
     status: 'not_subscribed',
-    activeEntitlements: [],
+    activeEntitlements: keys,
     managementURL: info.managementURL,
   };
 }
@@ -66,7 +60,7 @@ export function mapUnknownCustomerInfo(message?: string): CustomerInfoSummary {
     status: 'unknown',
     activeEntitlements: [],
     managementURL: null,
-    lastStoreError: message,
+    lastStoreError: userFacingRevenueCatError(message),
   };
 }
 

@@ -9,6 +9,8 @@ import type { UserSubscriptionStatusRow } from './serverSubscriptionTypes';
 export type AppAccessDisplayState =
   | 'loading'
   | 'unknown'
+  /** RevenueCat / StoreKit cannot run (Expo Go, wrong API key, missing appl_ key, etc.). */
+  | 'rc_misconfigured'
   | 'active_trial'
   | 'active_paid'
   | 'grace_period'
@@ -29,27 +31,42 @@ function serverTrialLooksActive(row: UserSubscriptionStatusRow | null): boolean 
 }
 
 /**
- * Production access rule:
- * - Prefer `user_subscription_status.entitlement_active` from Supabase (webhook mirror).
- * - If there is no server row yet (e.g. purchase before first webhook), allow when the store
- *   (RevenueCat) shows an active Pro entitlement so the user is not locked out briefly.
- * - Import credits never unlock the app without an active subscription (handled separately).
+ * Production access rule (membership unlocks the app — **not** import credits):
+ * - Access when **either** Supabase `user_subscription_status.entitlement_active` **or** RevenueCat shows
+ *   active `propfolio_pro`, so a new purchase unlocks the app before the webhook writes the server row.
+ * - Exception: server `billing_issue_detected` + inactive entitlement locks the app first.
+ * - Wallet / `current_balance` is intentionally ignored here; see `membershipCreditRules.ts` and `useImportGate`.
  */
 export function computeAppAccess(params: {
   accessHydrated: boolean;
   serverRow: UserSubscriptionStatusRow | null;
   storeSummary: CustomerInfoSummary;
   serverFetchFailed: boolean;
+  /** From `getRevenueCatEnvironmentBlockReason()` — SDK cannot be used in this binary/environment. */
+  revenueCatEnvironmentBlock: string | null;
 }): AppAccessComputed {
   if (!params.accessHydrated) {
     return { hasAppAccess: false, displayState: 'loading' };
+  }
+
+  /** Server-reported billing problem: lock the app even if the store SDK still shows an entitlement briefly. */
+  if (
+    params.serverRow &&
+    params.serverRow.billing_issue_detected &&
+    !params.serverRow.entitlement_active
+  ) {
+    return { hasAppAccess: false, displayState: 'billing_issue' };
   }
 
   const serverActive = params.serverRow?.entitlement_active === true;
   const hasServerRow = params.serverRow != null;
   const storeActive = hasPremiumAccess(params.storeSummary);
 
-  const hasAppAccess = serverActive || (!hasServerRow && storeActive);
+  /**
+   * Membership access: server mirror OR RevenueCat `propfolio_pro` (whichever is true).
+   * Lets new purchases unlock the app before the first webhook updates `user_subscription_status`.
+   */
+  const hasAppAccess = serverActive || storeActive;
 
   if (hasAppAccess) {
     if (params.storeSummary.status === 'grace_period') {
@@ -64,12 +81,8 @@ export function computeAppAccess(params: {
     return { hasAppAccess: true, displayState: 'active_paid' };
   }
 
-  if (
-    params.serverRow &&
-    params.serverRow.billing_issue_detected &&
-    !params.serverRow.entitlement_active
-  ) {
-    return { hasAppAccess: false, displayState: 'billing_issue' };
+  if (params.revenueCatEnvironmentBlock) {
+    return { hasAppAccess: false, displayState: 'rc_misconfigured' };
   }
 
   if (params.serverFetchFailed && params.storeSummary.status === 'unknown') {

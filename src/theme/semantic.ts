@@ -22,6 +22,8 @@ export const semantic = {
 
   accentGold: '#D9B056',
   accentGoldPressed: '#B8942E',
+  /** Slightly lighter than pressed — readable rim on circular nav buttons without a harsh ring */
+  accentGoldNavRim: '#C9A23D',
   accentGoldMuted: 'rgba(217, 176, 86, 0.16)',
   /** Text on gold buttons */
   accentGoldText: '#FFFFFF',

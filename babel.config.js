@@ -7,8 +7,11 @@ module.exports = function (api) {
         'module-resolver',
         {
           root: ['./'],
-          alias: { '@': './src' },
-          extensions: ['.ios.js', '.android.js', '.js', '.ts', '.tsx', '.json'],
+          alias: {
+            '@': './src',
+            '@listingUrlCore': './supabase/functions/_shared/listingUrlCore.ts',
+          },
+          extensions: ['.ios.js', '.android.js', '.js', '.ts', '.tsx', '.json', '.png'],
         },
       ],
     ],

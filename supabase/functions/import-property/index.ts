@@ -1,21 +1,22 @@
 /**
  * import-property — canonical property import Edge Function.
  * Persists: properties, property_imports (audit), property_snapshots (history).
- * Consumes one server credit per successful import via consume_import_credit (idempotent per correlationId).
+ * Consumes one server credit only when the saved property is `ready` (complete import), via
+ * consume_import_credit (idempotent per correlationId). Draft/error/partial imports do not charge.
  */
 import { requireAuthedUser } from '../_shared/auth.ts';
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts';
 import { logStructured } from '../_shared/logger.ts';
-import { fetchPropertyRecord, fetchRentLongTerm } from '../_shared/providers/rentcast.ts';
+import { loadOrFetchRentcastEnrichment } from '../_shared/import/rentcastEnrichment.ts';
+import { getServiceSupabase } from '../_shared/supabaseAdmin.ts';
 import {
   checkImportSubscriptionPreflight,
-  consumeImportCreditAfterSave,
-  deletePropertyAfterFailedCredit,
+  finalizeCreditForSavedImport,
   findCompletedPropertyIdForCorrelation,
   getWalletBalance,
   loadPropertyForReplay,
 } from './credits.ts';
-import { parseListingUrl, sanitizeListingUrl } from './listingUrl.ts';
+import { prepareListingUrlForImport, type ListingParseResult } from './listingUrl.ts';
 import { buildSnapshotAndMissing, type ResolvedPlace } from './snapshot.ts';
 
 type Mode = 'listing_url' | 'manual_place';
@@ -28,7 +29,8 @@ type Body = {
   investmentStrategy?: unknown;
 };
 
-const RENTCAST_TIMEOUT_MS = 14_000;
+/** RentCast property + rent AVM run in parallel; allow slow provider responses without premature abort. */
+const RENTCAST_TIMEOUT_MS = 22_000;
 
 type SupabaseUserClient = Awaited<ReturnType<typeof requireAuthedUser>>['supabase'];
 
@@ -81,6 +83,211 @@ function normalizePropertyStatus(s: string): 'draft' | 'ready' | 'error' {
   return 'draft';
 }
 
+function tryServiceSupabase(): ReturnType<typeof getServiceSupabase> | null {
+  try {
+    return getServiceSupabase();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Shared path: RentCast enrichment (with cache) → snapshot → DB → credit → audit log.
+ */
+async function executeImportSave(args: {
+  supabase: SupabaseUserClient;
+  userId: string;
+  correlationId: string;
+  investmentStrategy: 'buy_hold' | 'fix_flip';
+  listing: ListingParseResult | null;
+  place: ResolvedPlace | null;
+  addressLine: string;
+  sourceType: 'zillow_url' | 'redfin_url' | 'manual_address';
+  sourceUrl: string | null;
+  rawInput: string;
+  rentcastKey: string;
+  auditSourceType: string;
+  completeGeocoding: 'place_resolved' | 'slug_hint';
+  auditGeocoding: 'resolved' | 'hint_only' | 'place_resolved';
+}): Promise<Response> {
+  const t0 = Date.now();
+  const admin = tryServiceSupabase();
+
+  const tRc = Date.now();
+  const enrichment = await loadOrFetchRentcastEnrichment({
+    supabaseAdmin: admin,
+    placeId: args.place?.placeId,
+    addressLine: args.addressLine,
+    apiKey: args.rentcastKey,
+    timeoutMs: RENTCAST_TIMEOUT_MS,
+  });
+
+  logStructured({
+    scope: 'import',
+    step: enrichment.fromCache ? 'rentcast_cache_hit' : 'rentcast_fetched',
+    status: 'ok',
+    correlationId: args.correlationId,
+    userId: args.userId,
+    sourceType: args.auditSourceType,
+    extra: { ms: Date.now() - tRc, fromCache: enrichment.fromCache },
+  });
+
+  if (!args.rentcastKey) {
+    logStructured(
+      {
+        scope: 'import',
+        step: 'rentcast_property',
+        status: 'skip',
+        correlationId: args.correlationId,
+        userId: args.userId,
+        message: 'RENTCAST_API_KEY missing',
+      },
+      'warn',
+    );
+  } else if (!enrichment.fromCache) {
+    logStructured({
+      scope: 'import',
+      step: 'rentcast_property',
+      status: enrichment.rcProp ? 'ok' : 'fail',
+      correlationId: args.correlationId,
+      userId: args.userId,
+      sourceType: args.auditSourceType,
+      provider: 'rentcast',
+      message: enrichment.rcProp ? 'ok' : (enrichment.propErr ?? ''),
+    });
+    logStructured({
+      scope: 'import',
+      step: 'rentcast_rent',
+      status: enrichment.rcRent ? 'ok' : 'partial',
+      correlationId: args.correlationId,
+      userId: args.userId,
+      sourceType: args.auditSourceType,
+      provider: 'rentcast',
+      message: enrichment.rcRent ? 'ok' : (enrichment.rentErr ?? ''),
+    });
+  }
+
+  const { rcProp, rcRent, propErr, rentErr } = enrichment;
+
+  const { snapshot: snapBase, missingFields } = buildSnapshotAndMissing({
+    listing: args.listing,
+    place: args.place,
+    addressForRentcast: args.addressLine,
+    rentcastProperty: rcProp,
+    rentcastRent: rcRent,
+  });
+  const snapshot = { ...snapBase, investmentStrategy: args.investmentStrategy };
+
+  const formatted = snapshot.address.formatted?.trim() ?? '';
+  const status = !formatted ? 'error' : missingFields.length ? 'draft' : 'ready';
+
+  const { data: inserted, error: insErr } = await args.supabase
+    .from('properties')
+    .insert({
+      user_id: args.userId,
+      source_type: args.sourceType,
+      source_url: args.sourceUrl,
+      raw_input: args.rawInput,
+      status,
+      missing_fields: missingFields,
+      snapshot: snapshot as unknown as Record<string, unknown>,
+      place_id: args.place?.placeId ?? null,
+      formatted_address: formatted || null,
+      latitude: snapshot.geo.lat,
+      longitude: snapshot.geo.lng,
+      last_import_error: propErr || rentErr || null,
+    })
+    .select('id')
+    .single();
+
+  if (insErr || !inserted) {
+    logStructured(
+      {
+        scope: 'import',
+        step: 'db_insert',
+        status: 'fail',
+        correlationId: args.correlationId,
+        userId: args.userId,
+        message: insErr?.message ?? 'insert failed',
+      },
+      'error',
+    );
+    return jsonResponse({
+      ok: false,
+      error:
+        insErr?.message?.includes('row-level security') || insErr?.message?.includes('RLS')
+          ? 'Could not save this import due to account permissions. Try signing out and back in.'
+          : 'Could not save property. Check your connection and try again.',
+      code: 'DB_ERROR',
+    });
+  }
+
+  const propertyId = inserted.id as string;
+  const duration = Date.now() - t0;
+
+  await recordSnapshotVersion(args.supabase, {
+    user_id: args.userId,
+    property_id: propertyId,
+    snapshot: snapshot as unknown as Record<string, unknown>,
+    correlation_id: args.correlationId,
+  });
+
+  const creditResult = await finalizeCreditForSavedImport(
+    args.supabase,
+    args.userId,
+    propertyId,
+    args.correlationId,
+    status,
+  );
+  if (!creditResult.ok) {
+    return jsonResponse(creditResult.body, creditResult.httpStatus);
+  }
+
+  const importPayload: Record<string, unknown> = {
+    geocoding: args.auditGeocoding,
+    providerProperty: rcProp ? 'ok' : propErr,
+    providerRent: rcRent ? 'ok' : rentErr,
+    missingFields,
+  };
+  if (args.listing?.parsingStatus != null) {
+    importPayload.parsing = args.listing.parsingStatus;
+  }
+
+  await insertPropertyImportRow(args.supabase, {
+    user_id: args.userId,
+    property_id: propertyId,
+    correlation_id: args.correlationId,
+    source_type: args.auditSourceType,
+    step: 'complete',
+    status,
+    payload: importPayload,
+    duration_ms: duration,
+  });
+
+  logStructured({
+    scope: 'import',
+    step: 'complete',
+    status: status === 'ready' ? 'ok' : 'partial',
+    correlationId: args.correlationId,
+    userId: args.userId,
+    sourceType: args.auditSourceType,
+    parsing: args.listing?.parsingStatus,
+    geocoding: args.completeGeocoding,
+    provider: 'rentcast',
+    missingFields,
+  });
+
+  return jsonResponse({
+    ok: true,
+    propertyId,
+    status,
+    missingFields,
+    snapshot,
+    balance_after: creditResult.balanceAfter,
+    credit_consumed: creditResult.creditConsumed,
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -100,13 +307,11 @@ Deno.serve(async (req: Request) => {
         ? body.investmentStrategy
         : null;
     if (!investmentStrategy) {
-      return jsonResponse(
-        {
-          error: 'investmentStrategy is required and must be buy_hold or fix_flip',
-          code: 'VALIDATION_ERROR',
-        },
-        400,
-      );
+      return jsonResponse({
+        ok: false,
+        error: 'investmentStrategy is required and must be buy_hold or fix_flip',
+        code: 'VALIDATION_ERROR',
+      });
     }
 
     const rentcastKey = Deno.env.get('RENTCAST_API_KEY') ?? '';
@@ -114,15 +319,52 @@ Deno.serve(async (req: Request) => {
     if (body.mode === 'listing_url') {
       const rawUrl = (body.url ?? '').trim();
       if (!rawUrl) {
-        return jsonResponse({ error: 'url required', code: 'VALIDATION_ERROR' }, 400);
+        return jsonResponse({
+          ok: false,
+          error: 'Enter a valid Zillow or Redfin property link.',
+          code: 'VALIDATION_ERROR',
+        });
       }
-      const safeUrl = sanitizeListingUrl(rawUrl);
-      const parsed = parseListingUrl(safeUrl);
+
+      logStructured({
+        scope: 'import',
+        step: 'listing_url_received',
+        status: 'ok',
+        correlationId,
+        userId,
+        extra: { rawLen: rawUrl.length },
+      });
+
+      const { parsed, resolvedUrl } = await prepareListingUrlForImport(rawUrl);
+
+      logStructured({
+        scope: 'import',
+        step: 'listing_url_normalized',
+        status: parsed && !('unsupported' in parsed) ? 'ok' : 'fail',
+        correlationId,
+        userId,
+        extra: { resolvedHost: (() => {
+          try {
+            return new URL(resolvedUrl).hostname;
+          } catch {
+            return '';
+          }
+        })() },
+      });
+
       if (!parsed) {
-        return jsonResponse({ error: 'Invalid listing URL', code: 'VALIDATION_ERROR' }, 400);
+        return jsonResponse({
+          ok: false,
+          error: 'We couldn’t read this listing link. Try copying the main property page URL again.',
+          code: 'INVALID_URL',
+        });
       }
       if ('unsupported' in parsed) {
-        return jsonResponse({ error: parsed.message, code: 'UNSUPPORTED_HOST' }, 400);
+        return jsonResponse({
+          ok: false,
+          error: parsed.message,
+          code: parsed.code ?? 'UNSUPPORTED_PAGE',
+        });
       }
 
       const place = body.resolvedPlace ?? null;
@@ -173,6 +415,7 @@ Deno.serve(async (req: Request) => {
       if (existingListingPid) {
         const replay = await loadPropertyForReplay(supabase, userId, existingListingPid);
         if (replay) {
+          const replayBal = await getWalletBalance(supabase, userId);
           return jsonResponse({
             ok: true,
             propertyId: existingListingPid,
@@ -180,6 +423,8 @@ Deno.serve(async (req: Request) => {
             missingFields: replay.missingFields,
             snapshot: replay.snapshot,
             idempotentReplay: true,
+            balance_after: replayBal,
+            credit_consumed: false,
           });
         }
       }
@@ -205,194 +450,32 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const t0 = Date.now();
-      let rcProp: Record<string, unknown> | null = null;
-      let rcRent: Record<string, unknown> | null = null;
-      let propErr: string | null = null;
-      let rentErr: string | null = null;
-
-      if (rentcastKey) {
-        const pr = await fetchPropertyRecord(addressLine, rentcastKey, RENTCAST_TIMEOUT_MS);
-        logStructured({
-          scope: 'import',
-          step: 'rentcast_property',
-          status: pr.ok && pr.record ? 'ok' : 'fail',
-          correlationId,
-          userId,
-          sourceType: sourceTypeLog,
-          provider: 'rentcast',
-          message: pr.ok ? 'ok' : pr.ok === false ? pr.error : '',
-        });
-        if (pr.ok && pr.record) {
-          rcProp = pr.record;
-        } else if (!pr.ok) {
-          propErr = pr.error;
-        }
-
-        const rr = await fetchRentLongTerm(addressLine, rentcastKey, RENTCAST_TIMEOUT_MS);
-        logStructured({
-          scope: 'import',
-          step: 'rentcast_rent',
-          status: rr.ok && rr.data ? 'ok' : 'partial',
-          correlationId,
-          userId,
-          sourceType: sourceTypeLog,
-          provider: 'rentcast',
-          message: rr.ok ? 'ok' : rr.ok === false ? rr.error : '',
-        });
-        if (rr.ok && rr.data) {
-          rcRent = rr.data;
-        } else if (!rr.ok) {
-          rentErr = rr.error;
-        }
-      } else {
-        logStructured(
-          {
-            scope: 'import',
-            step: 'rentcast_property',
-            status: 'skip',
-            correlationId,
-            userId,
-            message: 'RENTCAST_API_KEY missing',
-          },
-          'warn',
-        );
-        propErr = 'rentcast_not_configured';
-        rentErr = 'rentcast_not_configured';
-      }
-
-      const { snapshot: snapBase, missingFields } = buildSnapshotAndMissing({
-        listing: parsed,
-        place,
-        addressForRentcast: addressLine,
-        rentcastProperty: rcProp,
-        rentcastRent: rcRent,
-      });
-      const snapshot = { ...snapBase, investmentStrategy };
-
-      const formatted = snapshot.address.formatted?.trim() ?? '';
-      const status = !formatted ? 'error' : missingFields.length ? 'draft' : 'ready';
-
-      const sourceType = parsed.provider === 'zillow' ? 'zillow_url' : 'redfin_url';
-
-      const { data: inserted, error: insErr } = await supabase
-        .from('properties')
-        .insert({
-          user_id: userId,
-          source_type: sourceType,
-          source_url: parsed.canonicalUrl,
-          raw_input: rawUrl.slice(0, 2048),
-          status,
-          missing_fields: missingFields,
-          snapshot: snapshot as unknown as Record<string, unknown>,
-          place_id: place?.placeId ?? null,
-          formatted_address: formatted || null,
-          latitude: snapshot.geo.lat,
-          longitude: snapshot.geo.lng,
-          last_import_error: propErr || rentErr || null,
-        })
-        .select('id')
-        .single();
-
-      if (insErr || !inserted) {
-        logStructured(
-          {
-            scope: 'import',
-            step: 'db_insert',
-            status: 'fail',
-            correlationId,
-            userId,
-            message: insErr?.message ?? 'insert failed',
-          },
-          'error',
-        );
-        return jsonResponse({ error: 'Could not save property', code: 'DB_ERROR' }, 500);
-      }
-
-      const propertyId = inserted.id as string;
-      const duration = Date.now() - t0;
-
-      await recordSnapshotVersion(supabase, {
-        user_id: userId,
-        property_id: propertyId,
-        snapshot: snapshot as unknown as Record<string, unknown>,
-        correlation_id: correlationId,
-      });
-
-      const creditListing = await consumeImportCreditAfterSave(
+      const stUrl = parsed.provider === 'zillow' ? 'zillow_url' : 'redfin_url';
+      return executeImportSave({
         supabase,
         userId,
-        propertyId,
         correlationId,
-      );
-      if (!creditListing.ok) {
-        await deletePropertyAfterFailedCredit(supabase, propertyId);
-        if (creditListing.code === 'insufficient_credits') {
-          return jsonResponse({
-            ok: false,
-            code: 'INSUFFICIENT_CREDITS',
-            message: 'You have no import credits left. Add credits or subscribe to continue.',
-            balance_after: creditListing.balanceAfter ?? 0,
-          });
-        }
-        if (creditListing.code === 'subscription_required') {
-          return jsonResponse({
-            ok: false,
-            code: 'SUBSCRIPTION_REQUIRED',
-            message: 'An active PropFolio membership is required to import properties.',
-            balance_after: creditListing.balanceAfter ?? 0,
-          });
-        }
-        return jsonResponse({
-          ok: false,
-          code: 'CREDIT_CONSUME_FAILED',
-          message: creditListing.rpcMessage ?? 'Could not apply import credit.',
-        });
-      }
-
-      await insertPropertyImportRow(supabase, {
-        user_id: userId,
-        property_id: propertyId,
-        correlation_id: correlationId,
-        source_type: sourceType,
-        step: 'complete',
-        status,
-        payload: {
-          parsing: parsed.parsingStatus,
-          geocoding: place ? 'resolved' : 'hint_only',
-          providerProperty: rcProp ? 'ok' : propErr,
-          providerRent: rcRent ? 'ok' : rentErr,
-          missingFields,
-        },
-        duration_ms: duration,
-      });
-
-      logStructured({
-        scope: 'import',
-        step: 'complete',
-        status: status === 'ready' ? 'ok' : 'partial',
-        correlationId,
-        userId,
-        sourceType,
-        parsing: parsed.parsingStatus,
-        geocoding: place ? 'place_resolved' : 'slug_hint',
-        provider: 'rentcast',
-        missingFields,
-      });
-
-      return jsonResponse({
-        ok: true,
-        propertyId,
-        status,
-        missingFields,
-        snapshot,
-        balance_after: creditListing.balanceAfter,
+        investmentStrategy,
+        listing: parsed,
+        place,
+        addressLine,
+        sourceType: stUrl,
+        sourceUrl: parsed.canonicalUrl,
+        rawInput: rawUrl.slice(0, 2048),
+        rentcastKey,
+        auditSourceType: stUrl,
+        completeGeocoding: place ? 'place_resolved' : 'slug_hint',
+        auditGeocoding: place ? 'resolved' : 'hint_only',
       });
     }
 
     const place = body.resolvedPlace;
     if (!place?.placeId || !place.formattedAddress?.trim()) {
-      return jsonResponse({ error: 'resolvedPlace required', code: 'VALIDATION_ERROR' }, 400);
+      return jsonResponse({
+        ok: false,
+        error: 'resolvedPlace required',
+        code: 'VALIDATION_ERROR',
+      });
     }
 
     const existingManualPid = await findCompletedPropertyIdForCorrelation(
@@ -403,6 +486,7 @@ Deno.serve(async (req: Request) => {
     if (existingManualPid) {
       const replayManual = await loadPropertyForReplay(supabase, userId, existingManualPid);
       if (replayManual) {
+        const replayBalManual = await getWalletBalance(supabase, userId);
         return jsonResponse({
           ok: true,
           propertyId: existingManualPid,
@@ -410,6 +494,8 @@ Deno.serve(async (req: Request) => {
           missingFields: replayManual.missingFields,
           snapshot: replayManual.snapshot,
           idempotentReplay: true,
+          balance_after: replayBalManual,
+          credit_consumed: false,
         });
       }
     }
@@ -435,144 +521,23 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const t0 = Date.now();
-    let rcProp: Record<string, unknown> | null = null;
-    let rcRent: Record<string, unknown> | null = null;
-    let propErr: string | null = null;
-    let rentErr: string | null = null;
-
     const addressLine = place.formattedAddress.trim();
 
-    if (rentcastKey) {
-      const pr = await fetchPropertyRecord(addressLine, rentcastKey, RENTCAST_TIMEOUT_MS);
-      if (pr.ok && pr.record) {
-        rcProp = pr.record;
-      } else if (!pr.ok) {
-        propErr = pr.error;
-      }
-
-      const rr = await fetchRentLongTerm(addressLine, rentcastKey, RENTCAST_TIMEOUT_MS);
-      if (rr.ok && rr.data) {
-        rcRent = rr.data;
-      } else if (!rr.ok) {
-        rentErr = rr.error;
-      }
-    } else {
-      propErr = 'rentcast_not_configured';
-      rentErr = 'rentcast_not_configured';
-    }
-
-    const { snapshot: snapBase, missingFields } = buildSnapshotAndMissing({
-      listing: null,
-      place,
-      addressForRentcast: addressLine,
-      rentcastProperty: rcProp,
-      rentcastRent: rcRent,
-    });
-    const snapshot = { ...snapBase, investmentStrategy };
-
-    const formatted = snapshot.address.formatted?.trim() ?? '';
-    const status = !formatted ? 'error' : missingFields.length ? 'draft' : 'ready';
-
-    const { data: inserted, error: insErr } = await supabase
-      .from('properties')
-      .insert({
-        user_id: userId,
-        source_type: 'manual_address',
-        source_url: null,
-        raw_input: addressLine.slice(0, 500),
-        status,
-        missing_fields: missingFields,
-        snapshot: snapshot as unknown as Record<string, unknown>,
-        place_id: place.placeId,
-        formatted_address: formatted || null,
-        latitude: snapshot.geo.lat,
-        longitude: snapshot.geo.lng,
-        last_import_error: propErr || rentErr || null,
-      })
-      .select('id')
-      .single();
-
-    if (insErr || !inserted) {
-      return jsonResponse({ error: 'Could not save property', code: 'DB_ERROR' }, 500);
-    }
-
-    const propertyId = inserted.id as string;
-    const duration = Date.now() - t0;
-
-    await recordSnapshotVersion(supabase, {
-      user_id: userId,
-      property_id: propertyId,
-      snapshot: snapshot as unknown as Record<string, unknown>,
-      correlation_id: correlationId,
-    });
-
-    const creditManual = await consumeImportCreditAfterSave(
+    return executeImportSave({
       supabase,
       userId,
-      propertyId,
       correlationId,
-    );
-    if (!creditManual.ok) {
-      await deletePropertyAfterFailedCredit(supabase, propertyId);
-      if (creditManual.code === 'insufficient_credits') {
-        return jsonResponse({
-          ok: false,
-          code: 'INSUFFICIENT_CREDITS',
-          message: 'You have no import credits left. Add credits or subscribe to continue.',
-          balance_after: creditManual.balanceAfter ?? 0,
-        });
-      }
-      if (creditManual.code === 'subscription_required') {
-        return jsonResponse({
-          ok: false,
-          code: 'SUBSCRIPTION_REQUIRED',
-          message: 'An active PropFolio membership is required to import properties.',
-          balance_after: creditManual.balanceAfter ?? 0,
-        });
-      }
-      return jsonResponse({
-        ok: false,
-        code: 'CREDIT_CONSUME_FAILED',
-        message: creditManual.rpcMessage ?? 'Could not apply import credit.',
-      });
-    }
-
-    await insertPropertyImportRow(supabase, {
-      user_id: userId,
-      property_id: propertyId,
-      correlation_id: correlationId,
-      source_type: 'manual_address',
-      step: 'complete',
-      status,
-      payload: {
-        geocoding: 'place_resolved',
-        providerProperty: rcProp ? 'ok' : propErr,
-        providerRent: rcRent ? 'ok' : rentErr,
-        missingFields,
-      },
-      duration_ms: duration,
-    });
-
-    logStructured({
-      scope: 'import',
-      step: 'complete',
-      status: status === 'ready' ? 'ok' : 'partial',
-      correlationId,
-      userId,
+      investmentStrategy,
+      listing: null,
+      place,
+      addressLine,
       sourceType: 'manual_address',
-      geocoding: 'place_resolved',
-      provider: 'rentcast',
-      missingFields,
-    });
-
-    return jsonResponse({
-      ok: true,
-      propertyId,
-      status,
-      missingFields,
-      snapshot,
-      balance_after: creditManual.balanceAfter,
+      sourceUrl: null,
+      rawInput: addressLine.slice(0, 500),
+      rentcastKey,
+      auditSourceType: 'manual_address',
+      completeGeocoding: 'place_resolved',
+      auditGeocoding: 'place_resolved',
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error';
@@ -580,7 +545,11 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401);
     }
     if (msg === 'SERVER_MISCONFIGURED') {
-      return jsonResponse({ error: 'Server misconfigured', code: 'SERVER_MISCONFIGURED' }, 500);
+      return jsonResponse({
+        ok: false,
+        error: 'Server misconfigured',
+        code: 'SERVER_MISCONFIGURED',
+      });
     }
     logStructured(
       {
@@ -592,6 +561,10 @@ Deno.serve(async (req: Request) => {
       },
       'error',
     );
-    return jsonResponse({ error: 'Server error', code: 'INTERNAL' }, 500);
+    return jsonResponse({
+      ok: false,
+      error: 'Something went wrong. Please try again in a moment.',
+      code: 'INTERNAL',
+    });
   }
 });

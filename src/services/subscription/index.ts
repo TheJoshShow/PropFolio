@@ -2,5 +2,13 @@ export type { AppAccessComputed, AppAccessDisplayState } from './computeAppAcces
 export { computeAppAccess } from './computeAppAccess';
 export { PREMIUM_ENTITLEMENT_ID } from './constants';
 export { hasPremiumAccess, subscriptionTierLabel, subscriptionStatusDetail } from './entitlementLogic';
+export {
+  canAccessApp,
+  canPurchaseCreditPacks,
+  canRunImport,
+  hasActiveMembership,
+  hasImportCredits,
+  hasPropfolioProEntitlement,
+} from './membershipCreditRules';
 export { fetchUserSubscriptionStatus } from './fetchServerSubscription';
 export type { UserSubscriptionStatusRow } from './serverSubscriptionTypes';

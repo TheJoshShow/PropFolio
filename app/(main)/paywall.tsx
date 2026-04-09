@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,22 +11,31 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  AppCloseButton,
+  HeaderActionSpacer,
+  headerLeadingInset,
+  headerTrailingInset,
+  stackHeaderTitleStyle,
+  stackModalHeaderBarStyle,
+} from '@/components/navigation';
 import { AppButton, Card, Screen } from '@/components/ui';
 import { LEGAL_PRIVACY_POLICY_URL, LEGAL_TERMS_OF_SERVICE_URL } from '@/config';
-import { BILLING_COPY, CreditWalletSummaryCard } from '@/features/billing';
+import {
+  BILLING_COPY,
+  CreditWalletSummaryCard,
+  logPaywallBillingDeveloperDiagnostics,
+  PaywallBillingStatusPanel,
+  resolvePaywallBillingState,
+} from '@/features/billing';
 import { useSubscription } from '@/features/subscription';
 import { openLegalDocument } from '@/lib/openLegalDocument';
+import { getRevenueCatEnvironmentBlockState } from '@/services/revenuecat';
 import { STORE_PRODUCT_IDS } from '@/services/revenuecat/productIds';
 import type { PaywallCatalog, PaywallPackageOption } from '@/services/revenuecat/types';
 import { colors, hitSlop, layout, spacing, typography } from '@/theme';
-
-const VALUE_BULLETS = [
-  'Full confidence scoring & scenario modeling',
-  BILLING_COPY.signupCredits,
-  BILLING_COPY.cycleCredits,
-  'Deterministic numbers — never “AI guess” metrics',
-];
 
 function SubscriptionRow({
   pkg,
@@ -47,11 +56,12 @@ function SubscriptionRow({
       <View style={styles.packRow}>
         <View style={styles.packText}>
           <Text style={styles.packTitle}>{isMonthly ? BILLING_COPY.subscriptionHeadline : pkg.title}</Text>
-          <Text style={styles.packDesc} numberOfLines={4}>
+          <Text style={styles.packDesc} numberOfLines={isMonthly ? 3 : 4}>
             {isMonthly ? BILLING_COPY.subscriptionTagline : pkg.description || 'Membership'}
           </Text>
-          {isMonthly ? <Text style={styles.packMicro}>{BILLING_COPY.subscriptionDetail}</Text> : null}
-          {isMonthly ? <Text style={styles.priceHint}>{BILLING_COPY.priceAfterFreeMonthHint}</Text> : null}
+          {isMonthly ? (
+            <Text style={styles.packIncludes}>{BILLING_COPY.paywallSubscriptionIncludesMonthlyImport}</Text>
+          ) : null}
         </View>
         <View style={styles.packRight}>
           <Text style={styles.packPrice}>{pkg.priceString}</Text>
@@ -69,6 +79,8 @@ function SubscriptionRow({
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const sub = useSubscription();
   const [catalog, setCatalog] = useState<PaywallCatalog | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -78,6 +90,17 @@ export default function PaywallScreen() {
     try {
       const c = await sub.loadPaywallCatalog();
       setCatalog(c);
+      if (__DEV__) {
+        logPaywallBillingDeveloperDiagnostics(
+          resolvePaywallBillingState({
+            envBlock: getRevenueCatEnvironmentBlockState(),
+            catalog: c,
+            catalogLoading: false,
+            isPremium: sub.hasAppAccess,
+          }),
+          'paywall_catalog_loaded',
+        );
+      }
     } finally {
       setCatalogLoading(false);
     }
@@ -89,6 +112,31 @@ export default function PaywallScreen() {
     }, [loadCatalog]),
   );
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitleAlign: 'center',
+      headerLargeTitle: false,
+      headerShadowVisible: false,
+      headerStyle: stackModalHeaderBarStyle,
+      headerTitleStyle: stackHeaderTitleStyle,
+      headerLeft: () => <HeaderActionSpacer />,
+      headerRight: () => <AppCloseButton onPress={() => router.back()} testID="propfolio.paywall.close" />,
+      headerLeftContainerStyle: headerLeadingInset(insets.left),
+      headerRightContainerStyle: headerTrailingInset(insets.right),
+    });
+  }, [navigation, router, insets.left, insets.right]);
+
+  const billingResolution = useMemo(
+    () =>
+      resolvePaywallBillingState({
+        envBlock: getRevenueCatEnvironmentBlockState(),
+        catalog,
+        catalogLoading,
+        isPremium: sub.hasAppAccess,
+      }),
+    [catalog, catalogLoading, sub.hasAppAccess],
+  );
+
   const onSubscribe = useCallback(async () => {
     await sub.purchaseSubscription();
   }, [sub]);
@@ -97,66 +145,45 @@ export default function PaywallScreen() {
   const showManage =
     sub.isPremium && sub.customerInfo.managementURL && typeof sub.customerInfo.managementURL === 'string';
 
+  const creditTopUpDisabled =
+    busy || !sub.canPurchaseCreditPacks || !billingResolution.storeCatalogReachable;
+
   return (
     <Screen
       scroll={false}
-      safeAreaEdges={['bottom', 'left', 'right']}
+      safeAreaEdges={['top', 'bottom', 'left', 'right']}
       contentContainerStyle={styles.flex}
       testID="propfolio.paywall"
     >
       <ScrollView
+        style={styles.scroll}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={catalogLoading} onRefresh={() => void loadCatalog()} />
         }
       >
-        <Pressable
-          style={styles.close}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          hitSlop={hitSlop}
-        >
-          <Text style={styles.closeText}>Close</Text>
-        </Pressable>
-
         <View style={styles.mark}>
           <Ionicons name="layers-outline" size={36} color={colors.accentScore} />
         </View>
         <Text style={styles.title}>{BILLING_COPY.paywallTitle}</Text>
         <Text style={styles.subtitle}>{BILLING_COPY.paywallSubtitle}</Text>
 
-        <CreditWalletSummaryCard compact />
+        <PaywallBillingStatusPanel resolution={billingResolution} />
+
+        <CreditWalletSummaryCard compact paywallEmbed />
 
         <Card elevation="xs" style={styles.planCard}>
-          <Text style={styles.planCardTitle}>How billing works</Text>
-          <Text style={styles.planLine}>
-            <Text style={styles.planEm}>Membership: </Text>
-            {BILLING_COPY.subscriptionTagline}. {BILLING_COPY.subscriptionDetail}
-          </Text>
-          <Text style={styles.planLine}>
-            <Text style={styles.planEm}>Credits: </Text>
-            {BILLING_COPY.signupCredits} {BILLING_COPY.cycleCredits}
-          </Text>
-          <Text style={styles.planLineMuted}>{BILLING_COPY.topUpIntro}</Text>
-          <Text style={styles.packGrid}>
-            Extra credits: {BILLING_COPY.packLadderShort} — Apple charges the live price at purchase.
-          </Text>
+          <Text style={styles.planCardTitleCaps}>{BILLING_COPY.paywallHowBillingWorksTitle}</Text>
+          <Text style={styles.planLine}>{BILLING_COPY.paywallHowBillingWorksMembershipLine}</Text>
+          <Text style={styles.planLineCredits}>{BILLING_COPY.paywallHowBillingWorksCreditsLine}</Text>
         </Card>
 
         {sub.storeNotice ? (
           <Card elevation="xs" style={styles.notice}>
             <Text style={styles.noticeText}>{sub.storeNotice}</Text>
             <AppButton label="Dismiss" variant="ghost" onPress={sub.clearStoreNotice} />
-          </Card>
-        ) : null}
-
-        {catalog?.sdkMessage ? (
-          <Card elevation="xs" style={styles.warnCard}>
-            <Text style={styles.warnText}>{catalog.sdkMessage}</Text>
-            <Text style={styles.warnHint}>
-              Use an iOS development build (not Expo Go), set RevenueCat keys, and match offering identifiers in `.env`.
-            </Text>
           </Card>
         ) : null}
 
@@ -178,7 +205,7 @@ export default function PaywallScreen() {
             ) : null}
           </Card>
         ) : (
-          <Text style={styles.sectionLabel}>Start membership</Text>
+          <Text style={styles.sectionLabel}>{BILLING_COPY.startMembershipCta}</Text>
         )}
 
         {!sub.isPremium && catalogLoading && !catalog ? (
@@ -190,63 +217,55 @@ export default function PaywallScreen() {
             <SubscriptionRow
               key={pkg.refKey}
               pkg={pkg}
-              disabled={busy}
+              disabled={busy || !billingResolution.canPurchaseSubscription}
               loading={sub.isPurchasing}
               onPress={() => void onSubscribe()}
               highlight={pkg.storeProductId === STORE_PRODUCT_IDS.subscriptionMonthly}
             />
           ))}
 
-        {!sub.isPremium && !catalogLoading && catalog && catalog.subscriptionPackages.length === 0 ? (
-          <Text style={styles.empty}>{BILLING_COPY.catalogSetupHint}</Text>
+        {!sub.isPremium && billingResolution.purchaseActionHint ? (
+          <Text style={styles.actionHint}>{billingResolution.purchaseActionHint}</Text>
         ) : null}
 
-        <Text style={styles.sectionLabel}>Import credits</Text>
-        <Text style={styles.sectionSub}>{BILLING_COPY.importCreditsPaywallBody}</Text>
-
-        <AppButton
-          label="Buy credit packs"
-          variant="secondary"
-          onPress={sub.openCreditTopUp}
-          disabled={busy}
-          testID="propfolio.paywall.topupCta"
-        />
-
-        <Card elevation="sm" style={styles.bullets}>
-          {VALUE_BULLETS.map((line) => (
-            <View key={line} style={styles.bulletRow}>
-              <Ionicons name="checkmark-circle" size={22} color={colors.success} />
-              <Text style={styles.bulletText}>{line}</Text>
-            </View>
-          ))}
-        </Card>
-
-        <AppButton
-          label={sub.isRestoring ? 'Restoring…' : BILLING_COPY.restore}
-          variant="ghost"
-          onPress={() => void sub.restorePurchases()}
-          disabled={busy}
-          loading={sub.isRestoring}
-        />
-
-        <Text style={styles.legalMicro}>{BILLING_COPY.legalNote}</Text>
-        <View style={styles.legalRow}>
-          <Pressable onPress={() => void openLegalDocument(LEGAL_PRIVACY_POLICY_URL)} hitSlop={hitSlop}>
-            <Text style={styles.legalLink}>Privacy Policy</Text>
-          </Pressable>
-          <Text style={styles.legalDot}> · </Text>
-          <Pressable onPress={() => void openLegalDocument(LEGAL_TERMS_OF_SERVICE_URL)} hitSlop={hitSlop}>
-            <Text style={styles.legalLink}>Terms of Service</Text>
-          </Pressable>
+        <View style={styles.importCreditsBlock}>
+          <Text style={styles.importCreditsTitle}>{BILLING_COPY.creditsHeadline}</Text>
+          <Text style={styles.importCreditsBody}>{BILLING_COPY.importCreditsPaywallBody}</Text>
+          <Text style={styles.importCreditsBody}>{BILLING_COPY.importCreditsPaywallBodySecond}</Text>
+          <AppButton
+            label={BILLING_COPY.paywallBuyCreditPacksCta}
+            variant="secondary"
+            onPress={sub.openCreditTopUp}
+            disabled={creditTopUpDisabled}
+            testID="propfolio.paywall.topupCta"
+          />
         </View>
 
-        {sub.lastError ? <Text style={styles.err}>{sub.lastError}</Text> : null}
+        <View style={styles.footerStack}>
+          <AppButton
+            label={sub.isRestoring ? 'Restoring…' : BILLING_COPY.restore}
+            variant="ghost"
+            onPress={() => void sub.restorePurchases()}
+            disabled={busy || !billingResolution.canUseRestorePurchases}
+            loading={sub.isRestoring}
+          />
+          {billingResolution.restoreDisabledExplanation && !billingResolution.canUseRestorePurchases ? (
+            <Text style={styles.restoreHint}>{billingResolution.restoreDisabledExplanation}</Text>
+          ) : null}
 
-        {sub.customerInfo.status === 'unknown' && !sub.lastError ? (
-          <Text style={styles.micro}>
-            App Store status unknown — pull to refresh or tap Restore purchases. Check network and billing setup.
-          </Text>
-        ) : null}
+          <Text style={styles.legalMicro}>{BILLING_COPY.legalNote}</Text>
+          <View style={styles.legalRow}>
+            <Pressable onPress={() => void openLegalDocument(LEGAL_PRIVACY_POLICY_URL)} hitSlop={hitSlop}>
+              <Text style={styles.legalLink}>Privacy Policy</Text>
+            </Pressable>
+            <Text style={styles.legalDot}> · </Text>
+            <Pressable onPress={() => void openLegalDocument(LEGAL_TERMS_OF_SERVICE_URL)} hitSlop={hitSlop}>
+              <Text style={styles.legalLink}>Terms of Service</Text>
+            </Pressable>
+          </View>
+
+          {sub.lastError ? <Text style={styles.err}>{sub.lastError}</Text> : null}
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -254,18 +273,12 @@ export default function PaywallScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  scroll: { flex: 1 },
   body: {
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingTop: spacing.md,
     paddingBottom: layout.listContentBottom,
     gap: spacing.md,
-  },
-  close: {
-    alignSelf: 'flex-end',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  closeText: {
-    ...typography.bodyMedium,
-    color: colors.accentCta,
   },
   mark: {
     width: 72,
@@ -295,28 +308,21 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderColor: colors.border,
   },
-  planCardTitle: {
+  planCardTitleCaps: {
     ...typography.sectionHeader,
     color: colors.textPrimary,
+    letterSpacing: 0.6,
   },
   planLine: {
     ...typography.bodySecondary,
     lineHeight: 22,
     color: colors.textPrimary,
   },
-  planEm: {
-    fontWeight: '700',
+  planLineCredits: {
+    ...typography.bodySecondary,
+    lineHeight: 22,
     color: colors.textPrimary,
-  },
-  planLineMuted: {
-    ...typography.caption,
-    color: colors.textMuted,
-    lineHeight: 18,
-  },
-  packGrid: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    lineHeight: 18,
+    marginTop: spacing.xs,
   },
   notice: {
     padding: spacing.md,
@@ -327,32 +333,44 @@ const styles = StyleSheet.create({
   noticeText: {
     ...typography.bodySecondary,
   },
-  warnCard: {
-    padding: spacing.md,
-    gap: spacing.xs,
-    borderColor: colors.warning,
+  actionHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    paddingHorizontal: spacing.xs,
   },
-  warnText: {
-    ...typography.bodyMedium,
-    color: colors.warning,
-  },
-  warnHint: {
+  restoreHint: {
     ...typography.caption,
     color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: spacing.md,
   },
   sectionLabel: {
     ...typography.sectionHeader,
-    marginTop: spacing.sm,
     color: colors.textPrimary,
   },
-  sectionSub: {
-    ...typography.caption,
-    color: colors.textMuted,
-    lineHeight: 18,
+  importCreditsBlock: {
+    gap: spacing.sm,
   },
-  spinner: { marginVertical: spacing.lg },
+  importCreditsTitle: {
+    ...typography.sectionHeader,
+    color: colors.textPrimary,
+    letterSpacing: 0.6,
+  },
+  importCreditsBody: {
+    ...typography.bodySecondary,
+    lineHeight: 22,
+    color: colors.textSecondary,
+  },
+  footerStack: {
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+    alignItems: 'stretch',
+  },
+  spinner: { marginVertical: spacing.md },
   packCard: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   packHighlight: {
     borderColor: colors.accentCta,
@@ -371,19 +389,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   packDesc: {
-    ...typography.caption,
+    ...typography.bodySecondary,
     color: colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 22,
   },
-  packMicro: {
-    ...typography.captionSmall,
-    color: colors.textMuted,
-  },
-  priceHint: {
-    ...typography.caption,
-    color: colors.accentScore,
+  packIncludes: {
+    ...typography.bodySecondary,
+    color: colors.textPrimary,
     fontWeight: '600',
-    marginTop: spacing.xs,
+    lineHeight: 22,
+    marginTop: spacing.xxs,
   },
   packRight: {
     alignItems: 'flex-end',
@@ -394,11 +409,6 @@ const styles = StyleSheet.create({
     ...typography.bodyMedium,
     fontWeight: '700',
     color: colors.textPrimary,
-  },
-  empty: {
-    ...typography.caption,
-    color: colors.textMuted,
-    lineHeight: 18,
   },
   active: {
     padding: spacing.lg,
@@ -415,20 +425,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textPrimary,
   },
-  bullets: {
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  bulletRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
-  bulletText: {
-    ...typography.body,
-    flex: 1,
-    lineHeight: 24,
-  },
   legalMicro: {
     ...typography.captionSmall,
     color: colors.textMuted,
@@ -441,7 +437,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginBottom: spacing.sm,
   },
   legalLink: {
     ...typography.bodyMedium,
@@ -456,10 +451,8 @@ const styles = StyleSheet.create({
     color: colors.danger,
     textAlign: 'center',
   },
-  micro: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
 });
+
+
+
+

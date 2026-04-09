@@ -17,33 +17,79 @@ import {
   type MonthlyIncludedGrantStatus,
   type UserCreditStateRpc,
 } from '@/services/credits';
-import { revenueCatService } from '@/services/revenuecat/revenueCatService';
+import { interpretPurchaseError } from '@/services/revenuecat/purchaseOutcome';
+import {
+  getRevenueCatEnvironmentBlockReason,
+  revenueCatService,
+} from '@/services/revenuecat/revenueCatService';
 import type { CustomerInfoSummary, PaywallCatalog } from '@/services/revenuecat/types';
+import { patchBillingDiagnosticsSub } from '@/services/billing/billingDiagnosticsStore';
 import {
   computeAppAccess,
   fetchUserSubscriptionStatus,
+  hasPremiumAccess,
   subscriptionStatusDetail,
   subscriptionTierLabel,
   type AppAccessDisplayState,
   type UserSubscriptionStatusRow,
 } from '@/services/subscription';
+import * as membershipRules from '@/services/subscription/membershipCreditRules';
 import { tryGetSupabaseClient } from '@/services/supabase';
+
+export type SubscriptionRefreshResult = {
+  isPremium: boolean;
+  hasAppAccess: boolean;
+  creditBalance: number;
+  hasImportCredits: boolean;
+  canPurchaseCreditPacks: boolean;
+  canRunImport: boolean;
+  canAccessApp: boolean;
+};
+
+function subscriptionRefreshPayload(hasAppAccess: boolean, balance: number): SubscriptionRefreshResult {
+  return {
+    isPremium: hasAppAccess,
+    hasAppAccess,
+    creditBalance: balance,
+    hasImportCredits: membershipRules.hasImportCredits({ creditBalance: balance }),
+    canPurchaseCreditPacks: membershipRules.canPurchaseCreditPacks({ hasAppAccess }),
+    canRunImport: membershipRules.canRunImport({
+      accessHydrated: true,
+      hasAppAccess,
+      creditBalance: balance,
+    }),
+    canAccessApp: membershipRules.canAccessApp({ accessHydrated: true, hasAppAccess }),
+  };
+}
 
 type SubscriptionContextValue = {
   customerInfo: CustomerInfoSummary;
-  /** @deprecated Prefer `hasAppAccess` — same value for gates. */
+  /** @deprecated Prefer `hasAppAccess` or `hasActiveMembership` — same value. */
   isPremium: boolean;
-  /** True when user may use portfolio, imports, and full analysis (active membership / free first month). */
+  /** Membership active: user may use the app (portfolio, etc.). Ignores credit balance. */
   hasAppAccess: boolean;
+  /** Same as `hasAppAccess` — explicit product language (“active membership”). */
+  hasActiveMembership: boolean;
+  canAccessApp: boolean;
+  hasImportCredits: boolean;
+  canPurchaseCreditPacks: boolean;
+  canRunImport: boolean;
   /** First server+store subscription hydration finished for this session (avoids gate flicker). */
   accessHydrated: boolean;
   accessDisplayState: AppAccessDisplayState;
   tierLabel: string;
   statusDetail: string;
-  /** Server wallet balance — authoritative for import credits (webhook grants). */
+  /** Server wallet balance — authoritative for import credits (signup, monthly grants, purchases). */
   creditBalance: number;
+  /**
+   * Apply `balance_after` from `import-property` (or similar) before a full `refresh()` completes.
+   * Does not replace `refresh()` — only avoids stale UI between success and reconciliation.
+   */
+  applyCreditBalanceHint: (balanceAfter: number | null | undefined) => void;
   /** True while the first wallet sync runs for a signed-in user — avoid showing 0 as final. */
   creditsLoading: boolean;
+  /** True only while the server credit wallet RPC is in flight (not full membership refresh). */
+  creditWalletSyncing: boolean;
   isLoading: boolean;
   isPurchasing: boolean;
   isRestoring: boolean;
@@ -51,7 +97,9 @@ type SubscriptionContextValue = {
   /** Non-error store messages (e.g. payment pending). */
   storeNotice: string | null;
   clearStoreNotice: () => void;
-  refresh: () => Promise<{ isPremium: boolean; hasAppAccess: boolean; creditBalance: number }>;
+  refresh: () => Promise<SubscriptionRefreshResult>;
+  /** Wallet snapshot only (no RevenueCat, does not toggle `creditWalletSyncing`) — Import focus + post-import reconcile. */
+  refreshCreditWalletOnly: () => Promise<void>;
   loadPaywallCatalog: () => Promise<PaywallCatalog>;
   /** Monthly membership (default package from the subscription offering). */
   purchaseSubscription: () => Promise<void>;
@@ -102,6 +150,33 @@ async function loadServerSubscriptionRow(
   return fetchUserSubscriptionStatus(client);
 }
 
+const WALLET_RPC_TIMEOUT_MS = 16_000;
+
+type WalletLoadResult = Awaited<ReturnType<typeof loadCreditWalletForUser>>;
+
+/** Race wallet RPC so `creditWalletSyncing` cannot hang indefinitely if Supabase stalls. */
+async function loadCreditWalletForUserWithTimeout(
+  userId: string | undefined | null,
+): Promise<WalletLoadResult | null> {
+  if (!userId) {
+    return loadCreditWalletForUser(userId);
+  }
+  try {
+    return await Promise.race([
+      loadCreditWalletForUser(userId),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('wallet_timeout')), WALLET_RPC_TIMEOUT_MS),
+      ),
+    ]);
+  } catch (e) {
+    if (e instanceof Error && e.message === 'wallet_timeout') {
+      console.warn('[Subscription] Credit wallet RPC timed out');
+      return null;
+    }
+    return loadCreditWalletForUser(userId);
+  }
+}
+
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, isReady } = useAuth();
@@ -111,17 +186,53 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [serverSubscription, setServerSubscription] = useState<UserSubscriptionStatusRow | null>(null);
   const [serverSubscriptionFetchFailed, setServerSubscriptionFetchFailed] = useState(false);
   const [creditBalance, setCreditBalance] = useState(0);
+  const creditBalanceRef = useRef(0);
   const [creditWalletState, setCreditWalletState] = useState<UserCreditStateRpc | null>(null);
   const [monthlyIncludedGrantStatus, setMonthlyIncludedGrantStatus] =
     useState<MonthlyIncludedGrantStatus>('unknown');
   const [isLoading, setIsLoading] = useState(true);
+  const [creditWalletSyncing, setCreditWalletSyncing] = useState(false);
   const [accessHydrated, setAccessHydrated] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [storeNotice, setStoreNotice] = useState<string | null>(null);
 
+  /** Nested `refresh()` / restore / purchase wallet loads must not clear `creditWalletSyncing` early. */
+  const creditWalletSyncDepthRef = useRef(0);
+
+  const enterCreditWalletSync = useCallback(() => {
+    creditWalletSyncDepthRef.current += 1;
+    if (creditWalletSyncDepthRef.current === 1) {
+      setCreditWalletSyncing(true);
+    }
+  }, []);
+
+  const exitCreditWalletSync = useCallback(() => {
+    creditWalletSyncDepthRef.current = Math.max(0, creditWalletSyncDepthRef.current - 1);
+    if (creditWalletSyncDepthRef.current === 0) {
+      setCreditWalletSyncing(false);
+    }
+  }, []);
+
+  const resetCreditWalletSync = useCallback(() => {
+    creditWalletSyncDepthRef.current = 0;
+    setCreditWalletSyncing(false);
+  }, []);
+
   const clearStoreNotice = useCallback(() => setStoreNotice(null), []);
+
+  const applyCreditBalanceHint = useCallback((balanceAfter: number | null | undefined) => {
+    if (typeof balanceAfter === 'number' && Number.isFinite(balanceAfter) && balanceAfter >= 0) {
+      const b = Math.floor(balanceAfter);
+      creditBalanceRef.current = b;
+      setCreditBalance(b);
+    }
+  }, []);
+
+  useEffect(() => {
+    creditBalanceRef.current = creditBalance;
+  }, [creditBalance]);
 
   useEffect(() => {
     serverSubscriptionRef.current = serverSubscription;
@@ -135,6 +246,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user?.id) {
+      resetCreditWalletSync();
       setAccessHydrated(true);
       setServerSubscription(null);
       setServerSubscriptionFetchFailed(false);
@@ -143,7 +255,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       return;
     }
     setAccessHydrated(false);
-  }, [user?.id]);
+  }, [user?.id, resetCreditWalletSync]);
 
   useEffect(() => {
     if (!isReady) {
@@ -158,23 +270,21 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     })();
   }, [isReady, user?.id]);
 
-  const refresh = useCallback(async (): Promise<{
-    isPremium: boolean;
-    hasAppAccess: boolean;
-    creditBalance: number;
-  }> => {
+  const refresh = useCallback(async (): Promise<SubscriptionRefreshResult> => {
     const gen = ++refreshGenerationRef.current;
     setLastError(null);
     setIsLoading(true);
     try {
       if (!user?.id) {
+        resetCreditWalletSync();
         setCustomerInfo(initialSummary);
+        creditBalanceRef.current = 0;
         setCreditBalance(0);
         setCreditWalletState(null);
         setMonthlyIncludedGrantStatus('unknown');
         setServerSubscription(null);
         setServerSubscriptionFetchFailed(false);
-        return { isPremium: false, hasAppAccess: false, creditBalance: 0 };
+        return subscriptionRefreshPayload(false, 0);
       }
 
       await revenueCatService.initialize();
@@ -186,17 +296,28 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const [info, walletLoad, subRes] = await Promise.all([
+      enterCreditWalletSync();
+      let walletLoad: WalletLoadResult | null;
+      try {
+        walletLoad = await loadCreditWalletForUserWithTimeout(user.id);
+      } finally {
+        exitCreditWalletSync();
+      }
+
+      if (walletLoad) {
+        creditBalanceRef.current = walletLoad.balance;
+        setCreditBalance(walletLoad.balance);
+        setCreditWalletState(walletLoad.state);
+        setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
+      }
+      const balance = walletLoad?.balance ?? creditBalanceRef.current;
+
+      const [info, subRes] = await Promise.all([
         revenueCatService.getCustomerInfo(),
-        loadCreditWalletForUser(user.id),
         loadServerSubscriptionRow(user.id),
       ]);
 
       setCustomerInfo(info);
-      setCreditBalance(walletLoad.balance);
-      setCreditWalletState(walletLoad.state);
-      setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
-      const balance = walletLoad.balance;
       if (subRes.error) {
         setServerSubscriptionFetchFailed(true);
       } else {
@@ -210,21 +331,27 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         serverRow: rowForAccess,
         storeSummary: info,
         serverFetchFailed: Boolean(subRes.error),
+        revenueCatEnvironmentBlock: getRevenueCatEnvironmentBlockReason(),
       });
 
-      return {
-        isPremium: access.hasAppAccess,
-        hasAppAccess: access.hasAppAccess,
-        creditBalance: balance,
-      };
+      return subscriptionRefreshPayload(access.hasAppAccess, balance);
     } catch (e) {
       setLastError(e instanceof Error ? e.message : 'Membership sync failed');
       try {
-        const walletLoad = await loadCreditWalletForUser(user?.id);
-        setCreditBalance(walletLoad.balance);
-        setCreditWalletState(walletLoad.state);
-        setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
-        const balance = walletLoad.balance;
+        enterCreditWalletSync();
+        let walletLoad: WalletLoadResult | null;
+        try {
+          walletLoad = await loadCreditWalletForUserWithTimeout(user?.id);
+        } finally {
+          exitCreditWalletSync();
+        }
+        if (walletLoad) {
+          creditBalanceRef.current = walletLoad.balance;
+          setCreditBalance(walletLoad.balance);
+          setCreditWalletState(walletLoad.state);
+          setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
+        }
+        const balance = walletLoad?.balance ?? creditBalanceRef.current;
         const subRes = await loadServerSubscriptionRow(user?.id);
         if (subRes.error) {
           setServerSubscriptionFetchFailed(true);
@@ -240,10 +367,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           serverRow: rowForAccessCatch,
           storeSummary: info,
           serverFetchFailed: Boolean(subRes.error),
+          revenueCatEnvironmentBlock: getRevenueCatEnvironmentBlockReason(),
         });
-        return { isPremium: access.hasAppAccess, hasAppAccess: access.hasAppAccess, creditBalance: balance };
+        return subscriptionRefreshPayload(access.hasAppAccess, balance);
       } catch {
-        return { isPremium: false, hasAppAccess: false, creditBalance: 0 };
+        return subscriptionRefreshPayload(false, 0);
       }
     } finally {
       setIsLoading(false);
@@ -251,7 +379,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setAccessHydrated(true);
       }
     }
-  }, [isReady, user?.id]);
+  }, [isReady, user?.id, resetCreditWalletSync, enterCreditWalletSync, exitCreditWalletSync]);
 
   useEffect(() => {
     if (!isReady) {
@@ -289,10 +417,19 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       }
       setCustomerInfo(result.customerInfo);
       setLastError(null);
-      const walletLoad = await loadCreditWalletForUser(user?.id);
-      setCreditBalance(walletLoad.balance);
-      setCreditWalletState(walletLoad.state);
-      setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
+      enterCreditWalletSync();
+      let walletLoad: WalletLoadResult | null;
+      try {
+        walletLoad = await loadCreditWalletForUserWithTimeout(user?.id);
+      } finally {
+        exitCreditWalletSync();
+      }
+      if (walletLoad) {
+        creditBalanceRef.current = walletLoad.balance;
+        setCreditBalance(walletLoad.balance);
+        setCreditWalletState(walletLoad.state);
+        setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
+      }
       const subRes = await loadServerSubscriptionRow(user?.id);
       if (subRes.error) {
         setServerSubscriptionFetchFailed(true);
@@ -302,7 +439,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       }
       await revenueCatService.invalidateCustomerInfoCache();
     },
-    [user?.id],
+    [user?.id, enterCreditWalletSync, exitCreditWalletSync],
   );
 
   const purchaseSubscription = useCallback(async () => {
@@ -311,32 +448,33 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     setIsPurchasing(true);
     try {
       if (isReady) {
-        await revenueCatService.syncAppUserId(user?.id ?? null);
+        try {
+          await revenueCatService.syncAppUserId(user?.id ?? null);
+        } catch (e) {
+          const r = interpretPurchaseError(e);
+          if (r.outcome === 'error') {
+            setLastError(r.message);
+            return;
+          }
+          if (r.outcome === 'pending') {
+            setStoreNotice(r.message);
+            return;
+          }
+        }
       }
       const result = await revenueCatService.purchaseDefaultSubscription();
       await applyPurchaseResult(result);
+    } catch (e) {
+      const r = interpretPurchaseError(e);
+      if (r.outcome === 'error') {
+        setLastError(r.message);
+      } else if (r.outcome === 'pending') {
+        setStoreNotice(r.message);
+      }
     } finally {
       setIsPurchasing(false);
     }
   }, [applyPurchaseResult, isReady, user?.id]);
-
-  const purchaseCreditsPack = useCallback(
-    async (refKey: string) => {
-      setStoreNotice(null);
-      setLastError(null);
-      setIsPurchasing(true);
-      try {
-        if (isReady) {
-          await revenueCatService.syncAppUserId(user?.id ?? null);
-        }
-        const result = await revenueCatService.purchaseByRefKey(refKey);
-        await applyPurchaseResult(result);
-      } finally {
-        setIsPurchasing(false);
-      }
-    },
-    [applyPurchaseResult, isReady, user?.id],
-  );
 
   const restorePurchases = useCallback(async () => {
     setLastError(null);
@@ -348,10 +486,19 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       }
       const info = await revenueCatService.restorePurchases();
       setCustomerInfo(info);
-      const walletLoad = await loadCreditWalletForUser(user?.id);
-      setCreditBalance(walletLoad.balance);
-      setCreditWalletState(walletLoad.state);
-      setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
+      enterCreditWalletSync();
+      let walletLoad: WalletLoadResult | null;
+      try {
+        walletLoad = await loadCreditWalletForUserWithTimeout(user?.id);
+      } finally {
+        exitCreditWalletSync();
+      }
+      if (walletLoad) {
+        creditBalanceRef.current = walletLoad.balance;
+        setCreditBalance(walletLoad.balance);
+        setCreditWalletState(walletLoad.state);
+        setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
+      }
       const subRes = await loadServerSubscriptionRow(user?.id);
       if (subRes.error) {
         setServerSubscriptionFetchFailed(true);
@@ -364,7 +511,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsRestoring(false);
     }
-  }, [isReady, user?.id]);
+  }, [isReady, user?.id, enterCreditWalletSync, exitCreditWalletSync]);
 
   const openPaywall = useCallback(() => {
     router.push('/paywall');
@@ -374,6 +521,28 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     router.push('/credit-top-up');
   }, [router]);
 
+  /**
+   * Wallet snapshot only — does **not** set `creditWalletSyncing`.
+   * Import screen focus + post-import reconcile must not flip that flag or `useFocusEffect([sub])` will
+   * re-run forever (new `sub` every render), blocking `canRunImport` and flickering ImportCreditNotice.
+   */
+  const refreshCreditWalletOnly = useCallback(async () => {
+    if (!user?.id) {
+      return;
+    }
+    try {
+      const walletLoad = await loadCreditWalletForUserWithTimeout(user.id);
+      if (walletLoad) {
+        creditBalanceRef.current = walletLoad.balance;
+        setCreditBalance(walletLoad.balance);
+        setCreditWalletState(walletLoad.state);
+        setMonthlyIncludedGrantStatus(walletLoad.monthlyIncluded);
+      }
+    } catch {
+      /* keep prior balance; timeout path returns null from loader */
+    }
+  }, [user?.id]);
+
   const accessComputed = useMemo(
     () =>
       computeAppAccess({
@@ -381,6 +550,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         serverRow: serverSubscription,
         storeSummary: customerInfo,
         serverFetchFailed: serverSubscriptionFetchFailed,
+        revenueCatEnvironmentBlock: getRevenueCatEnvironmentBlockReason(),
       }),
     [accessHydrated, serverSubscription, customerInfo, serverSubscriptionFetchFailed],
   );
@@ -393,8 +563,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       return 'Checking access…';
     }
     if (!hasAppAccess) {
+      if (accessDisplayState === 'rc_misconfigured') {
+        return 'Billing unavailable in this build';
+      }
       if (accessDisplayState === 'unknown') {
-        return 'Status unknown';
+        return 'Could not verify membership';
       }
       if (accessDisplayState === 'billing_issue') {
         return 'Billing issue';
@@ -409,8 +582,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       return 'Verifying your membership with PropFolio and the App Store…';
     }
     if (!hasAppAccess) {
+      if (accessDisplayState === 'rc_misconfigured') {
+        return (
+          getRevenueCatEnvironmentBlockReason() ??
+          'Fix RevenueCat configuration (public appl_ key, EAS env), use a dev build or TestFlight—not Expo Go—then rebuild.'
+        );
+      }
       if (accessDisplayState === 'unknown') {
-        return 'Check your connection, then try Restore purchases or start membership.';
+        return (
+          customerInfo.lastStoreError ??
+          'We could not confirm membership with Apple. Check your connection, tap Restore purchases, or subscribe from the paywall.'
+        );
       }
       if (accessDisplayState === 'billing_issue') {
         return 'Update payment in the App Store to restore access.';
@@ -425,17 +607,123 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   const creditsLoading = isLoading && Boolean(user);
 
+  const hasActiveMembership = hasAppAccess;
+  const canAccessAppComputed = useMemo(
+    () => membershipRules.canAccessApp({ accessHydrated, hasAppAccess }),
+    [accessHydrated, hasAppAccess],
+  );
+  const hasImportCreditsComputed = useMemo(
+    () => membershipRules.hasImportCredits({ creditBalance }),
+    [creditBalance],
+  );
+  const canPurchaseCreditPacksComputed = useMemo(
+    () => membershipRules.canPurchaseCreditPacks({ hasAppAccess }),
+    [hasAppAccess],
+  );
+  const canRunImportComputed = useMemo(
+    () =>
+      membershipRules.canRunImport({
+        accessHydrated,
+        hasAppAccess,
+        creditBalance,
+      }),
+    [accessHydrated, hasAppAccess, creditBalance],
+  );
+
+  const purchaseCreditsPack = useCallback(
+    async (refKey: string) => {
+      if (!membershipRules.canPurchaseCreditPacks({ hasAppAccess })) {
+        setLastError('Active membership is required to buy import credit packs.');
+        return;
+      }
+      setStoreNotice(null);
+      setLastError(null);
+      setIsPurchasing(true);
+      try {
+        if (isReady) {
+          try {
+            await revenueCatService.syncAppUserId(user?.id ?? null);
+          } catch (e) {
+            const r = interpretPurchaseError(e);
+            if (r.outcome === 'error') {
+              setLastError(r.message);
+              return;
+            }
+            if (r.outcome === 'pending') {
+              setStoreNotice(r.message);
+              return;
+            }
+          }
+        }
+        const result = await revenueCatService.purchaseByRefKey(refKey);
+        await applyPurchaseResult(result);
+      } catch (e) {
+        const r = interpretPurchaseError(e);
+        if (r.outcome === 'error') {
+          setLastError(r.message);
+        } else if (r.outcome === 'pending') {
+          setStoreNotice(r.message);
+        }
+      } finally {
+        setIsPurchasing(false);
+      }
+    },
+    [applyPurchaseResult, hasAppAccess, isReady, user?.id],
+  );
+
+  useEffect(() => {
+    if (!__DEV__) {
+      return;
+    }
+    const w = creditWalletState?.wallet;
+    patchBillingDiagnosticsSub({
+      membership: {
+        storeEntitlementActive: hasPremiumAccess(customerInfo),
+        activeEntitlementIds: [...customerInfo.activeEntitlements],
+        storeSubscriptionStatus: customerInfo.status,
+        serverEntitlementActive: serverSubscription?.entitlement_active ?? null,
+      },
+      credits: {
+        walletBalance: creditBalance,
+        signupBonusGranted:
+          typeof w?.signup_bonus_credits_granted === 'number' ? w.signup_bonus_credits_granted : null,
+        monthlyIncludedGranted:
+          typeof w?.monthly_included_credits_granted === 'number' ? w.monthly_included_credits_granted : null,
+        canRunImport: canRunImportComputed,
+        canPurchaseCreditPacks: canPurchaseCreditPacksComputed,
+      },
+      lastErrors: {
+        purchase: lastError,
+      },
+    });
+  }, [
+    customerInfo,
+    creditWalletState,
+    creditBalance,
+    serverSubscription,
+    lastError,
+    canRunImportComputed,
+    canPurchaseCreditPacksComputed,
+  ]);
+
   const value = useMemo(
     () => ({
       customerInfo,
       isPremium,
       hasAppAccess,
+      hasActiveMembership,
+      canAccessApp: canAccessAppComputed,
+      hasImportCredits: hasImportCreditsComputed,
+      canPurchaseCreditPacks: canPurchaseCreditPacksComputed,
+      canRunImport: canRunImportComputed,
       accessHydrated,
       accessDisplayState,
       tierLabel,
       statusDetail,
       creditBalance,
+      applyCreditBalanceHint,
       creditsLoading,
+      creditWalletSyncing,
       isLoading,
       isPurchasing,
       isRestoring,
@@ -443,6 +731,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       storeNotice,
       clearStoreNotice,
       refresh,
+      refreshCreditWalletOnly,
       loadPaywallCatalog,
       purchaseSubscription,
       purchaseCreditsPack,
@@ -457,12 +746,19 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       customerInfo,
       isPremium,
       hasAppAccess,
+      hasActiveMembership,
+      canAccessAppComputed,
+      hasImportCreditsComputed,
+      canPurchaseCreditPacksComputed,
+      canRunImportComputed,
       accessHydrated,
       accessDisplayState,
       tierLabel,
       statusDetail,
       creditBalance,
+      applyCreditBalanceHint,
       creditsLoading,
+      creditWalletSyncing,
       isLoading,
       isPurchasing,
       isRestoring,
@@ -470,6 +766,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       storeNotice,
       clearStoreNotice,
       refresh,
+      refreshCreditWalletOnly,
       loadPaywallCatalog,
       purchaseSubscription,
       purchaseCreditsPack,

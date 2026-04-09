@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import {
   FlatList,
@@ -15,20 +15,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AppButton,
   Card,
-  FloatingActionButton,
   PortfolioListSkeleton,
   PortfolioPropertyCard,
-  PortfolioSummaryRow,
   Screen,
-  formatPortfolioValue,
 } from '@/components/ui';
-import { buildPortfolioView, usePortfolioHeader, useProperties } from '@/features/portfolio';
+import { buildPortfolioView, PortfolioScreenHeader, useProperties } from '@/features/portfolio';
 import { useSubscription } from '@/features/subscription';
 import { colors, layout, semantic, spacing, typography } from '@/theme';
 
 export default function PortfolioScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { properties, loading, error, refresh } = useProperties();
   const sub = useSubscription();
@@ -38,18 +34,20 @@ export default function PortfolioScreen() {
     void sub.refresh();
   }, [refresh, sub]);
 
-  const { items, stats } = useMemo(() => buildPortfolioView(properties), [properties]);
+  const { items } = useMemo(() => buildPortfolioView(properties), [properties]);
 
   const onImport = useCallback(() => {
     router.push('/import-property');
   }, [router]);
 
-  usePortfolioHeader(navigation, router, onImport);
+  const onOpenSettings = useCallback(() => {
+    router.push('/settings');
+  }, [router]);
 
   const showInitialLoad = loading && properties.length === 0;
   const showEmpty = !loading && properties.length === 0 && !error;
   const showFatalError = !loading && properties.length === 0 && Boolean(error);
-  const fabBottom = Math.max(insets.bottom, spacing.md) + spacing.sm;
+  const listBottomPad = Math.max(insets.bottom, spacing.md) + spacing.lg;
 
   const listHeader = useMemo(
     () => (
@@ -60,13 +58,6 @@ export default function PortfolioScreen() {
     [],
   );
 
-  const listFooter = useMemo(
-    () => (
-      <PortfolioSummaryRow totalValueFormatted={formatPortfolioValue(stats.totalEstimatedValue)} />
-    ),
-    [stats.totalEstimatedValue],
-  );
-
   if (showInitialLoad) {
     return (
       <Screen
@@ -75,10 +66,10 @@ export default function PortfolioScreen() {
         contentContainerStyle={styles.flex}
         testID="propfolio.portfolio.loading"
       >
+        <PortfolioScreenHeader onPressSettings={onOpenSettings} />
         <View style={styles.body}>
           <Text style={styles.sectionLabel}>My Portfolio</Text>
           <PortfolioListSkeleton count={6} />
-          <PortfolioSummaryRow totalValueFormatted="—" />
         </View>
       </Screen>
     );
@@ -92,6 +83,7 @@ export default function PortfolioScreen() {
         contentContainerStyle={styles.errorScroll}
         testID="propfolio.portfolio.error"
       >
+        <PortfolioScreenHeader onPressSettings={onOpenSettings} />
         <Card elevation="md" style={styles.errorCard}>
           <View style={styles.errorIconWrap}>
             <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
@@ -117,30 +109,24 @@ export default function PortfolioScreen() {
         contentContainerStyle={styles.flex}
         testID="propfolio.portfolio.empty"
       >
+        <PortfolioScreenHeader onPressSettings={onOpenSettings} />
         <View style={styles.body}>
           <Text style={styles.sectionLabel}>My Portfolio</Text>
-          <Card elevation="sm" style={styles.emptyCard}>
-            <Text style={styles.emptyKicker}>Start here</Text>
-            <Text style={styles.emptyTitle}>Your portfolio is empty</Text>
-            <Text style={styles.emptyBody}>
-              Import a listing or run an address to get a confidence score, cash flow read, and deal signals
-              — without MLS lock-in.
-            </Text>
-            <AppButton
-              label="Import a property"
-              onPress={onImport}
-              leftIcon={<Ionicons name="add" size={22} color={colors.onCta} />}
-              testID="propfolio.portfolio.importCta"
-            />
-          </Card>
-          <PortfolioSummaryRow totalValueFormatted="—" />
+          <View style={styles.emptyMain}>
+            <Card elevation="sm" style={styles.emptyCard}>
+              <Text style={styles.emptyKicker}>Start here</Text>
+              <Text style={styles.emptyTitle}>Your portfolio is empty</Text>
+              <Text style={styles.emptyBody}>
+                Import a property to analyze deals faster and invest with confidence.
+              </Text>
+              <AppButton
+                label="+ Import Property"
+                onPress={onImport}
+                testID="propfolio.portfolio.importCta"
+              />
+            </Card>
+          </View>
         </View>
-        <FloatingActionButton
-          accessibilityLabel="Import property"
-          onPress={onImport}
-          style={[styles.fab, { bottom: fabBottom }]}
-          icon={<Ionicons name="add" size={30} color={colors.onCta} />}
-        />
       </Screen>
     );
   }
@@ -152,6 +138,7 @@ export default function PortfolioScreen() {
       contentContainerStyle={styles.flex}
       testID="propfolio.portfolio.main"
     >
+      <PortfolioScreenHeader onPressSettings={onOpenSettings} />
       {error ? (
         <Pressable onPress={() => void refresh()} style={styles.inlineBanner} accessibilityRole="button">
           <Ionicons name="alert-circle" size={18} color={semantic.danger} />
@@ -186,11 +173,7 @@ export default function PortfolioScreen() {
           />
         )}
         ListHeaderComponent={listHeader}
-        ListFooterComponent={listFooter}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: fabBottom + 56 + spacing.lg },
-        ]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPad }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -199,13 +182,6 @@ export default function PortfolioScreen() {
             tintColor={semantic.accentGold}
           />
         }
-      />
-
-      <FloatingActionButton
-        accessibilityLabel="Import property"
-        onPress={onImport}
-        style={[styles.fab, { bottom: fabBottom }]}
-        icon={<Ionicons name="add" size={30} color={colors.onCta} />}
       />
     </Screen>
   );
@@ -248,9 +224,11 @@ const styles = StyleSheet.create({
     color: semantic.danger,
     flex: 1,
   },
-  fab: {
-    position: 'absolute',
-    right: 0,
+  emptyMain: {
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 0,
+    paddingBottom: spacing.xl,
   },
   emptyCard: {
     padding: spacing.xl,

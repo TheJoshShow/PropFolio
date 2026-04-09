@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -11,11 +12,12 @@ import {
   View,
 } from 'react-native';
 
+import { AppCloseButton, headerTrailingInset } from '@/components/navigation';
 import { AppButton, AppTextField, BottomSheetContainer } from '@/components/ui';
 import { defaultFinancing, defaultOperating, mergeUserAssumptions, normalizedInputsFromSnapshot } from '@/scoring';
 import type { UserAssumptionOverrides } from '@/scoring';
 import type { PropertySnapshotV1 } from '@/types/property';
-import { colors, hitSlop, spacing, typography } from '@/theme';
+import { colors, hitSlop, navigationChrome, spacing, typography } from '@/theme';
 
 type Props = {
   visible: boolean;
@@ -52,6 +54,7 @@ export function AssumptionsEditorModal({
   onApply,
   onResetToImport,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [purchase, setPurchase] = useState('');
   const [rent, setRent] = useState('');
   const [arv, setArv] = useState('');
@@ -201,6 +204,17 @@ export function AssumptionsEditorModal({
             hitSlop={hitSlop}
           />
           <BottomSheetContainer contentBottomInset={spacing.xl}>
+          <View
+            style={[
+              styles.sheetTopBar,
+              {
+                paddingLeft: Math.max(insets.left, navigationChrome.headerBarEdgePadding),
+              },
+              headerTrailingInset(insets.right),
+            ]}
+          >
+            <AppCloseButton onPress={onClose} testID="propfolio.assumptionsModal.close" />
+          </View>
           <Text style={styles.sheetTitle}>Assumptions & what-if</Text>
           <Text style={styles.sheetSub}>
             Changes recalc instantly after you apply. Values are not sent to AI — only deterministic math.
@@ -283,6 +297,13 @@ const styles = StyleSheet.create({
   },
   dismiss: {
     flex: 1,
+  },
+  sheetTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    minHeight: navigationChrome.headerActionMinHeight,
+    marginBottom: spacing.sm,
   },
   sheetTitle: {
     ...typography.cardTitle,

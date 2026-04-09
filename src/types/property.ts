@@ -32,6 +32,8 @@ export type PropertySnapshotV1 = {
     sqft?: number | null;
     yearBuilt?: number | null;
     propertyType?: string | null;
+    /** Multifamily unit count when provider supplies it (e.g. RentCast features.unitCount). */
+    unitCount?: number | null;
   };
   financials?: {
     lastSalePrice?: number | null;

@@ -11,10 +11,13 @@ import {
   validateEmail,
   validateFullName,
   validateNewPassword,
+  validateOptionalPhone,
+  visibleAuthFieldError,
 } from '@/features/auth';
+import { BILLING_COPY } from '@/features/billing';
 import { signUpWithEmail } from '@/services/auth';
 import { tryGetSupabaseClient } from '@/services/supabase';
-import { colors, iconSizes, layout, semantic, spacing, textPresets } from '@/theme';
+import { colors, iconSizes, layout, radius, semantic, spacing, textPresets } from '@/theme';
 
 export default function CreateAccountScreen() {
   const router = useRouter();
@@ -22,14 +25,24 @@ export default function CreateAccountScreen() {
   const { isConfigured } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameBlurred, setNameBlurred] = useState(false);
+  const [emailBlurred, setEmailBlurred] = useState(false);
+  const [phoneBlurred, setPhoneBlurred] = useState(false);
+  const [passwordBlurred, setPasswordBlurred] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const nameErr = useMemo(() => validateFullName(name), [name]);
   const emailErr = useMemo(() => validateEmail(email), [email]);
+  const phoneErr = useMemo(() => validateOptionalPhone(phone), [phone]);
   const passErr = useMemo(() => validateNewPassword(password), [password]);
-  const canSubmit = isFormValid([nameErr, emailErr, passErr]) && isConfigured;
+  const nameVisible = visibleAuthFieldError(nameErr, nameBlurred, submitAttempted);
+  const emailVisible = visibleAuthFieldError(emailErr, emailBlurred, submitAttempted);
+  const phoneVisible = visibleAuthFieldError(phoneErr, phoneBlurred, submitAttempted);
+  const passVisible = visibleAuthFieldError(passErr, passwordBlurred, submitAttempted);
 
   function onClose() {
     if (router.canGoBack()) {
@@ -43,9 +56,10 @@ export default function CreateAccountScreen() {
     setError(null);
     const nErr = validateFullName(name);
     const eErr = validateEmail(email);
+    const phErr = validateOptionalPhone(phone);
     const pErr = validateNewPassword(password);
-    if (!isFormValid([nErr, eErr, pErr])) {
-      setError(nErr ?? eErr ?? pErr ?? 'Check the form and try again.');
+    if (!isFormValid([nErr, eErr, phErr, pErr])) {
+      setSubmitAttempted(true);
       return;
     }
 
@@ -57,7 +71,13 @@ export default function CreateAccountScreen() {
 
     setSubmitting(true);
     try {
-      const result = await signUpWithEmail(client, email.trim(), password, name.trim());
+      const result = await signUpWithEmail(
+        client,
+        email.trim(),
+        password,
+        name.trim(),
+        phone.trim() || undefined,
+      );
       if (!result.ok) {
         setError(result.message);
         return;
@@ -93,10 +113,11 @@ export default function CreateAccountScreen() {
             placeholder="Enter your full name"
             value={name}
             onChangeText={setName}
+            onBlur={() => setNameBlurred(true)}
             autoComplete="name"
             textContentType="name"
             autoCapitalize="words"
-            errorMessage={nameErr ?? undefined}
+            errorMessage={nameVisible}
             leftAccessory={
               <Ionicons name="person-outline" size={iconSizes.md} color={semantic.textTertiary} />
             }
@@ -108,11 +129,27 @@ export default function CreateAccountScreen() {
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
+            onBlur={() => setEmailBlurred(true)}
             autoComplete="email"
             textContentType="emailAddress"
-            errorMessage={emailErr ?? undefined}
+            errorMessage={emailVisible}
             leftAccessory={
               <Ionicons name="mail-outline" size={iconSizes.md} color={semantic.textTertiary} />
+            }
+          />
+          <AppTextField
+            label="Phone (optional)"
+            variant="outline"
+            placeholder="Mobile number"
+            keyboardType="phone-pad"
+            value={phone}
+            onChangeText={setPhone}
+            onBlur={() => setPhoneBlurred(true)}
+            autoComplete="tel"
+            textContentType="telephoneNumber"
+            errorMessage={phoneVisible}
+            leftAccessory={
+              <Ionicons name="call-outline" size={iconSizes.md} color={semantic.textTertiary} />
             }
           />
           <AppTextField
@@ -121,20 +158,39 @@ export default function CreateAccountScreen() {
             placeholder="Create a password"
             value={password}
             onChangeText={setPassword}
+            onBlur={() => setPasswordBlurred(true)}
             secureTextEntry
             textContentType="newPassword"
             autoComplete="password-new"
-            errorMessage={passErr ?? undefined}
+            errorMessage={passVisible}
             leftAccessory={
               <Ionicons name="lock-closed-outline" size={iconSizes.md} color={semantic.textTertiary} />
             }
           />
-          <Text style={styles.hint}>Use at least 8 characters with a letter and a number.</Text>
-          <Text style={styles.creditsExplainer}>
-            After signup you receive 3 import credits on our servers: 2 signup bonus credits and 1 included credit for
-            your first billing cycle. With an active membership, you get 1 credit each month; extra imports use packs
-            (1 / 5 / 10 / 20 credits). Membership is $1.99/mo after a free first month through Apple.
+          <Text style={styles.hint}>
+            At least 8 characters, including 1 uppercase letter, 1 number, and 1 symbol.
           </Text>
+
+          <View style={styles.benefitsBlock}>
+            <Text style={styles.benefitsSectionTitle}>{BILLING_COPY.createAccountMembershipIncludesTitle}</Text>
+            <View style={styles.benefitList}>
+              {BILLING_COPY.createAccountMembershipBullets.map((line) => (
+                <View key={line} style={styles.benefitRow}>
+                  <Text style={styles.benefitBullet}>•</Text>
+                  <Text style={styles.benefitLine}>{line}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={styles.benefitsSectionTitle}>{BILLING_COPY.createAccountLimitedOfferTitle}</Text>
+            <View style={styles.benefitList}>
+              {BILLING_COPY.createAccountLimitedOfferBullets.map((line) => (
+                <View key={line} style={styles.benefitRow}>
+                  <Text style={styles.benefitBullet}>•</Text>
+                  <Text style={styles.benefitLine}>{line}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
 
           <View style={styles.errorSlot}>
             {error ? <Text style={styles.banner}>{error}</Text> : null}
@@ -144,7 +200,7 @@ export default function CreateAccountScreen() {
             label="Create Account"
             onPress={onSubmit}
             loading={submitting}
-            disabled={!canSubmit || submitting}
+            disabled={submitting || !isConfigured}
             style={styles.submit}
           />
         </View>
@@ -187,11 +243,43 @@ const styles = StyleSheet.create({
     color: semantic.textTertiary,
     marginTop: -spacing.xs,
   },
-  creditsExplainer: {
-    ...textPresets.caption,
-    color: semantic.textSecondary,
+  benefitsBlock: {
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: semantic.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: semantic.border,
+  },
+  /** Product-style subheads — not uppercase legal labels. */
+  benefitsSectionTitle: {
+    ...textPresets.bodyMedium,
+    fontSize: 15,
     lineHeight: 20,
-    marginTop: spacing.sm,
+    fontWeight: '600',
+    color: semantic.textPrimary,
+  },
+  benefitList: {
+    gap: spacing.xs,
+    paddingLeft: spacing.xxs,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  benefitBullet: {
+    ...textPresets.bodySecondary,
+    color: semantic.textSecondary,
+    lineHeight: 22,
+    width: 18,
+    textAlign: 'center',
+    marginTop: 1,
+  },
+  benefitLine: {
+    ...textPresets.bodySecondary,
+    flex: 1,
   },
   errorSlot: {
     minHeight: 22,

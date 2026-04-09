@@ -34,3 +34,22 @@ export const layout = {
   listContentBottom: spacing.xxxl,
   minTapSize: 44,
 } as const;
+
+/**
+ * Native header / modal chrome.
+ * - `headerActionSlot*` — balanced left/right zones (iOS-native ghost icons + touch targets).
+ * - `circularButton*` — optional **emphasis** (gold capsule) for `HeaderIconButton` `visual="emphasis"`.
+ */
+export const navigationChrome = {
+  circularButtonDiameter: 44,
+  circularButtonBorderWidth: 2,
+  /** Width of each header corner slot (matches minimum tap target). */
+  headerActionSlotWidth: 44,
+  headerActionMinHeight: 44,
+  /** Default Ionicons size in header ghost actions */
+  headerIconSize: 24,
+  /** Slightly smaller icon inside gold emphasis circle (optical balance). */
+  headerIconEmphasisSize: 22,
+  /** Minimum horizontal inset from screen edge inside header bar (pairs with safe area). */
+  headerBarEdgePadding: spacing.sm,
+} as const;

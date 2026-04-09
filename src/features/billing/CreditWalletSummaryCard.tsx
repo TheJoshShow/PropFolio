@@ -11,17 +11,26 @@ import { renewalOrTrialLine } from './billingFormat';
 type Props = {
   /** Tighter spacing for embedding in paywall. */
   compact?: boolean;
+  /** Avoid long SDK / billing-troubleshooting copy; paywall uses a single billing banner instead. */
+  paywallEmbed?: boolean;
+  /**
+   * Settings → Membership: status from `hasAppAccess` only in this card; hide renewal, included-credit
+   * lines, and bottom buy-credits CTAs (the parent screen owns pack purchase / gated copy).
+   */
+  membershipSettings?: boolean;
 };
 
-export function CreditWalletSummaryCard({ compact }: Props) {
+export function CreditWalletSummaryCard({ compact, paywallEmbed, membershipSettings }: Props) {
   const sub = useSubscription();
   const subRow = sub.creditWalletState?.subscription as Record<string, unknown> | undefined;
   const entitlementActive = Boolean(subRow?.entitlement_active);
-  const renewalLine = renewalOrTrialLine(sub.creditWalletState?.subscription);
+  const renewalLine = membershipSettings
+    ? null
+    : renewalOrTrialLine(sub.creditWalletState?.subscription);
   const lifetimeUsed = sub.creditWalletState?.wallet?.lifetime_credits_used;
 
   let includedLine: string = BILLING_COPY.includedThisPeriod.notSubscribed;
-  if (sub.hasAppAccess && entitlementActive) {
+  if (!membershipSettings && sub.hasAppAccess && entitlementActive) {
     switch (sub.monthlyIncludedGrantStatus) {
       case 'granted':
         includedLine = BILLING_COPY.includedThisPeriod.granted;
@@ -34,6 +43,17 @@ export function CreditWalletSummaryCard({ compact }: Props) {
     }
   }
 
+  const balancePending =
+    sub.creditWalletSyncing || (sub.creditsLoading && sub.creditBalance === 0);
+
+  /** `hasAppAccess` from `computeAppAccess` in `SubscriptionContext` (server mirror + RevenueCat when hydrated). */
+  const membershipStatusLabel = (() => {
+    if (!sub.accessHydrated || sub.accessDisplayState === 'loading') {
+      return 'Checking…';
+    }
+    return sub.hasAppAccess ? 'Active' : 'Inactive';
+  })();
+
   return (
     <Card elevation="sm" style={[styles.card, compact ? styles.cardCompact : null]}>
       <View style={styles.headerRow}>
@@ -43,25 +63,36 @@ export function CreditWalletSummaryCard({ compact }: Props) {
 
       <Text style={styles.balanceLabel}>Available credits</Text>
       <Text style={styles.balanceValue} testID="propfolio.wallet.balance">
-        {sub.creditsLoading ? '…' : sub.creditBalance}
+        {balancePending ? '…' : sub.creditBalance}
       </Text>
 
       <View style={styles.divider} />
 
-      <Text style={styles.sectionLabel}>{BILLING_COPY.subscriptionAccessTitle}</Text>
-      <Text style={styles.sectionValue}>{sub.tierLabel}</Text>
-      <Text style={styles.sectionSub}>{sub.statusDetail}</Text>
-      {renewalLine ? <Text style={styles.renewal}>{renewalLine}</Text> : null}
-
-      <View style={styles.divider} />
-
-      <Text style={styles.included}>{includedLine}</Text>
+      {membershipSettings ? (
+        <>
+          <Text style={styles.sectionLabel}>{BILLING_COPY.membershipStatusLabel}</Text>
+          <Text style={styles.sectionValue}>{membershipStatusLabel}</Text>
+        </>
+      ) : (
+        <>
+          <Text style={styles.sectionLabel}>{BILLING_COPY.subscriptionAccessTitle}</Text>
+          <Text style={styles.sectionValue}>
+            {paywallEmbed && !sub.hasAppAccess ? BILLING_COPY.paywallWalletMembershipStatus : sub.tierLabel}
+          </Text>
+          <Text style={styles.sectionSub}>
+            {paywallEmbed && !sub.hasAppAccess ? BILLING_COPY.paywallWalletMembershipHint : sub.statusDetail}
+          </Text>
+          {renewalLine ? <Text style={styles.renewal}>{renewalLine}</Text> : null}
+          <View style={styles.divider} />
+          <Text style={styles.included}>{includedLine}</Text>
+        </>
+      )}
 
       {typeof lifetimeUsed === 'number' && lifetimeUsed > 0 ? (
         <Text style={styles.lifetime}>{BILLING_COPY.lifetimeUsed(lifetimeUsed)}</Text>
       ) : null}
 
-      {!compact ? (
+      {!membershipSettings && !compact && sub.canPurchaseCreditPacks ? (
         <AppButton
           label={BILLING_COPY.buyCreditsCta}
           variant="secondary"
@@ -69,6 +100,8 @@ export function CreditWalletSummaryCard({ compact }: Props) {
           style={styles.cta}
           testID="propfolio.wallet.topup"
         />
+      ) : !membershipSettings && !compact && !sub.canPurchaseCreditPacks ? (
+        <Text style={styles.gatedHint}>{BILLING_COPY.creditPacksRequireMembership}</Text>
       ) : null}
     </Card>
   );
@@ -144,6 +177,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   cta: {
+    marginTop: spacing.md,
+  },
+  gatedHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    lineHeight: 18,
     marginTop: spacing.md,
   },
 });

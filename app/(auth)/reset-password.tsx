@@ -8,6 +8,7 @@ import {
   useAuth,
   validateNewPassword,
   validatePasswordMatch,
+  visibleAuthFieldError,
 } from '@/features/auth';
 import { updatePassword } from '@/services/auth';
 import { tryGetSupabaseClient } from '@/services/supabase';
@@ -20,20 +21,24 @@ export default function ResetPasswordScreen() {
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passwordBlurred, setPasswordBlurred] = useState(false);
+  const [confirmBlurred, setConfirmBlurred] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const passErr = useMemo(() => validateNewPassword(password), [password]);
   const matchErr = useMemo(
     () => (password ? validatePasswordMatch(password, confirm) : null),
     [password, confirm],
   );
-  const canSubmit = isFormValid([passErr, matchErr]);
+  const passVisible = visibleAuthFieldError(passErr, passwordBlurred, submitAttempted);
+  const matchVisible = visibleAuthFieldError(matchErr, confirmBlurred, submitAttempted);
 
   async function onSubmit() {
     setError(null);
     const pErr = validateNewPassword(password);
     const mErr = validatePasswordMatch(password, confirm);
     if (!isFormValid([pErr, mErr])) {
-      setError(pErr ?? mErr ?? 'Check the form.');
+      setSubmitAttempted(true);
       return;
     }
 
@@ -76,28 +81,32 @@ export default function ResetPasswordScreen() {
           variant="filled"
           value={password}
           onChangeText={setPassword}
+          onBlur={() => setPasswordBlurred(true)}
           secureTextEntry
           textContentType="newPassword"
           autoComplete="password-new"
-          errorMessage={passErr ?? undefined}
+          errorMessage={passVisible}
         />
         <AppTextField
           label="Confirm password"
           variant="filled"
           value={confirm}
           onChangeText={setConfirm}
+          onBlur={() => setConfirmBlurred(true)}
           secureTextEntry
           textContentType="newPassword"
           autoComplete="password-new"
-          errorMessage={matchErr ?? undefined}
+          errorMessage={matchVisible}
         />
-        <Text style={styles.hint}>At least 8 characters with a letter and a number.</Text>
+        <Text style={styles.hint}>
+          At least 8 characters, including 1 uppercase letter, 1 number, and 1 symbol.
+        </Text>
         {error ? <Text style={styles.banner}>{error}</Text> : null}
         <AppButton
           label="Update password"
           onPress={onSubmit}
           loading={submitting}
-          disabled={!canSubmit || submitting}
+          disabled={submitting}
         />
       </View>
 

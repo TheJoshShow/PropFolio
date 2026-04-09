@@ -6,4 +6,4 @@
 export { buildPortfolioView } from './buildPortfolioView';
 export type { PortfolioAggregateStats, PortfolioPropertyListItem } from './buildPortfolioView';
 export { useProperties } from './useProperties';
-export { usePortfolioHeader } from './usePortfolioHeader';
+export { PortfolioScreenHeader } from './PortfolioScreenHeader';

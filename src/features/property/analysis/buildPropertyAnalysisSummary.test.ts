@@ -36,6 +36,7 @@ describe('buildPropertyAnalysisSummary', () => {
     const rows = buildPropertyAnalysisSummary(baseRow(), null);
     expect(rows.find((r) => r.label === 'Full Address')?.value).toContain('123 Main');
     expect(rows.find((r) => r.label === 'Square Footage')?.value).toContain('1,200');
+    expect(rows.find((r) => r.label === 'Estimated Total Rent')?.value).toBe('$2,000/mo');
     expect(rows.find((r) => r.label === 'Estimated Mortgage')?.value).toBe('—');
   });
 

@@ -11,7 +11,6 @@ export const heights = {
   tabMin: 44,
   listRowMin: 52,
   metricRowMin: 48,
-  topBar: 44,
 } as const;
 
 export const iconSizes = {

@@ -44,8 +44,8 @@ export function buildPropertyAnalysisSummary(
     Number.isFinite(snap.financials.rentEstimateMonthly)
       ? snap.financials.rentEstimateMonthly
       : null);
-  const estTotalRentAnnual =
-    rentMonthly != null && Number.isFinite(rentMonthly) ? formatCurrency(rentMonthly * 12) : '—';
+  const estTotalRentMonthly =
+    rentMonthly != null && Number.isFinite(rentMonthly) ? `${formatCurrency(rentMonthly)}/mo` : '—';
 
   const purchaseRaw =
     eff?.purchasePrice ??
@@ -66,7 +66,7 @@ export function buildPropertyAnalysisSummary(
     { label: 'Property Type', value: propertyType },
     { label: 'Number of Units', value: units },
     { label: 'Square Footage', value: sqft },
-    { label: 'Estimated Total Rent', value: estTotalRentAnnual },
+    { label: 'Estimated Total Rent', value: estTotalRentMonthly },
     { label: 'Purchase Price', value: purchase },
     { label: 'Estimated Mortgage', value: mortgage },
   ];

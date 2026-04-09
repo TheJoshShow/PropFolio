@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { generateUuid, isValidUuid } from './uuid';
+import { generatePlacesSessionToken, generateUuid, isValidUuid } from './uuid';
 
 describe('isValidUuid', () => {
   it('accepts lowercase v4', () => {
@@ -15,5 +15,13 @@ describe('isValidUuid', () => {
 
   it('generated ids validate', () => {
     expect(isValidUuid(generateUuid())).toBe(true);
+  });
+});
+
+describe('generatePlacesSessionToken', () => {
+  it('is 32 hex chars (Google Places sessionToken max 36, URL-safe)', () => {
+    const t = generatePlacesSessionToken();
+    expect(t).toHaveLength(32);
+    expect(/^[0-9a-f]{32}$/.test(t)).toBe(true);
   });
 });

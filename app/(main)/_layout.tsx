@@ -1,6 +1,15 @@
 import { Redirect, Stack, usePathname } from 'expo-router';
-import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  AppBackButton,
+  HeaderActionSpacer,
+  headerLeadingInset,
+  headerTrailingInset,
+  stackHeaderBarStyle,
+  stackHeaderTitleStyle,
+  stackModalHeaderBarStyle,
+} from '@/components/navigation';
 import { AuthBootView } from '@/components/ui';
 import { useAuth } from '@/features/auth';
 import { useSubscription } from '@/features/subscription';
@@ -9,6 +18,7 @@ import { semantic } from '@/theme';
 
 export default function MainLayout() {
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
   const {
     isReady,
     isSignedIn,
@@ -45,22 +55,32 @@ export default function MainLayout() {
 
   return (
     <Stack
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerLargeTitle: true,
-        ...(Platform.OS === 'ios' ? { headerBlurEffect: 'systemMaterial' as const } : {}),
         headerTransparent: false,
         headerShadowVisible: false,
-        headerStyle: { backgroundColor: semantic.background },
+        headerStyle: stackHeaderBarStyle,
         headerTintColor: semantic.textPrimary,
+        headerTitleStyle: stackHeaderTitleStyle,
         headerLargeTitleStyle: { color: semantic.textPrimary },
+        headerTitleAlign: 'center',
         contentStyle: { backgroundColor: semantic.background },
-      }}
+        headerBackVisible: false,
+        headerLeftContainerStyle: headerLeadingInset(insets.left),
+        headerRightContainerStyle: headerTrailingInset(insets.right),
+        headerLeft: ({ canGoBack }) =>
+          canGoBack ? (
+            <AppBackButton onPress={() => navigation.goBack()} testID="propfolio.stack.header.back" />
+          ) : null,
+        headerRight: ({ canGoBack }) => (canGoBack ? <HeaderActionSpacer /> : null),
+      })}
     >
       <Stack.Screen
         name="access-restricted"
         options={{
           title: 'Membership',
           headerLargeTitle: false,
+          headerTitleAlign: 'center',
         }}
       />
       <Stack.Screen
@@ -69,6 +89,8 @@ export default function MainLayout() {
           presentation: 'modal',
           title: 'Membership',
           headerLargeTitle: false,
+          headerStyle: stackModalHeaderBarStyle,
+          headerTitleStyle: stackHeaderTitleStyle,
         }}
       />
       <Stack.Screen
@@ -77,6 +99,14 @@ export default function MainLayout() {
           presentation: 'modal',
           title: 'Buy credits',
           headerLargeTitle: false,
+          headerStyle: stackModalHeaderBarStyle,
+          headerTitleStyle: stackHeaderTitleStyle,
+        }}
+      />
+      <Stack.Screen
+        name="portfolio"
+        options={{
+          headerShown: false,
         }}
       />
       <Stack.Screen name="settings" options={{ headerShown: false }} />

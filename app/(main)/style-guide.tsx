@@ -3,6 +3,7 @@ import { useNavigation } from 'expo-router';
 import { useLayoutEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AppBackButton, HeaderActionSpacer } from '@/components/navigation';
 import {
   AppButton,
   AppTextField,
@@ -207,7 +208,11 @@ export default function StyleGuideScreen() {
       </TabPillRow>
 
       <SectionHeader title="Primitives: TopBar, SectionCard, rows" />
-      <TopBar title="Modal title" left={<Text style={{ fontSize: 20 }}>‹</Text>} onPressLeft={() => {}} />
+      <TopBar
+        title="Modal title"
+        left={<AppBackButton onPress={() => {}} accessibilityLabel="Demo back" />}
+        right={<HeaderActionSpacer />}
+      />
       <SectionCard title="SectionCard" style={styles.cardGap} elevation="xs">
         <MetricRow
           label="Full address"

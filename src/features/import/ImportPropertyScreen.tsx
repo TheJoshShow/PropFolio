@@ -3,10 +3,8 @@ import { Redirect, useFocusEffect, useNavigation, useRouter } from 'expo-router'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +13,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  AppCloseButton,
+  HeaderActionSpacer,
+  headerLeadingInset,
+  headerTrailingInset,
+  stackHeaderTitleStyle,
+  stackModalHeaderBarStyle,
+} from '@/components/navigation';
 import {
   AppButton,
   AuthBootView,
@@ -28,63 +34,21 @@ import type { InvestmentStrategy } from '@/lib/investmentStrategy';
 import { investmentStrategyLabel } from '@/lib/investmentStrategy';
 import { generateUuid } from '@/lib/uuid';
 import { propertyImportService } from '@/services/property-import';
-import type { PropertyImportResult, ResolvedPlaceDto } from '@/services/property-import';
-import { sanitizePastedUrl, isNonEmptyUrl } from '@/services/import/sanitize';
+import { isResolvedPlaceComplete } from '@/services/property-import/placesResponseTransforms';
+import { pasteContainsImportableListing } from '@/services/import/listingImportReadiness';
+import {
+  clipListingPasteForSubmit,
+  inferPrimaryListingHost,
+} from '@/services/import/listingUrlNormalize';
 import { tryGetSupabaseClient } from '@/services/supabase';
-import { hitSlop, iconSizes, radius, semantic, spacing, textPresets } from '@/theme';
+import { iconSizes, radius, semantic, spacing, textPresets } from '@/theme';
 
-type Step = 'method' | 'strategy' | 'input';
-type ImportKind = 'listing' | 'manual';
+import { ManualAddressInputSection } from './ManualAddressInputSection';
+import { useImportSubmission } from './useImportSubmission';
+import { useManualAddressSearch } from './useManualAddressSearch';
+import { useUnifiedImportScreenState } from './useUnifiedImportScreenState';
 
-function isNeedsAddress(r: PropertyImportResult): r is Extract<PropertyImportResult, { code: 'NEEDS_ADDRESS' }> {
-  return (
-    r != null &&
-    typeof r === 'object' &&
-    'ok' in r &&
-    (r as { ok: boolean }).ok === false &&
-    (r as { code?: string }).code === 'NEEDS_ADDRESS'
-  );
-}
-
-function isSuccess(r: PropertyImportResult): r is Extract<PropertyImportResult, { ok: true }> {
-  return r != null && typeof r === 'object' && 'ok' in r && (r as { ok: boolean }).ok === true;
-}
-
-function isInsufficientCredits(
-  r: PropertyImportResult,
-): r is Extract<PropertyImportResult, { code: 'INSUFFICIENT_CREDITS' }> {
-  return (
-    r != null &&
-    typeof r === 'object' &&
-    'ok' in r &&
-    (r as { ok: boolean }).ok === false &&
-    (r as { code?: string }).code === 'INSUFFICIENT_CREDITS'
-  );
-}
-
-function isSubscriptionRequired(
-  r: PropertyImportResult,
-): r is Extract<PropertyImportResult, { code: 'SUBSCRIPTION_REQUIRED' }> {
-  return (
-    r != null &&
-    typeof r === 'object' &&
-    'ok' in r &&
-    (r as { ok: boolean }).ok === false &&
-    (r as { code?: string }).code === 'SUBSCRIPTION_REQUIRED'
-  );
-}
-
-function isCreditConsumeFailed(
-  r: PropertyImportResult,
-): r is Extract<PropertyImportResult, { code: 'CREDIT_CONSUME_FAILED' }> {
-  return (
-    r != null &&
-    typeof r === 'object' &&
-    'ok' in r &&
-    (r as { ok: boolean }).ok === false &&
-    (r as { code?: string }).code === 'CREDIT_CONSUME_FAILED'
-  );
-}
+type FlowStep = 'strategy' | 'unified';
 
 export function ImportPropertyScreen() {
   const router = useRouter();
@@ -92,159 +56,79 @@ export function ImportPropertyScreen() {
   const insets = useSafeAreaInsets();
   const { isReady, isSignedIn, needsEmailVerification } = useAuth();
   const sub = useSubscription();
+  const { refreshCreditWalletOnly, applyCreditBalanceHint, creditBalance, creditWalletSyncing } = sub;
   const { ensureCanImport } = useImportGate();
 
-  const sessionTokenRef = useRef(generateUuid());
   const correlationIdRef = useRef(generateUuid());
+  const [placesCorrelationId, setPlacesCorrelationId] = useState(() => generateUuid());
 
-  const [step, setStep] = useState<Step>('method');
-  const [importKind, setImportKind] = useState<ImportKind | null>(null);
+  const [flowStep, setFlowStep] = useState<FlowStep>('strategy');
   const [strategy, setStrategy] = useState<InvestmentStrategy | null>(null);
 
-  const [linkUrl, setLinkUrl] = useState('');
-  const [pendingListingUrl, setPendingListingUrl] = useState<string | null>(null);
-  const [addressQuery, setAddressQuery] = useState('');
-  const [predictions, setPredictions] = useState<{ placeId: string; text: string }[]>([]);
-  const [selected, setSelected] = useState<ResolvedPlaceDto | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [banner, setBanner] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [listingUrl, setListingUrl] = useState('');
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [completingListingAddress, setCompletingListingAddress] = useState(false);
+  const [pendingListingUrl, setPendingListingUrl] = useState<string | null>(null);
+  const [listingHostForCompletion, setListingHostForCompletion] = useState<'zillow' | 'redfin' | null>(
+    null,
+  );
+  const [banner, setBanner] = useState<string | null>(null);
+  /** Avoid showing “Credits left: 0” while wallet RPC is still reconciling a true balance > 0. */
+  const [creditWalletSyncStall, setCreditWalletSyncStall] = useState(false);
 
   const configured = Boolean(tryGetSupabaseClient());
 
+  useEffect(() => {
+    if (!creditWalletSyncing) {
+      setCreditWalletSyncStall(false);
+      return;
+    }
+    const id = setTimeout(() => setCreditWalletSyncStall(true), 12_000);
+    return () => clearTimeout(id);
+  }, [creditWalletSyncing]);
+
+  const creditsPillContent = useMemo(() => {
+    if (creditWalletSyncing && !creditWalletSyncStall && creditBalance === 0) {
+      return { mode: 'loading' as const };
+    }
+    return { mode: 'count' as const, value: creditBalance };
+  }, [creditBalance, creditWalletSyncing, creditWalletSyncStall]);
+
+  const manualPlacesActive = flowStep === 'unified';
+
+  const manualAddress = useManualAddressSearch({
+    active: manualPlacesActive,
+    placesCorrelationId,
+  });
+
+  const { urlClientState, urlIsStableVerified, activeImportSource } = useUnifiedImportScreenState({
+    listingUrl,
+    importReadyFromSuggestionPick: manualAddress.importReadyFromSuggestionPick,
+    completingListingAddress,
+  });
+
   useFocusEffect(
     useCallback(() => {
-      void sub.refresh();
-    }, [sub]),
+      void refreshCreditWalletOnly();
+    }, [refreshCreditWalletOnly]),
   );
 
   useLayoutEffect(() => {
     navigation.setOptions({
       title: 'Import Property',
+      headerLargeTitle: false,
+      headerTitleAlign: 'center',
+      headerShadowVisible: false,
+      headerStyle: stackModalHeaderBarStyle,
+      headerTitleStyle: stackHeaderTitleStyle,
+      headerLeft: () => <HeaderActionSpacer />,
+      headerLeftContainerStyle: headerLeadingInset(insets.left),
+      headerRightContainerStyle: headerTrailingInset(insets.right),
       headerRight: () => (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          onPress={() => router.back()}
-          hitSlop={hitSlop}
-          style={styles.headerBtn}
-        >
-          <Ionicons name="close" size={iconSizes.xl} color={semantic.textPrimary} />
-        </Pressable>
+        <AppCloseButton onPress={() => router.back()} testID="propfolio.import.header.close" />
       ),
     });
-  }, [navigation, router]);
-
-  const runAutocomplete = useCallback(
-    async (q: string) => {
-      if (q.trim().length < 2) {
-        setPredictions([]);
-        return;
-      }
-      setSearching(true);
-      setError(null);
-      try {
-        const res = await propertyImportService.placesAutocomplete(
-          q,
-          sessionTokenRef.current,
-          correlationIdRef.current,
-        );
-        setPredictions(res.predictions ?? []);
-      } catch (e) {
-        setPredictions([]);
-        setError(e instanceof Error ? e.message : 'Search failed');
-      } finally {
-        setSearching(false);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (step !== 'input' || importKind !== 'manual') {
-      return;
-    }
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    debounceRef.current = setTimeout(() => {
-      void runAutocomplete(addressQuery);
-    }, 320);
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, [addressQuery, step, importKind, runAutocomplete]);
-
-  const selectPrediction = useCallback(
-    async (placeId: string) => {
-      setError(null);
-      setSearching(true);
-      try {
-        const res = await propertyImportService.placesResolve(placeId, correlationIdRef.current);
-        setSelected({
-          placeId: res.placeId,
-          formattedAddress: res.formattedAddress,
-          latitude: res.latitude,
-          longitude: res.longitude,
-        });
-        setPredictions([]);
-        setAddressQuery(res.formattedAddress);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not resolve address');
-      } finally {
-        setSearching(false);
-      }
-    },
-    [],
-  );
-
-  const finishImport = useCallback(
-    async (result: PropertyImportResult) => {
-      if (isNeedsAddress(result)) {
-        setPendingListingUrl(sanitizePastedUrl(linkUrl));
-        setImportKind('manual');
-        setStep('input');
-        setBanner('Confirm the property address to complete this listing import.');
-        return;
-      }
-      if (isInsufficientCredits(result)) {
-        await sub.refresh();
-        throw new Error(
-          result.message ??
-            'Not enough credits. Buy a pack from Settings or wait for your monthly included credit.',
-        );
-      }
-      if (isSubscriptionRequired(result)) {
-        await sub.refresh();
-        throw new Error(
-          result.message ??
-            'You need an active PropFolio membership to import. Open Membership from Settings.',
-        );
-      }
-      if (isCreditConsumeFailed(result)) {
-        await sub.refresh();
-        throw new Error(result.message ?? 'Could not confirm your credit with the server. Try again.');
-      }
-      if (isSuccess(result)) {
-        await sub.refresh();
-        router.replace(`/property/${result.propertyId}`);
-        return;
-      }
-      if (result && typeof result === 'object' && 'error' in result) {
-        const err = (result as { error?: string }).error;
-        if (typeof err === 'string' && err.length) {
-          throw new Error(err);
-        }
-      }
-      throw new Error('Import could not be completed.');
-    },
-    [linkUrl, router, sub],
-  );
+  }, [insets.left, insets.right, navigation, router]);
 
   const requireStrategy = useCallback((): InvestmentStrategy => {
     if (!strategy) {
@@ -253,151 +137,256 @@ export function ImportPropertyScreen() {
     return strategy;
   }, [strategy]);
 
-  const onImportLink = useCallback(async () => {
-    let s: InvestmentStrategy;
-    try {
-      s = requireStrategy();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Choose a strategy');
+  const navigateToImportedProperty = useCallback(
+    (propertyId: string) => {
+      router.replace(`/property/${propertyId}`);
+    },
+    [router],
+  );
+
+  const rotateCorrelationIdOnSuccess = useCallback(() => {
+    correlationIdRef.current = generateUuid();
+    setPlacesCorrelationId(generateUuid());
+  }, []);
+
+  const subscriptionRefresh = useCallback(() => refreshCreditWalletOnly(), [refreshCreditWalletOnly]);
+
+  const applyServerBalanceHint = useCallback(
+    (balanceAfter: number | null | undefined) => applyCreditBalanceHint(balanceAfter),
+    [applyCreditBalanceHint],
+  );
+
+  const { runSubmission, importError, clearImportError, isSubmitting, submissionPhase } = useImportSubmission({
+    ensureCanImport,
+    subscriptionRefresh,
+    correlationIdRef,
+    onNavigateToProperty: navigateToImportedProperty,
+    rotateCorrelationIdOnSuccess,
+    applyServerBalanceHint,
+  });
+
+  const applyListingNeedsAddressFlow = useCallback(
+    (paste: string) => {
+      const host = inferPrimaryListingHost(paste) ?? 'zillow';
+      clearImportError();
+      setPendingListingUrl(clipListingPasteForSubmit(paste));
+      setListingHostForCompletion(host);
+      setCompletingListingAddress(true);
+      setBanner('Confirm the property address to finish this listing import.');
+      setPlacesCorrelationId(generateUuid());
+      manualAddress.resetSearchSession();
+    },
+    [clearImportError, manualAddress],
+  );
+
+  const onImportListingUrl = useCallback(() => {
+    void runSubmission({
+      beforeValidate: () => setBanner(null),
+      validateInput: () => {
+        if (!pasteContainsImportableListing(listingUrl)) {
+          return 'Use a Zillow or Redfin property page link (with homedetails / zpid, or Redfin /home/ id). Search or browse pages won’t import.';
+        }
+        return null;
+      },
+      requireStrategy,
+      invoke: ({ strategy: s }) =>
+        propertyImportService.importFromListingUrl(
+          clipListingPasteForSubmit(listingUrl),
+          null,
+          s,
+          correlationIdRef.current,
+        ),
+      onNeedsAddress: () => applyListingNeedsAddressFlow(listingUrl),
+    });
+  }, [applyListingNeedsAddressFlow, listingUrl, requireStrategy, runSubmission]);
+
+  const onImportAddressOnly = useCallback(() => {
+    if (!manualAddress.importReadyFromSuggestionPick) {
       return;
     }
-    const url = sanitizePastedUrl(linkUrl);
-    if (!isNonEmptyUrl(url)) {
-      setError('Paste a Zillow or Redfin listing link.');
+    const place = manualAddress.placeDetails;
+    if (!place || !isResolvedPlaceComplete(place)) {
       return;
     }
-    if (!(await ensureCanImport())) {
-      setError('You need 1 import credit. Open Buy credits or Membership from Settings.');
+    void runSubmission({
+      validateInput: () => null,
+      requireStrategy,
+      invoke: ({ strategy: s }) =>
+        propertyImportService.importFromManualPlace(place, s, correlationIdRef.current),
+      afterSuccessfulImport: () => {
+        manualAddress.resetSearchSession();
+      },
+    });
+  }, [manualAddress, requireStrategy, runSubmission]);
+
+  const onCompleteListingWithAddress = useCallback(() => {
+    if (!manualAddress.importReadyFromSuggestionPick) {
       return;
     }
-    setError(null);
-    setBanner(null);
-    setImporting(true);
-    try {
-      const result = await propertyImportService.importFromListingUrl(
-        url,
-        null,
-        s,
-        correlationIdRef.current,
+    const place = manualAddress.placeDetails;
+    if (!place || !isResolvedPlaceComplete(place)) {
+      return;
+    }
+    const listingUrlForCompletion = pendingListingUrl;
+    void runSubmission({
+      validateInput: () => null,
+      requireStrategy,
+      invoke: ({ strategy: s }) => {
+        if (listingUrlForCompletion) {
+          return propertyImportService.importFromListingUrl(
+            listingUrlForCompletion,
+            place,
+            s,
+            correlationIdRef.current,
+          );
+        }
+        return propertyImportService.importFromManualPlace(place, s, correlationIdRef.current);
+      },
+      afterSuccessfulImport:
+        listingUrlForCompletion != null
+          ? () => {
+              setPendingListingUrl(null);
+              setCompletingListingAddress(false);
+              setListingHostForCompletion(null);
+              setBanner(null);
+              manualAddress.resetSearchSession();
+            }
+          : () => {
+              manualAddress.resetSearchSession();
+            },
+    });
+  }, [manualAddress, pendingListingUrl, requireStrategy, runSubmission]);
+
+  const onImportPrimary = useCallback(() => {
+    if (completingListingAddress) {
+      void onCompleteListingWithAddress();
+      return;
+    }
+    if (activeImportSource === 'url') {
+      void onImportListingUrl();
+    } else if (activeImportSource === 'address') {
+      void onImportAddressOnly();
+    }
+  }, [
+    activeImportSource,
+    completingListingAddress,
+    onCompleteListingWithAddress,
+    onImportAddressOnly,
+    onImportListingUrl,
+  ]);
+
+  const primaryDisabled = useMemo(() => {
+    if (!configured || !strategy || isSubmitting || !sub.canRunImport) {
+      return true;
+    }
+    if (completingListingAddress) {
+      return (
+        !manualAddress.importReadyFromSuggestionPick ||
+        manualAddress.isResolvingSelection ||
+        manualAddress.isManualGeocoding
       );
-      await finishImport(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Import failed');
-    } finally {
-      setImporting(false);
     }
-  }, [linkUrl, finishImport, ensureCanImport, requireStrategy]);
+    if (activeImportSource === 'url') {
+      return !urlIsStableVerified;
+    }
+    if (activeImportSource === 'address') {
+      return (
+        !manualAddress.importReadyFromSuggestionPick ||
+        manualAddress.isResolvingSelection ||
+        manualAddress.isManualGeocoding
+      );
+    }
+    return true;
+  }, [
+    activeImportSource,
+    completingListingAddress,
+    configured,
+    isSubmitting,
+    manualAddress.importReadyFromSuggestionPick,
+    manualAddress.isManualGeocoding,
+    manualAddress.isResolvingSelection,
+    strategy,
+    sub.canRunImport,
+    urlIsStableVerified,
+  ]);
 
-  const onImportAddress = useCallback(async () => {
-    let s: InvestmentStrategy;
-    try {
-      s = requireStrategy();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Choose a strategy');
+  const primaryLabel = useMemo(() => {
+    if (isSubmitting) {
+      return 'Importing…';
+    }
+    if (completingListingAddress) {
+      return manualAddress.importReadyFromSuggestionPick ? 'Complete import' : 'Import Property';
+    }
+    if (activeImportSource === 'url') {
+      return 'Import from Link';
+    }
+    if (activeImportSource === 'address') {
+      return 'Import Address';
+    }
+    return 'Import Property';
+  }, [
+    activeImportSource,
+    completingListingAddress,
+    isSubmitting,
+    manualAddress.importReadyFromSuggestionPick,
+  ]);
+
+  const continueFromStrategy = useCallback(() => {
+    if (!strategy) {
       return;
     }
-    if (!selected?.placeId) {
-      setError('Select an address from the suggestions.');
-      return;
-    }
-    if (!(await ensureCanImport())) {
-      setError('You need 1 import credit. Open Buy credits or Membership from Settings.');
-      return;
-    }
-    setError(null);
-    setImporting(true);
-    try {
-      let result: PropertyImportResult;
-      if (pendingListingUrl) {
-        result = await propertyImportService.importFromListingUrl(
-          pendingListingUrl,
-          selected,
-          s,
-          correlationIdRef.current,
-        );
-        setPendingListingUrl(null);
-        setBanner(null);
-      } else {
-        result = await propertyImportService.importFromManualPlace(
-          selected,
-          s,
-          correlationIdRef.current,
-        );
-      }
-      await finishImport(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Import failed');
-    } finally {
-      setImporting(false);
-    }
-  }, [selected, pendingListingUrl, finishImport, ensureCanImport, requireStrategy]);
+    clearImportError();
+    correlationIdRef.current = generateUuid();
+    setPlacesCorrelationId(generateUuid());
+    setListingUrl('');
+    manualAddress.resetSearchSession();
+    setFlowStep('unified');
+  }, [clearImportError, manualAddress, strategy]);
 
-  const linkDisabled = useMemo(
-    () =>
-      !configured ||
-      !isNonEmptyUrl(sanitizePastedUrl(linkUrl)) ||
-      importing ||
-      sub.creditsLoading ||
-      sub.creditBalance < 1,
-    [configured, linkUrl, importing, sub.creditsLoading, sub.creditBalance],
-  );
-
-  const addressDisabled = useMemo(
-    () =>
-      !configured || !selected || importing || sub.creditsLoading || sub.creditBalance < 1,
-    [configured, selected, importing, sub.creditsLoading, sub.creditBalance],
-  );
-
-  const goListingPath = useCallback(() => {
-    setError(null);
-    setImportKind('listing');
-    setStep('strategy');
-    setStrategy(null);
-  }, []);
-
-  const goManualPath = useCallback(() => {
-    setError(null);
-    setImportKind('manual');
-    setStep('strategy');
-    setStrategy(null);
-  }, []);
-
-  const chooseStrategyAndContinue = useCallback((next: InvestmentStrategy) => {
-    setError(null);
-    setStrategy(next);
-    setStep('input');
-  }, []);
-
-  const backToMethod = useCallback(() => {
-    setStep('method');
-    setImportKind(null);
-    setStrategy(null);
-    setError(null);
-    setBanner(null);
-  }, []);
-
-  const backToStrategy = useCallback(() => {
-    setStep('strategy');
-    setStrategy(null);
-    setError(null);
-  }, []);
-
-  const backFromManualInput = useCallback(() => {
-    if (pendingListingUrl) {
+  const backFromUnified = useCallback(() => {
+    if (completingListingAddress) {
+      setCompletingListingAddress(false);
       setPendingListingUrl(null);
+      setListingHostForCompletion(null);
       setBanner(null);
-      setImportKind('listing');
-      setStep('input');
-      setSelected(null);
-      setAddressQuery('');
-      setPredictions([]);
-      setError(null);
+      manualAddress.resetSearchSession();
+      clearImportError();
       return;
     }
-    setStep('strategy');
-    setStrategy(null);
-    setError(null);
-  }, [pendingListingUrl]);
+    setFlowStep('strategy');
+    setListingUrl('');
+    manualAddress.resetSearchSession();
+    clearImportError();
+  }, [clearImportError, completingListingAddress, manualAddress]);
+
+  const onChangeManualAddress = useCallback(() => {
+    manualAddress.resetSearchSession();
+    clearImportError();
+  }, [clearImportError, manualAddress]);
+
+  useEffect(() => {
+    if (flowStep === 'unified' && !strategy) {
+      setCompletingListingAddress(false);
+      setPendingListingUrl(null);
+      setListingHostForCompletion(null);
+      setBanner(null);
+      setFlowStep('strategy');
+      setListingUrl('');
+    }
+  }, [flowStep, strategy]);
+
+  const stepIndicator = useMemo(() => {
+    if (flowStep === 'strategy') {
+      return 'Step 1 of 2';
+    }
+    return 'Step 2 of 2';
+  }, [flowStep]);
+
+  const showUrlInvalidHint =
+    flowStep === 'unified' &&
+    !completingListingAddress &&
+    listingUrl.trim().length > 0 &&
+    urlClientState === 'invalid';
 
   if (!isReady) {
     return <AuthBootView testID="propfolio.import.boot" />;
@@ -425,73 +414,35 @@ export function ImportPropertyScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.section + spacing.xxl }]}
+          keyboardShouldPersistTaps="always"
+          nestedScrollEnabled
+          removeClippedSubviews={false}
           showsVerticalScrollIndicator={false}
         >
           {!configured ? (
             <Text style={styles.warn}>Add Supabase credentials to import properties.</Text>
           ) : null}
 
-          {step === 'method' ? (
-            <>
-              <Text style={styles.helper}>
-                Add a property from a listing link or by address. Data is enriched on our servers — your keys stay
-                private.
-              </Text>
-              <View style={styles.optionStack}>
-                <Card
-                  elevation="sm"
-                  shape="sheet"
-                  onPress={goListingPath}
-                  style={styles.optionCard}
-                  testID="propfolio.import.method.zillow"
-                >
-                  <View style={styles.optionIcon}>
-                    <Ionicons name="home-outline" size={iconSizes.xl + 4} color={semantic.navy} />
-                  </View>
-                  <View style={styles.optionTextCol}>
-                    <Text style={styles.optionTitle}>Import from Zillow</Text>
-                    <Text style={styles.optionSub}>Paste a listing URL (Zillow or Redfin supported)</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={iconSizes.md} color={semantic.textTertiary} />
-                </Card>
-                <Card
-                  elevation="sm"
-                  shape="sheet"
-                  onPress={goManualPath}
-                  style={styles.optionCard}
-                  testID="propfolio.import.method.manual"
-                >
-                  <View style={styles.optionIcon}>
-                    <Ionicons name="location-outline" size={iconSizes.xl + 4} color={semantic.navy} />
-                  </View>
-                  <View style={styles.optionTextCol}>
-                    <Text style={styles.optionTitle}>Enter Address Manually</Text>
-                    <Text style={styles.optionSub}>Search and select the property location</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={iconSizes.md} color={semantic.textTertiary} />
-                </Card>
-              </View>
-            </>
-          ) : null}
+          <Text style={styles.stepPill}>{stepIndicator}</Text>
 
-          {step === 'strategy' ? (
-            <>
-              <Text style={styles.helper}>
-                Choose how you plan to invest. This drives which financial lens we use on the analysis screen. You
-                must pick one before import can finish.
-              </Text>
+          {flowStep === 'strategy' ? (
+            <View style={styles.section}>
+              <Text style={styles.screenTitle}>Choose your strategy</Text>
+              <Text style={styles.screenSub}>Metrics tailored to your investment style.</Text>
               <View style={styles.optionStack}>
                 <Card
                   elevation="sm"
                   shape="sheet"
-                  onPress={() => chooseStrategyAndContinue('buy_hold')}
-                  style={styles.optionCard}
+                  onPress={() => {
+                    clearImportError();
+                    setStrategy('buy_hold');
+                  }}
+                  style={[styles.optionCard, strategy === 'buy_hold' && styles.optionCardSelected]}
                   testID="propfolio.import.strategy.buy_hold"
                 >
                   <View style={styles.optionIcon}>
@@ -499,15 +450,24 @@ export function ImportPropertyScreen() {
                   </View>
                   <View style={styles.optionTextCol}>
                     <Text style={styles.optionTitle}>Buy &amp; Hold</Text>
-                    <Text style={styles.optionSub}>Long-term rent and cash flow focus</Text>
+                    <Text style={styles.optionSub}>
+                      Analyze rental income, cash flow, and long-term returns
+                    </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={iconSizes.md} color={semantic.textTertiary} />
+                  {strategy === 'buy_hold' ? (
+                    <Ionicons name="checkmark-circle" size={iconSizes.lg} color={semantic.accentGold} />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={iconSizes.md} color={semantic.textTertiary} />
+                  )}
                 </Card>
                 <Card
                   elevation="sm"
                   shape="sheet"
-                  onPress={() => chooseStrategyAndContinue('fix_flip')}
-                  style={styles.optionCard}
+                  onPress={() => {
+                    clearImportError();
+                    setStrategy('fix_flip');
+                  }}
+                  style={[styles.optionCard, strategy === 'fix_flip' && styles.optionCardSelected]}
                   testID="propfolio.import.strategy.fix_flip"
                 >
                   <View style={styles.optionIcon}>
@@ -515,123 +475,209 @@ export function ImportPropertyScreen() {
                   </View>
                   <View style={styles.optionTextCol}>
                     <Text style={styles.optionTitle}>Fix &amp; Flip</Text>
-                    <Text style={styles.optionSub}>Renovation and resale / ARV focus</Text>
+                    <Text style={styles.optionSub}>
+                      Analyze resale potential, renovation upside, and flip margins
+                    </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={iconSizes.md} color={semantic.textTertiary} />
+                  {strategy === 'fix_flip' ? (
+                    <Ionicons name="checkmark-circle" size={iconSizes.lg} color={semantic.accentGold} />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={iconSizes.md} color={semantic.textTertiary} />
+                  )}
                 </Card>
               </View>
-              <AppButton label="Back" variant="secondary" onPress={backToMethod} testID="propfolio.import.strategy.back" />
-            </>
-          ) : null}
-
-          {step === 'input' && importKind === 'listing' ? (
-            <View style={styles.inputBlock}>
-              <ImportCreditNotice />
-              {banner ? <Text style={styles.banner}>{banner}</Text> : null}
-              {error ? <Text style={styles.err}>{error}</Text> : null}
-              <Text style={styles.strategyPill}>
-                Strategy: {strategy ? investmentStrategyLabel(strategy) : '—'}
-              </Text>
-              <Text style={styles.fieldLabel}>Zillow or Redfin URL</Text>
-              <TextInput
-                style={styles.linkInput}
-                placeholder="https://www.zillow.com/homedetails/…"
-                placeholderTextColor={semantic.placeholder}
-                value={linkUrl}
-                onChangeText={setLinkUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                multiline
-                textAlignVertical="top"
-              />
-              <Text style={styles.hint}>Tracking parameters are stripped automatically.</Text>
               <AppButton
-                label={importing ? 'Importing…' : 'Import listing'}
-                onPress={onImportLink}
-                disabled={linkDisabled}
-                loading={importing}
-                testID="propfolio.import.submit.link"
+                label="Continue"
+                onPress={continueFromStrategy}
+                disabled={!strategy}
+                style={styles.importCtaPrimary}
+                testID="propfolio.import.strategy.continue"
               />
-              <AppButton label="Back" variant="secondary" onPress={backToStrategy} />
             </View>
           ) : null}
 
-          {step === 'input' && importKind === 'manual' ? (
-            <View style={styles.inputBlock}>
-              <ImportCreditNotice />
-              {banner ? <Text style={styles.banner}>{banner}</Text> : null}
-              {error ? <Text style={styles.err}>{error}</Text> : null}
-              <Text style={styles.strategyPill}>
-                Strategy: {strategy ? investmentStrategyLabel(strategy) : '—'}
-              </Text>
-              <Text style={styles.fieldLabel}>Search address</Text>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Start typing an address"
-                placeholderTextColor={semantic.placeholder}
-                value={addressQuery}
-                onChangeText={(t) => {
-                  setAddressQuery(t);
-                  setSelected(null);
-                }}
-                autoCorrect={false}
-              />
-              {searching ? (
-                <ActivityIndicator style={styles.spinner} color={semantic.accentGold} />
-              ) : null}
-              <FlatList
-                data={predictions}
-                keyExtractor={(item) => item.placeId}
-                keyboardShouldPersistTaps="handled"
-                style={styles.list}
-                scrollEnabled={predictions.length > 0}
-                renderItem={({ item }) => (
-                  <Pressable
-                    style={({ pressed }) => [styles.predRow, pressed && styles.predPressed]}
-                    onPress={() => void selectPrediction(item.placeId)}
-                    hitSlop={hitSlop}
-                    accessibilityRole="button"
-                    accessibilityLabel={item.text}
+          {flowStep === 'unified' ? (
+            <View style={styles.unifiedBlock}>
+              <View style={styles.creditsRow}>
+                <View style={styles.creditsPill}>
+                  {creditsPillContent.mode === 'loading' ? (
+                    <ActivityIndicator size="small" color={semantic.accentGold} />
+                  ) : null}
+                  <Text
+                    style={styles.creditsPillText}
+                    testID="propfolio.import.credits.left"
+                    accessibilityRole="text"
+                    accessibilityLabel={
+                      creditsPillContent.mode === 'loading'
+                        ? 'Updating credit balance'
+                        : `Credits left: ${creditsPillContent.value}`
+                    }
                   >
-                    <Text style={styles.predText}>{item.text}</Text>
-                  </Pressable>
-                )}
-                ListEmptyComponent={
-                  addressQuery.trim().length >= 2 && !searching ? (
-                    <Text style={styles.emptyPred}>No matches — try refining the search.</Text>
-                  ) : null
-                }
-              />
-              {selected ? (
-                <Card elevation="xs" shape="sheet" style={styles.confirmCard}>
-                  <Text style={styles.confirmLabel}>Selected</Text>
-                  <Text style={styles.confirmAddr}>{selected.formattedAddress}</Text>
-                </Card>
+                    {creditsPillContent.mode === 'loading'
+                      ? 'Updating credits…'
+                      : `Credits left: ${creditsPillContent.value}`}
+                  </Text>
+                </View>
+              </View>
+
+              <ImportCreditNotice />
+
+              {submissionPhase === 'validating' ? (
+                <Text style={styles.phaseLine}>Checking membership and credits…</Text>
               ) : null}
-              <AppButton
-                label={importing ? 'Importing…' : pendingListingUrl ? 'Complete listing import' : 'Import address'}
-                onPress={onImportAddress}
-                disabled={addressDisabled}
-                loading={importing}
-                testID="propfolio.import.submit.address"
-              />
-              <AppButton label="Back" variant="secondary" onPress={backFromManualInput} />
+              {submissionPhase === 'submitting' ? (
+                <Text style={styles.phaseLine}>Fetching property data and saving…</Text>
+              ) : null}
+              {banner ? <Text style={styles.banner}>{banner}</Text> : null}
+              {importError ? <Text style={styles.err}>{importError}</Text> : null}
+
+              <View style={styles.strategyBadge}>
+                <Text style={styles.strategyBadgeText}>
+                  Strategy · {strategy ? investmentStrategyLabel(strategy) : '—'}
+                </Text>
+              </View>
+
+              <View style={styles.urlSection}>
+                <Text style={styles.linkSectionTitle}>Paste Zillow or Redfin link</Text>
+                <TextInput
+                  style={[
+                    styles.linkInput,
+                    urlIsStableVerified &&
+                    activeImportSource === 'url' &&
+                    !completingListingAddress
+                      ? styles.linkInputVerified
+                      : null,
+                  ]}
+                  placeholder="Paste property link"
+                  placeholderTextColor={semantic.placeholder}
+                  value={completingListingAddress ? (pendingListingUrl ?? listingUrl) : listingUrl}
+                  onChangeText={(t) => {
+                    if (completingListingAddress) {
+                      return;
+                    }
+                    clearImportError();
+                    setListingUrl(t);
+                  }}
+                  editable={!completingListingAddress}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  multiline
+                  textAlignVertical="top"
+                  accessibilityLabel="Listing URL"
+                  testID="propfolio.import.listingUrl"
+                />
+                {completingListingAddress ? (
+                  <Text style={styles.completionNote}>
+                    Listing:{' '}
+                    {listingHostForCompletion === 'zillow'
+                      ? 'Zillow'
+                      : listingHostForCompletion === 'redfin'
+                        ? 'Redfin'
+                        : 'URL'}{' '}
+                    · confirm the street address below.
+                  </Text>
+                ) : null}
+                {!completingListingAddress && listingUrl.trim().length > 0 ? (
+                  <View style={styles.urlStatusRow}>
+                    {urlClientState === 'checking' ? (
+                      <>
+                        <ActivityIndicator size="small" color={semantic.accentGold} />
+                        <Text style={styles.urlStatusText}>Checking link…</Text>
+                      </>
+                    ) : null}
+                    {urlIsStableVerified ? (
+                      <>
+                        <Ionicons name="checkmark-circle" size={iconSizes.md} color={semantic.accentGold} />
+                        <Text style={styles.urlStatusText}>Ready to import from link</Text>
+                      </>
+                    ) : null}
+                  </View>
+                ) : null}
+                {showUrlInvalidHint ? (
+                  <Text style={styles.urlInvalid} accessibilityLiveRegion="polite">
+                    Use a property page URL (Zillow homedetails / zpid, or Redfin /home/…). Search and
+                    browse links can&apos;t be imported.
+                  </Text>
+                ) : null}
+                {!completingListingAddress &&
+                urlIsStableVerified &&
+                manualAddress.importReadyFromSuggestionPick ? (
+                  <Text style={styles.urlBothHint} accessibilityRole="text">
+                    Link and address are both ready — import uses the{' '}
+                    <Text style={styles.urlBothHintEmph}>listing link</Text>. Clear the link field if you
+                    only want the searched address.
+                  </Text>
+                ) : null}
+              </View>
+
+              <View style={styles.addressSection}>
+                <ManualAddressInputSection
+                  manualAddress={manualAddress}
+                  onQueryChangeSideEffect={clearImportError}
+                  onChangeAddress={onChangeManualAddress}
+                  fieldLabel="SEARCH ADDRESS"
+                  verifiedCardTitle="Verified address"
+                  emphasizeVerifiedSelection={
+                    completingListingAddress || activeImportSource === 'address'
+                  }
+                  visualVariant="importSheet"
+                />
+              </View>
+
+              {!isSubmitting &&
+              (completingListingAddress ||
+                activeImportSource === 'url' ||
+                activeImportSource === 'address') ? (
+                <View style={styles.ctaPreorder}>
+                  {completingListingAddress && !manualAddress.importReadyFromSuggestionPick ? (
+                    <Text style={styles.activeSourcePlaceholder} testID="propfolio.import.activeSource.placeholder">
+                      Pick and verify an address below to finish this listing import.
+                    </Text>
+                  ) : completingListingAddress ? (
+                    <Text style={styles.activeSourceLine} testID="propfolio.import.activeSource">
+                      <Text style={styles.activeSourceEmph}>Active source</Text>
+                      {' · '}
+                      Verified address (finish listing import)
+                    </Text>
+                  ) : activeImportSource === 'url' ? (
+                    <Text style={styles.activeSourceLine} testID="propfolio.import.activeSource">
+                      <Text style={styles.activeSourceEmph}>Active source</Text>
+                      {' · '}
+                      Listing link
+                    </Text>
+                  ) : (
+                    <Text style={styles.activeSourceLine} testID="propfolio.import.activeSource">
+                      <Text style={styles.activeSourceEmph}>Active source</Text>
+                      {' · '}
+                      Verified address
+                    </Text>
+                  )}
+                </View>
+              ) : null}
+
+              <View style={styles.ctaColumn}>
+                <AppButton
+                  label={primaryLabel}
+                  onPress={onImportPrimary}
+                  disabled={primaryDisabled}
+                  loading={isSubmitting}
+                  style={styles.importCtaPrimary}
+                  labelStyle={styles.importCtaPrimaryLabel}
+                  testID="propfolio.import.submit.primary"
+                />
+                <AppButton
+                  label="Back"
+                  variant="secondary"
+                  onPress={backFromUnified}
+                  style={styles.importCtaSecondary}
+                  labelStyle={styles.importCtaSecondaryLabel}
+                  testID="propfolio.import.back"
+                />
+              </View>
             </View>
           ) : null}
         </ScrollView>
-
-        {step === 'method' ? (
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-            <AppButton label="Cancel" variant="secondary" onPress={() => router.back()} testID="propfolio.import.cancel" />
-          </View>
-        ) : null}
-
-        {step === 'strategy' ? (
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-            <AppButton label="Cancel" variant="secondary" onPress={() => router.back()} testID="propfolio.import.cancel.strategy" />
-          </View>
-        ) : null}
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -640,30 +686,93 @@ export function ImportPropertyScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scrollContent: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
     gap: spacing.md,
+    maxWidth: 520,
+    width: '100%',
+    alignSelf: 'center',
   },
-  headerBtn: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+  stepPill: {
+    ...textPresets.caption,
+    fontWeight: '600',
+    color: semantic.textTertiary,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: spacing.xs,
   },
-  helper: {
+  section: {
+    gap: spacing.lg,
+    width: '100%',
+  },
+  unifiedBlock: {
+    gap: spacing.lg,
+    width: '100%',
+  },
+  creditsRow: {
+    alignSelf: 'center',
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  creditsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: semantic.surfaceMuted,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: semantic.border,
+    maxWidth: '100%',
+  },
+  creditsPillText: {
+    ...textPresets.caption,
+    fontWeight: '700',
+    color: semantic.navy,
+    letterSpacing: 0.2,
+  },
+  linkSectionTitle: {
+    ...textPresets.bodyMedium,
+    fontSize: 17,
+    color: semantic.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  screenTitle: {
+    ...textPresets.bodyMedium,
+    fontSize: 22,
+    color: semantic.navy,
+    letterSpacing: -0.35,
+    textAlign: 'center',
+  },
+  screenSub: {
     ...textPresets.bodySecondary,
     color: semantic.textSecondary,
-    lineHeight: 22,
-    marginBottom: spacing.sm,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   warn: {
     ...textPresets.caption,
     color: semantic.warning,
+    textAlign: 'center',
   },
   banner: {
     ...textPresets.caption,
     color: semantic.accentGold,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   err: {
     ...textPresets.caption,
     color: semantic.danger,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   optionStack: {
     gap: spacing.md,
@@ -671,10 +780,19 @@ const styles = StyleSheet.create({
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
     gap: spacing.md,
-    minHeight: 96,
+    minHeight: 100,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: semantic.border,
+    backgroundColor: semantic.surface,
+  },
+  optionCardSelected: {
+    borderWidth: 2,
+    borderColor: semantic.accentGold,
+    backgroundColor: semantic.surfaceMuted,
   },
   optionIcon: {
     width: 48,
@@ -699,63 +817,144 @@ const styles = StyleSheet.create({
     color: semantic.textTertiary,
     lineHeight: 18,
   },
-  inputBlock: {
-    gap: spacing.sm,
+  strategyBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: semantic.surfaceMuted,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: semantic.border,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  strategyPill: {
+  strategyBadgeText: {
     ...textPresets.caption,
-    fontWeight: '600',
-    color: semantic.textSecondary,
-    marginBottom: spacing.xs,
+    fontWeight: '700',
+    color: semantic.navy,
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
-  fieldLabel: {
-    ...textPresets.metricLabel,
-    color: semantic.textSecondary,
+  urlSection: {
+    marginBottom: spacing.lg,
+    width: '100%',
   },
-  hint: {
-    ...textPresets.captionSmall,
-    color: semantic.textTertiary,
+  addressSection: {
+    marginBottom: spacing.md,
+    width: '100%',
   },
   linkInput: {
     ...textPresets.body,
-    minHeight: 100,
+    fontSize: 16,
+    lineHeight: 22,
+    minHeight: 120,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: semantic.border,
-    borderRadius: radius.card,
-    padding: spacing.md,
-    backgroundColor: semantic.surfaceMuted,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    backgroundColor: semantic.surface,
     color: semantic.textPrimary,
   },
-  searchInput: {
-    ...textPresets.body,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: semantic.border,
-    borderRadius: 999,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: semantic.surfaceMuted,
-    color: semantic.textPrimary,
+  linkInputVerified: {
+    borderColor: semantic.accentGold,
+    borderWidth: 1,
   },
-  spinner: { marginVertical: spacing.sm },
-  list: { maxHeight: 200 },
-  predRow: {
-    minHeight: 48,
+  urlStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  urlStatusText: {
+    ...textPresets.captionSmall,
+    color: semantic.textSecondary,
+  },
+  urlInvalid: {
+    ...textPresets.captionSmall,
+    color: semantic.danger,
+    marginTop: spacing.sm,
+    lineHeight: 18,
+  },
+  urlBothHint: {
+    ...textPresets.captionSmall,
+    color: semantic.textTertiary,
+    marginTop: spacing.sm,
+    lineHeight: 18,
+  },
+  urlBothHintEmph: {
+    fontWeight: '700',
+    color: semantic.textSecondary,
+  },
+  completionNote: {
+    ...textPresets.captionSmall,
+    color: semantic.textSecondary,
+    lineHeight: 18,
+    marginTop: spacing.sm,
+  },
+  ctaPreorder: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: semantic.border,
+    paddingHorizontal: spacing.xs,
   },
-  predPressed: { backgroundColor: semantic.surfaceMuted },
-  predText: { ...textPresets.body, color: semantic.textPrimary },
-  emptyPred: { ...textPresets.caption, marginTop: spacing.xs },
-  confirmCard: { marginVertical: spacing.sm, padding: spacing.md },
-  confirmLabel: { ...textPresets.metricLabel, marginBottom: spacing.xxs },
-  confirmAddr: { ...textPresets.bodyMedium },
-  footer: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: semantic.border,
-    backgroundColor: semantic.background,
+  activeSourceLine: {
+    ...textPresets.bodySecondary,
+    color: semantic.textPrimary,
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  activeSourceEmph: {
+    fontWeight: '700',
+    color: semantic.navy,
+  },
+  activeSourcePlaceholder: {
+    ...textPresets.caption,
+    color: semantic.textTertiary,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  ctaColumn: {
+    gap: spacing.md,
+    marginTop: spacing.sm,
+    width: '100%',
+    alignSelf: 'stretch',
+    paddingBottom: spacing.sm,
+  },
+  importCtaPrimary: {
+    alignSelf: 'stretch',
+    width: '100%',
+    borderRadius: radius.full,
+    minHeight: 56,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  importCtaPrimaryLabel: {
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  importCtaSecondary: {
+    alignSelf: 'stretch',
+    width: '100%',
+    borderRadius: radius.full,
+    minHeight: 56,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: semantic.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: semantic.border,
+  },
+  importCtaSecondaryLabel: {
+    fontWeight: '600',
+    color: semantic.navy,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  phaseLine: {
+    ...textPresets.caption,
+    color: semantic.textSecondary,
+    textAlign: 'center',
   },
 });

@@ -5,6 +5,8 @@ export function accessRestrictedTitle(state: AppAccessDisplayState): string {
   switch (state) {
     case 'loading':
       return 'Checking membership';
+    case 'rc_misconfigured':
+      return 'Billing not available';
     case 'unknown':
       return 'Could not verify membership';
     case 'billing_issue':
@@ -24,6 +26,8 @@ export function accessRestrictedBody(state: AppAccessDisplayState): string {
   switch (state) {
     case 'loading':
       return 'We are confirming your membership with PropFolio and Apple. This usually takes a moment.';
+    case 'rc_misconfigured':
+      return 'This build cannot talk to the App Store billing SDK (wrong RevenueCat key, Expo Go, or missing native build). Use the public Apple SDK key (appl_…) in EAS, install a development or TestFlight build, then try again. Import credits never unlock the app by themselves.';
     case 'unknown':
       return 'We could not confirm an active membership. Check your connection, tap Restore purchases, or subscribe. Import credits do not unlock the app by themselves.';
     case 'billing_issue':
@@ -31,15 +35,18 @@ export function accessRestrictedBody(state: AppAccessDisplayState): string {
     case 'expired':
       return 'Your membership ended. Import credits stay in your wallet for when you join again. Subscribe to keep using PropFolio.';
     default:
-      return 'PropFolio is $1.99/month after a free first month (handled by Apple). Subscribe for membership; credits are sold separately and require an active membership.';
+      return 'PropFolio is $1.99/month after a free first month (handled by Apple). Subscribe for membership to unlock the app. Import credits are separate: they never unlock the app by themselves, and packs are sold only while your membership is active.';
   }
 }
 
 /** Shown under tier label on Settings when user is gated or hydrating. */
 export function settingsAccessSubtitle(state: AppAccessDisplayState, hasAppAccess: boolean): string {
   if (!hasAppAccess) {
+    if (state === 'rc_misconfigured') {
+      return 'Fix billing configuration or use a dev / TestFlight build (not Expo Go).';
+    }
     if (state === 'unknown') {
-      return 'We could not verify your membership.';
+      return 'We could not verify your membership with Apple.';
     }
     if (state === 'billing_issue') {
       return 'Fix billing in the App Store to restore access.';

@@ -1,29 +1,49 @@
-import { StyleSheet, Text } from 'react-native';
+import type { User } from '@supabase/supabase-js';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Card, Screen } from '@/components/ui';
 import { useAuth } from '@/features/auth';
-import { colors, spacing, typography } from '@/theme';
+import { resolveUserFullNameForDisplay, type ProfileRow } from '@/services/auth';
+import { layout, semantic, spacing, typography } from '@/theme';
 
-export default function PersonalInformationScreen() {
+function displayPhone(profile: ProfileRow | null, user: User | null): string {
+  const fromProfile = profile?.phone?.trim();
+  if (fromProfile) {
+    return fromProfile;
+  }
+  const raw = user?.user_metadata?.phone;
+  if (typeof raw === 'string' && raw.trim().length > 0) {
+    return raw.trim();
+  }
+  return '—';
+}
+
+export default function AccountDetailsScreen() {
   const { user, profile } = useAuth();
+  const fullName = resolveUserFullNameForDisplay(profile, user);
+  const email = user?.email ?? '—';
+  const phone = displayPhone(profile, user);
 
   return (
-    <Screen scroll safeAreaEdges={['bottom', 'left', 'right']} contentContainerStyle={styles.body}>
-      <Text style={styles.lead}>
-        Your display identity comes from your account. Profile fields will sync from Supabase when the profile API
-        is fully wired.
-      </Text>
+    <Screen
+      scroll
+      safeAreaEdges={['bottom', 'left', 'right']}
+      contentContainerStyle={styles.body}
+      testID="propfolio.settings.account"
+    >
       <Card elevation="xs" style={styles.card}>
-        <Text style={styles.label}>Full name</Text>
-        <Text style={styles.value}>{profile?.full_name?.trim() || '—'}</Text>
+        <Text style={styles.name}>{fullName}</Text>
+        <Text style={styles.email} numberOfLines={2}>
+          {email}
+        </Text>
       </Card>
+
       <Card elevation="xs" style={styles.card}>
-        <Text style={styles.label}>Email</Text>
-        <Text style={styles.value}>{user?.email ?? '—'}</Text>
+        <View style={styles.phoneBlock}>
+          <Text style={styles.label}>Phone number</Text>
+          <Text style={styles.value}>{phone}</Text>
+        </View>
       </Card>
-      <Text style={styles.foot}>
-        Placeholder screen — add editable fields + validation when `profiles` table and RLS policies are ready.
-      </Text>
     </Screen>
   );
 }
@@ -31,14 +51,26 @@ export default function PersonalInformationScreen() {
 const styles = StyleSheet.create({
   body: {
     gap: spacing.md,
+    paddingHorizontal: layout.screenPaddingHorizontal,
     paddingBottom: spacing.xxxl,
-  },
-  lead: {
-    ...typography.bodySecondary,
-    lineHeight: 24,
+    paddingTop: spacing.sm,
   },
   card: {
     padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  name: {
+    ...typography.bodyMedium,
+    fontSize: 18,
+    fontWeight: '700',
+    color: semantic.textPrimary,
+  },
+  email: {
+    ...typography.bodySecondary,
+    color: semantic.textSecondary,
+    lineHeight: 22,
+  },
+  phoneBlock: {
     gap: spacing.xs,
   },
   label: {
@@ -46,10 +78,6 @@ const styles = StyleSheet.create({
   },
   value: {
     ...typography.bodyMedium,
-  },
-  foot: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: spacing.md,
+    color: semantic.textPrimary,
   },
 });

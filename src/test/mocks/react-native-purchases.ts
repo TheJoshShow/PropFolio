@@ -9,6 +9,8 @@ export const PURCHASES_ERROR_CODE = {
   STORE_PROBLEM_ERROR: '2',
   PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR: '5',
   CONFIGURATION_ERROR: '23',
+  PRODUCT_REQUEST_TIMED_OUT_ERROR: '32',
+  API_ENDPOINT_BLOCKED: '33',
 } as const;
 
 export type CustomerInfo = Record<string, unknown>;

@@ -4,6 +4,8 @@ export {
   validateEmail,
   validateFullName,
   validateNewPassword,
+  validateOptionalPhone,
   validatePasswordMatch,
   validatePasswordSignIn,
+  visibleAuthFieldError,
 } from './validation';

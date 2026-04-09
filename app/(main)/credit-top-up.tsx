@@ -1,25 +1,41 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  AppCloseButton,
+  HeaderActionSpacer,
+  headerLeadingInset,
+  headerTrailingInset,
+  stackHeaderTitleStyle,
+  stackModalHeaderBarStyle,
+} from '@/components/navigation';
 import { AppButton, Card, Screen } from '@/components/ui';
-import { BILLING_COPY } from '@/features/billing';
+import {
+  BILLING_COPY,
+  creditPackPurchasesAllowed,
+  logPaywallBillingDeveloperDiagnostics,
+  PaywallBillingStatusPanel,
+  resolvePaywallBillingState,
+} from '@/features/billing';
 import { useSubscription } from '@/features/subscription';
+import { getRevenueCatEnvironmentBlockState } from '@/services/revenuecat';
 import {
   CREDIT_PACK_PRODUCT_ORDER,
   CREDITS_PER_STORE_PRODUCT,
+  inferCreditPackSizeFromProductId,
 } from '@/services/revenuecat/productIds';
 import type { PaywallCatalog, PaywallPackageOption } from '@/services/revenuecat/types';
-import { colors, hitSlop, layout, spacing, typography } from '@/theme';
+import { colors, layout, spacing, typography } from '@/theme';
 
 type PackRow = {
   productId: string;
@@ -29,20 +45,32 @@ type PackRow = {
 };
 
 function buildPackRows(catalog: PaywallCatalog | null): PackRow[] {
+  const pkgs = catalog?.creditPackages ?? [];
   const byId = new Map<string, PaywallPackageOption>();
-  for (const p of catalog?.creditPackages ?? []) {
+  const byCredits = new Map<number, PaywallPackageOption>();
+  for (const p of pkgs) {
     byId.set(p.storeProductId, p);
+    const cq = p.creditsQuantity ?? inferCreditPackSizeFromProductId(p.storeProductId);
+    if (cq != null && !byCredits.has(cq)) {
+      byCredits.set(cq, p);
+    }
   }
-  return CREDIT_PACK_PRODUCT_ORDER.map((productId, index) => ({
-    productId,
-    credits: CREDITS_PER_STORE_PRODUCT[productId] ?? 0,
-    referencePrice: BILLING_COPY.packReference[index]?.referencePrice ?? '',
-    pkg: byId.get(productId),
-  }));
+  return CREDIT_PACK_PRODUCT_ORDER.map((productId, index) => {
+    const credits = CREDITS_PER_STORE_PRODUCT[productId] ?? 0;
+    const pkg = byId.get(productId) ?? (credits > 0 ? byCredits.get(credits) : undefined);
+    return {
+      productId,
+      credits,
+      referencePrice: BILLING_COPY.packReference[index]?.referencePrice ?? '',
+      pkg,
+    };
+  });
 }
 
 export default function CreditTopUpScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const sub = useSubscription();
   const [catalog, setCatalog] = useState<PaywallCatalog | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +81,17 @@ export default function CreditTopUpScreen() {
     try {
       const c = await sub.loadPaywallCatalog();
       setCatalog(c);
+      if (__DEV__) {
+        logPaywallBillingDeveloperDiagnostics(
+          resolvePaywallBillingState({
+            envBlock: getRevenueCatEnvironmentBlockState(),
+            catalog: c,
+            catalogLoading: false,
+            isPremium: sub.hasAppAccess,
+          }),
+          'credit_top_up_catalog_loaded',
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -64,8 +103,45 @@ export default function CreditTopUpScreen() {
     }, [load]),
   );
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitleAlign: 'center',
+      headerLargeTitle: false,
+      headerShadowVisible: false,
+      headerStyle: stackModalHeaderBarStyle,
+      headerTitleStyle: stackHeaderTitleStyle,
+      headerLeft: () => <HeaderActionSpacer />,
+      headerRight: () => <AppCloseButton onPress={() => router.back()} testID="propfolio.creditTopUp.close" />,
+      headerLeftContainerStyle: headerLeadingInset(insets.left),
+      headerRightContainerStyle: headerTrailingInset(insets.right),
+    });
+  }, [navigation, router, insets.left, insets.right]);
+
   const rows = useMemo(() => buildPackRows(catalog), [catalog]);
   const busy = sub.isPurchasing || sub.isRestoring;
+
+  const billingResolution = useMemo(
+    () =>
+      resolvePaywallBillingState({
+        envBlock: getRevenueCatEnvironmentBlockState(),
+        catalog,
+        catalogLoading: loading,
+        isPremium: sub.hasAppAccess,
+      }),
+    [catalog, loading, sub.hasAppAccess],
+  );
+
+  const creditPurchasesAllowed = useMemo(
+    () =>
+      sub.canPurchaseCreditPacks &&
+      creditPackPurchasesAllowed({
+        envBlock: getRevenueCatEnvironmentBlockState(),
+        catalog,
+        catalogLoading: loading,
+        isPremium: sub.hasAppAccess,
+      }),
+    [sub.canPurchaseCreditPacks, catalog, loading, sub.hasAppAccess],
+  );
 
   const onBuy = useCallback(
     async (refKey: string | undefined) => {
@@ -90,52 +166,43 @@ export default function CreditTopUpScreen() {
       testID="propfolio.creditTopUp"
     >
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.body}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.accentCta} />
         }
       >
-        <Pressable
-          style={styles.close}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          hitSlop={hitSlop}
-        >
-          <Text style={styles.closeText}>Close</Text>
-        </Pressable>
-
         <View style={styles.mark}>
           <Ionicons name="add-circle-outline" size={34} color={colors.accentScore} />
         </View>
-        <Text style={styles.title}>Top up credits</Text>
-        <Text style={styles.subtitle}>{BILLING_COPY.topUpIntro}</Text>
+        <Text style={styles.title}>{BILLING_COPY.creditTopUpTitle}</Text>
 
-        <Card elevation="xs" style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Your balance</Text>
-          <Text style={styles.balanceValue}>
-            {sub.creditsLoading ? '…' : `${sub.creditBalance} available`}
-          </Text>
-        </Card>
-
-        {catalog?.sdkMessage ? (
-          <Card elevation="xs" style={styles.warnCard}>
-            <Text style={styles.warnText}>{catalog.sdkMessage}</Text>
+        {!sub.canPurchaseCreditPacks ? (
+          <Card elevation="xs" style={styles.membershipGate}>
+            <Text style={styles.membershipGateText}>{BILLING_COPY.creditPacksRequireMembership}</Text>
+            <AppButton label="View membership" variant="secondary" onPress={() => router.push('/paywall')} />
           </Card>
         ) : null}
 
+        {sub.canPurchaseCreditPacks ? <PaywallBillingStatusPanel resolution={billingResolution} /> : null}
+
+        <Card elevation="xs" style={styles.balanceCard}>
+          <Text style={styles.balanceLabel}>{BILLING_COPY.creditBalanceLabel}</Text>
+          <Text style={styles.balanceValue}>
+            {sub.creditWalletSyncing || (sub.creditsLoading && sub.creditBalance === 0)
+              ? '…'
+              : BILLING_COPY.creditBalanceAvailable(sub.creditBalance)}
+          </Text>
+        </Card>
+
         {loading && !catalog ? <ActivityIndicator color={colors.accentCta} style={styles.spinner} /> : null}
 
-        <Text style={styles.sectionLabel}>Choose a pack</Text>
-        <Text style={styles.referenceNote}>
-          Reference pricing (US): {BILLING_COPY.packReference.map((p) => `${p.credits} @ ${p.referencePrice}`).join(' · ')}
-          . Apple may show tax or regional pricing at checkout.
-        </Text>
+        <Text style={styles.sectionLabel}>{BILLING_COPY.creditChoosePackSection}</Text>
 
         {rows.map((row) => {
           const pkg = row.pkg;
           const priceLine = pkg?.priceString ?? row.referencePrice;
-          const disabled = busy || !pkg;
+          const disabled = busy || !pkg || !creditPurchasesAllowed;
           return (
             <Card key={row.productId} elevation="sm" style={styles.packCard}>
               <View style={styles.packRow}>
@@ -147,9 +214,7 @@ export default function CreditTopUpScreen() {
                     {pkg?.title ? `${pkg.title} · ` : null}
                     {priceLine}
                   </Text>
-                  {!pkg ? (
-                    <Text style={styles.packMissing}>This pack is not available in this build—check App Store Connect.</Text>
-                  ) : null}
+                  {!pkg ? <Text style={styles.packMissing}>{BILLING_COPY.creditPackUnavailableFromStore}</Text> : null}
                 </View>
                 <AppButton
                   label={purchasingKey === pkg?.refKey ? '…' : 'Buy'}
@@ -167,9 +232,12 @@ export default function CreditTopUpScreen() {
           label={sub.isRestoring ? 'Restoring…' : BILLING_COPY.restore}
           variant="ghost"
           onPress={() => void sub.restorePurchases()}
-          disabled={busy}
+          disabled={busy || !billingResolution.canUseRestorePurchases}
           loading={sub.isRestoring}
         />
+        {billingResolution.restoreDisabledExplanation && !billingResolution.canUseRestorePurchases ? (
+          <Text style={styles.restoreHint}>{billingResolution.restoreDisabledExplanation}</Text>
+        ) : null}
 
         {sub.lastError ? <Text style={styles.err}>{sub.lastError}</Text> : null}
       </ScrollView>
@@ -180,17 +248,10 @@ export default function CreditTopUpScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   body: {
+    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingTop: spacing.md,
     paddingBottom: layout.listContentBottom,
     gap: spacing.md,
-  },
-  close: {
-    alignSelf: 'flex-end',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  closeText: {
-    ...typography.bodyMedium,
-    color: colors.accentCta,
   },
   mark: {
     width: 64,
@@ -207,12 +268,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textPrimary,
     letterSpacing: -0.4,
-  },
-  subtitle: {
-    ...typography.bodySecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: spacing.sm,
   },
   balanceCard: {
     padding: spacing.md,
@@ -231,24 +286,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
-  warnCard: {
-    padding: spacing.md,
-    borderColor: colors.warning,
+  restoreHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: spacing.md,
   },
-  warnText: {
+  membershipGate: {
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderColor: colors.accentCta,
+  },
+  membershipGateText: {
     ...typography.bodySecondary,
-    color: colors.warning,
+    lineHeight: 22,
+    color: colors.textPrimary,
   },
   spinner: { marginVertical: spacing.lg },
   sectionLabel: {
     ...typography.sectionHeader,
     marginTop: spacing.sm,
     color: colors.textPrimary,
-  },
-  referenceNote: {
-    ...typography.caption,
-    color: colors.textMuted,
-    lineHeight: 18,
   },
   packCard: {
     padding: spacing.md,
@@ -277,7 +336,7 @@ const styles = StyleSheet.create({
   },
   packMissing: {
     ...typography.captionSmall,
-    color: colors.warning,
+    color: colors.textMuted,
     marginTop: spacing.xxs,
   },
   err: {

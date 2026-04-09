@@ -40,7 +40,7 @@ export function SettingsProfileRow({ displayName, email, onPress }: Props) {
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Profile, ${displayName}`}
+        accessibilityLabel={`Account details, ${displayName}, ${email}`}
         onPress={onPress}
         hitSlop={hitSlop}
         style={({ pressed }) => [styles.row, shadowStyle('sm'), pressed && styles.pressed]}
@@ -92,6 +92,7 @@ const styles = StyleSheet.create({
   name: {
     ...textPresets.bodyMedium,
     fontSize: 18,
+    fontWeight: '700',
     color: semantic.textPrimary,
   },
   email: {

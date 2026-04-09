@@ -15,6 +15,7 @@ import {
 import { isSupabaseConfigured } from '@/config';
 import { applySessionFromUrl, fetchProfileByUserId, type ProfileRow } from '@/services/auth';
 import { getSupabaseClient, tryGetSupabaseClient } from '@/services/supabase';
+import { syncSessionMirrorFromSession } from '@/services/supabase/sessionMirrorForEdge';
 
 type AuthContextState = {
   phase: 'loading' | 'ready';
@@ -194,6 +195,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authUnsub?.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!state.isConfigured) {
+      syncSessionMirrorFromSession(null);
+      return;
+    }
+    syncSessionMirrorFromSession(state.session);
+  }, [state.isConfigured, state.session]);
 
   const value = useMemo(
     () => ({

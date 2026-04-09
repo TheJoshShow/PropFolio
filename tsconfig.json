@@ -6,6 +6,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@listingUrlCore": [
+        "./supabase/functions/_shared/listingUrlCore.ts"
       ]
     }
   },

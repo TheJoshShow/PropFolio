@@ -201,3 +201,74 @@ export async function deletePropertyAfterFailedCredit(
     console.warn('rollback property after credit failure', error.message);
   }
 }
+
+export type PropertyPersistStatus = 'draft' | 'ready' | 'error';
+
+/**
+ * Charges one credit only when the saved property is `ready` (complete import).
+ * Draft/error/partial snapshots do not consume credits; balance is read for the response.
+ * On consume failure for `ready`, the property row is rolled back.
+ */
+export async function finalizeCreditForSavedImport(
+  supabase: SupabaseUserClient,
+  userId: string,
+  propertyId: string,
+  correlationId: string,
+  propertyStatus: PropertyPersistStatus,
+): Promise<
+  | { ok: true; balanceAfter: number | null; creditConsumed: boolean }
+  | {
+      ok: false;
+      httpStatus: number;
+      body: Record<string, unknown>;
+    }
+> {
+  if (propertyStatus !== 'ready') {
+    const balanceAfter = await getWalletBalance(supabase, userId);
+    return { ok: true, balanceAfter, creditConsumed: false };
+  }
+
+  const credit = await consumeImportCreditAfterSave(supabase, userId, propertyId, correlationId);
+  if (!credit.ok) {
+    await deletePropertyAfterFailedCredit(supabase, propertyId);
+    if (credit.code === 'insufficient_credits') {
+      return {
+        ok: false,
+        httpStatus: 200,
+        body: {
+          ok: false,
+          code: 'INSUFFICIENT_CREDITS',
+          message: 'You have no import credits left. Add credits or subscribe to continue.',
+          balance_after: credit.balanceAfter ?? 0,
+        },
+      };
+    }
+    if (credit.code === 'subscription_required') {
+      return {
+        ok: false,
+        httpStatus: 200,
+        body: {
+          ok: false,
+          code: 'SUBSCRIPTION_REQUIRED',
+          message: 'An active PropFolio membership is required to import properties.',
+          balance_after: credit.balanceAfter ?? 0,
+        },
+      };
+    }
+    return {
+      ok: false,
+      httpStatus: 200,
+      body: {
+        ok: false,
+        code: 'CREDIT_CONSUME_FAILED',
+        message: credit.rpcMessage ?? 'Could not apply import credit.',
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    balanceAfter: credit.balanceAfter,
+    creditConsumed: true,
+  };
+}

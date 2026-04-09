@@ -1,11 +1,14 @@
 /**
- * Routes reachable without an active subscription (trial/paid).
- * Align with product policy: credits alone do not unlock the app.
+ * Routes reachable without `hasAppAccess` (active membership / trial).
+ * Credit top-up is allowed so users can see balance and membership messaging; purchases still require membership.
  */
 export function isRouteExemptFromSubscriptionGate(pathname: string): boolean {
   const p = pathname.split('?')[0] ?? pathname;
 
   if (p === '/paywall' || p.startsWith('/paywall/')) {
+    return true;
+  }
+  if (p === '/credit-top-up' || p.startsWith('/credit-top-up/')) {
     return true;
   }
   if (p === '/access-restricted' || p.startsWith('/access-restricted/')) {

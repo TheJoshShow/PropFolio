@@ -10,6 +10,7 @@ import {
   useAuth,
   validateEmail,
   validatePasswordSignIn,
+  visibleAuthFieldError,
 } from '@/features/auth';
 import { signInWithEmail } from '@/services/auth';
 import { tryGetSupabaseClient } from '@/services/supabase';
@@ -23,10 +24,14 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailBlurred, setEmailBlurred] = useState(false);
+  const [passwordBlurred, setPasswordBlurred] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const emailErr = useMemo(() => validateEmail(email), [email]);
   const passErr = useMemo(() => validatePasswordSignIn(password), [password]);
-  const canSubmit = isFormValid([emailErr, passErr]) && isConfigured;
+  const emailVisible = visibleAuthFieldError(emailErr, emailBlurred, submitAttempted);
+  const passVisible = visibleAuthFieldError(passErr, passwordBlurred, submitAttempted);
 
   function onClose() {
     if (router.canGoBack()) {
@@ -41,7 +46,7 @@ export default function SignInScreen() {
     const eErr = validateEmail(email);
     const pErr = validatePasswordSignIn(password);
     if (!isFormValid([eErr, pErr])) {
-      setError(eErr ?? pErr ?? 'Check the form and try again.');
+      setSubmitAttempted(true);
       return;
     }
 
@@ -90,9 +95,10 @@ export default function SignInScreen() {
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
+            onBlur={() => setEmailBlurred(true)}
             autoComplete="email"
             textContentType="emailAddress"
-            errorMessage={emailErr ?? undefined}
+            errorMessage={emailVisible}
             leftAccessory={
               <Ionicons name="mail-outline" size={iconSizes.md} color={semantic.textTertiary} />
             }
@@ -116,10 +122,11 @@ export default function SignInScreen() {
             placeholder="Enter your password"
             value={password}
             onChangeText={setPassword}
+            onBlur={() => setPasswordBlurred(true)}
             secureTextEntry
             textContentType="password"
             autoComplete="password"
-            errorMessage={passErr ?? undefined}
+            errorMessage={passVisible}
             leftAccessory={
               <Ionicons name="lock-closed-outline" size={iconSizes.md} color={semantic.textTertiary} />
             }
@@ -133,7 +140,7 @@ export default function SignInScreen() {
             label="Sign In"
             onPress={onSubmit}
             loading={submitting}
-            disabled={!canSubmit || submitting}
+            disabled={submitting || !isConfigured}
             style={styles.submit}
           />
         </View>

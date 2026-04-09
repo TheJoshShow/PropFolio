@@ -44,6 +44,7 @@ export function Screen({
 
   const body = scroll ? (
     <ScrollView
+      style={styles.scroll}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
       showsVerticalScrollIndicator={false}
@@ -89,6 +90,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: layout.screenPaddingHorizontal,
     paddingVertical: layout.screenPaddingVertical,
+  },
+  scroll: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,

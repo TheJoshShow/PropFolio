@@ -5,6 +5,7 @@ export {
   hitSlop,
   iconSizes,
   layout,
+  navigationChrome,
   radius,
   semantic,
   spacing,

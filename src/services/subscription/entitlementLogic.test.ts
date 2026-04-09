@@ -24,8 +24,16 @@ describe('hasPremiumAccess', () => {
     expect(hasPremiumAccess(s)).toBe(false);
   });
 
-  it('is true in grace period', () => {
-    const s: CustomerInfoSummary = { status: 'grace_period', activeEntitlements: [] };
+  it('is false when only non-pro entitlements are active (e.g. misconfigured consumable)', () => {
+    const s: CustomerInfoSummary = { status: 'not_subscribed', activeEntitlements: ['credits_only'] };
+    expect(hasPremiumAccess(s)).toBe(false);
+  });
+
+  it('is true in grace period when pro entitlement is listed', () => {
+    const s: CustomerInfoSummary = {
+      status: 'grace_period',
+      activeEntitlements: [RC_ENTITLEMENT_PRO],
+    };
     expect(hasPremiumAccess(s)).toBe(true);
   });
 });
