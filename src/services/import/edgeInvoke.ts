@@ -3,6 +3,13 @@ import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from '@s
 
 import { createAbortError, isAbortError } from '@/lib/abortError';
 import { getSupabaseClient } from '@/services/supabase';
+import { AuthPrepError, isInvalidRefreshTokenError } from '@/services/supabase/authPrepErrors';
+import { coalescedRefreshSession } from '@/services/supabase/coalescedRefreshSession';
+import {
+  AUTH_REFRESH_SESSION_TIMEOUT_MS,
+  TOKEN_REFRESH_BUFFER_SEC,
+} from '@/services/supabase/edgeInvokeAuthConstants';
+import { logRefreshTimeout } from '@/services/supabase/importAuthTelemetry';
 import {
   getMirroredAccessTokenIfFresh,
   syncSessionMirrorFromSession,
@@ -12,23 +19,15 @@ import {
 const DEFAULT_TIMEOUT_MS = 55_000;
 /** Listing + manual import: listing prep + RentCast (parallel) + DB + credit RPC; under Supabase wall-clock limits. */
 export const IMPORT_PROPERTY_TIMEOUT_MS = 95_000;
-/** Network refresh — must allow slow cellular / cold Supabase auth. */
-const AUTH_REFRESH_SESSION_TIMEOUT_MS = 75_000;
-/**
- * Only proactively refresh the JWT when it expires within this many seconds.
- * A large buffer causes frequent refresh calls before `import-property`; on slow networks those can
- * time out and surface as generic “connection” errors before the Edge Function runs.
- */
-const TOKEN_REFRESH_BUFFER_SEC = 45;
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () => Error): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(timeoutMessage)), ms);
+    timer = setTimeout(() => reject(onTimeout()), ms);
   });
   try {
     return await Promise.race([promise, timeoutPromise]);
@@ -87,12 +86,24 @@ async function authorizationHeaderForEdgeInvoke(
 
   if (forceRefresh) {
     const { data, error } = await withTimeout(
-      client.auth.refreshSession(),
+      coalescedRefreshSession(client, 'edge_invoke'),
       AUTH_REFRESH_SESSION_TIMEOUT_MS,
-      'Could not refresh your sign-in in time. Check your connection and try again.',
+      () => {
+        logRefreshTimeout('edge_invoke', AUTH_REFRESH_SESSION_TIMEOUT_MS);
+        return new AuthPrepError(
+          'refresh_timeout',
+          'Sign-in refresh is taking too long. Check your connection and try again, or sign in again.',
+        );
+      },
     );
     const token = data.session?.access_token;
     if (error || !data.session?.user?.id || !token) {
+      if (isInvalidRefreshTokenError(error)) {
+        throw new AuthPrepError(
+          'invalid_refresh',
+          'Your session is no longer valid. Please sign in again.',
+        );
+      }
       throw new Error('Your session expired. Please sign in again.');
     }
     syncSessionMirrorFromSession(data.session);
@@ -115,8 +126,14 @@ async function authorizationHeaderForEdgeInvoke(
 
   syncSessionMirrorFromSession(session);
 
+  /**
+   * Only refresh when the access JWT is **past expiry** (`exp <= nowSec`).
+   * Do NOT refresh merely because the token is within TOKEN_REFRESH_BUFFER_SEC — that collides with
+   * GoTrue `startAutoRefresh` and stacks `refreshSession()` calls, which then hit our outer timeout.
+   * A not-yet-expired token is still valid for Edge until `exp`.
+   */
   const exp = session.expires_at;
-  if (typeof exp === 'number' && exp <= nowSec + TOKEN_REFRESH_BUFFER_SEC) {
+  if (typeof exp === 'number' && exp <= nowSec) {
     return authorizationHeaderForEdgeInvoke(client, true);
   }
 
@@ -228,7 +245,6 @@ export async function invokeEdgeFunction<TResponse>(
   let forceRefreshNext = false;
   /** One refresh+retry even when `retries === 0` (otherwise JWT recovery never runs). */
   let jwtRecoveryAttempted = false;
-
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const authorization = await authorizationHeaderForEdgeInvoke(client, forceRefreshNext);
@@ -269,6 +285,10 @@ export async function invokeEdgeFunction<TResponse>(
         throw createAbortError();
       }
 
+      if (e instanceof AuthPrepError && (e.code === 'refresh_timeout' || e.code === 'invalid_refresh')) {
+        throw e;
+      }
+
       lastMessage = e instanceof Error ? e.message : 'Import failed';
 
       const jwtFail = isLikelyJwtAuthFailure(lastMessage);
@@ -289,6 +309,14 @@ export async function invokeEdgeFunction<TResponse>(
         await sleep(350 * (attempt + 1));
       }
     }
+  }
+
+  if (__DEV__) {
+    console.warn('[PropFolio] invokeEdgeFunction exhausted retries', {
+      function: name,
+      lastMessage,
+      retriesAttempted: retries + 1,
+    });
   }
 
   throw new Error(friendlyAuthFailureMessage(lastMessage));

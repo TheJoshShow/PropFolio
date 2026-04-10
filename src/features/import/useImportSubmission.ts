@@ -1,7 +1,11 @@
 import { useCallback, useRef, useState, type MutableRefObject } from 'react';
 
 import type { InvestmentStrategy } from '@/lib/investmentStrategy';
+import { saveImportListingDraft } from '@/services/import/importListingDraftStorage';
 import type { PropertyImportNeedsAddress, PropertyImportResult, PropertyImportSuccess } from '@/services/property-import';
+import { AuthPrepError } from '@/services/supabase/authPrepErrors';
+import { tryGetSupabaseClient } from '@/services/supabase';
+import { prepareSessionForEdgeInvoke } from '@/services/supabase/prepareSessionForEdgeInvoke';
 
 import { mapImportUserFacingError } from './mapImportUserError';
 import { interpretPropertyImportResult } from './propertyImportLifecycle';
@@ -41,6 +45,10 @@ type UseImportSubmissionOptions = {
    * matches server truth immediately (no fake client decrement).
    */
   applyServerBalanceHint?: (balanceAfter: number | null | undefined) => void;
+  /** Persisted after `invalid_refresh` so the user can paste the same listing URL post sign-in. */
+  getListingDraftForRecovery?: () => string | null;
+  /** e.g. sign out + replace to `/` — runs after draft save when refresh token is dead. */
+  onInvalidRefreshSession?: () => Promise<void>;
 };
 
 /**
@@ -55,12 +63,26 @@ export function useImportSubmission({
   onNavigateToProperty,
   rotateCorrelationIdOnSuccess,
   applyServerBalanceHint,
+  getListingDraftForRecovery,
+  onInvalidRefreshSession,
 }: UseImportSubmissionOptions) {
   const inFlightRef = useRef(false);
   const [phase, setPhase] = useState<ImportSubmissionPhase>('idle');
   const [importError, setImportError] = useState<string | null>(null);
 
   const clearImportError = useCallback(() => setImportError(null), []);
+
+  const recoverFromInvalidRefresh = useCallback(async () => {
+    const draft = getListingDraftForRecovery?.() ?? null;
+    if (draft) {
+      await saveImportListingDraft(draft);
+    }
+    try {
+      await onInvalidRefreshSession?.();
+    } catch {
+      /* sign-out navigation is best-effort */
+    }
+  }, [getListingDraftForRecovery, onInvalidRefreshSession]);
 
   const runSubmission = useCallback(
     async (args: RunPropertyImportSubmissionArgs): Promise<void> => {
@@ -85,6 +107,25 @@ export function useImportSubmission({
       const validationMessage = args.validateInput();
       if (validationMessage) {
         setImportError(validationMessage);
+        setPhase('idle');
+        inFlightRef.current = false;
+        return;
+      }
+
+      try {
+        const supabase = tryGetSupabaseClient();
+        if (!supabase) {
+          setImportError('Add Supabase credentials to import properties.');
+          setPhase('idle');
+          inFlightRef.current = false;
+          return;
+        }
+        await prepareSessionForEdgeInvoke(supabase);
+      } catch (e) {
+        if (e instanceof AuthPrepError && e.code === 'invalid_refresh') {
+          await recoverFromInvalidRefresh();
+        }
+        setImportError(mapImportUserFacingError(e));
         setPhase('idle');
         inFlightRef.current = false;
         return;
@@ -164,6 +205,9 @@ export function useImportSubmission({
             setImportError('Import could not be completed.');
         }
       } catch (e) {
+        if (e instanceof AuthPrepError && e.code === 'invalid_refresh') {
+          await recoverFromInvalidRefresh();
+        }
         setImportError(mapImportUserFacingError(e));
       } finally {
         setPhase('idle');
@@ -176,6 +220,7 @@ export function useImportSubmission({
       rotateCorrelationIdOnSuccess,
       subscriptionRefresh,
       applyServerBalanceHint,
+      recoverFromInvalidRefresh,
     ],
   );
 

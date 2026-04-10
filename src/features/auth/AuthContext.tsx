@@ -15,6 +15,7 @@ import {
 import { isSupabaseConfigured } from '@/config';
 import { applySessionFromUrl, fetchProfileByUserId, type ProfileRow } from '@/services/auth';
 import { getSupabaseClient, tryGetSupabaseClient } from '@/services/supabase';
+import { registerSupabaseAuthAutoRefresh } from '@/services/supabase/supabaseAutoRefresh';
 import { syncSessionMirrorFromSession } from '@/services/supabase/sessionMirrorForEdge';
 
 type AuthContextState = {
@@ -98,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     let linkSub: ReturnType<typeof Linking.addEventListener> | undefined;
     let authUnsub: { unsubscribe: () => void } | undefined;
+    let disposeAutoRefresh: (() => void) | undefined;
 
     void (async () => {
       try {
@@ -122,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const client = getSupabaseClient();
+      disposeAutoRefresh = registerSupabaseAuthAutoRefresh(client);
 
       const handleUrl = async (url: string | null) => {
         if (!url) {
@@ -143,8 +146,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void handleUrl(url);
       });
 
-      const { data: sessionData } = await client.auth.getSession();
+      const { data: sessionData, error: bootstrapSessionError } = await client.auth.getSession();
       const session = sessionData.session;
+      if (__DEV__) {
+        console.log('[PropFolio auth] auth-bootstrap', {
+          userId: session?.user?.id ?? null,
+          hasAccessToken: Boolean(session?.access_token),
+          hasRefreshToken: Boolean(session?.refresh_token),
+          expiresAt: session?.expires_at ?? null,
+          getSessionError: bootstrapSessionError?.message ?? null,
+        });
+      }
       const hydrated = await hydrateFromSession(client, session);
 
       if (mounted) {
@@ -193,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       linkSub?.remove();
       authUnsub?.unsubscribe();
+      disposeAutoRefresh?.();
     };
   }, []);
 

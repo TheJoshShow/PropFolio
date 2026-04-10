@@ -1,44 +1,32 @@
 import { describe, expect, it } from 'vitest';
 
-import { isManualImportReadyFromSuggestionPick } from './manualImportReadiness';
+import { isManualImportReadyToSubmit } from './manualImportReadiness';
 
-describe('isManualImportReadyFromSuggestionPick', () => {
-  it('is false without a selected suggestion', () => {
-    expect(
-      isManualImportReadyFromSuggestionPick(
-        {
-          placeId: 'a',
-          formattedAddress: '1 Main',
-          latitude: 1,
-          longitude: 2,
-          normalizedOneLine: null,
-          streetNumber: null,
-          route: null,
-          city: null,
-          state: null,
-          postalCode: null,
-          country: null,
-        },
-        null,
-      ),
-    ).toBe(false);
+const completePlace = {
+  placeId: 'a',
+  formattedAddress: '1 Main',
+  latitude: 1,
+  longitude: 2,
+  normalizedOneLine: null,
+  streetNumber: null,
+  route: null,
+  city: null,
+  state: null,
+  postalCode: null,
+  country: null,
+};
+
+describe('isManualImportReadyToSubmit', () => {
+  it('is false without a matching suggestion or selected place id', () => {
+    expect(isManualImportReadyToSubmit(completePlace, null, null)).toBe(false);
   });
 
   it('is false when placeId does not match the picked suggestion', () => {
     expect(
-      isManualImportReadyFromSuggestionPick(
+      isManualImportReadyToSubmit(
         {
+          ...completePlace,
           placeId: 'resolved',
-          formattedAddress: '1 Main',
-          latitude: 1,
-          longitude: 2,
-          normalizedOneLine: null,
-          streetNumber: null,
-          route: null,
-          city: null,
-          state: null,
-          postalCode: null,
-          country: null,
         },
         {
           placeId: 'other',
@@ -47,13 +35,14 @@ describe('isManualImportReadyFromSuggestionPick', () => {
           fullText: 'x',
           text: 'x',
         },
+        'resolved',
       ),
     ).toBe(false);
   });
 
   it('is true when suggestion and resolved place match', () => {
     expect(
-      isManualImportReadyFromSuggestionPick(
+      isManualImportReadyToSubmit(
         {
           placeId: 'same',
           formattedAddress: '1 Main St',
@@ -74,7 +63,43 @@ describe('isManualImportReadyFromSuggestionPick', () => {
           fullText: '1 Main',
           text: '1 Main',
         },
+        'same',
       ),
     ).toBe(true);
+  });
+
+  it('is true after verify-address (geocode) when selectedPlaceId matches placeDetails', () => {
+    expect(
+      isManualImportReadyToSubmit(
+        {
+          placeId: 'ChIJxyz',
+          formattedAddress: '10 Oak St, Chicago, IL',
+          latitude: 41.9,
+          longitude: -87.6,
+          normalizedOneLine: null,
+          streetNumber: '10',
+          route: 'Oak St',
+          city: 'Chicago',
+          state: 'IL',
+          postalCode: '60601',
+          country: 'US',
+        },
+        null,
+        'ChIJxyz',
+      ),
+    ).toBe(true);
+  });
+
+  it('is false when geocode selectedPlaceId does not match placeDetails.placeId', () => {
+    expect(
+      isManualImportReadyToSubmit(
+        {
+          ...completePlace,
+          placeId: 'resolved-id',
+        },
+        null,
+        'stale-id',
+      ),
+    ).toBe(false);
   });
 });

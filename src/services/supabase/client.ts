@@ -1,5 +1,6 @@
 /**
  * Supabase client (anon key). Session persistence: AsyncStorage.
+ * React Native token timers: `AuthProvider` registers AppState → start/stopAutoRefresh (required by Supabase for RN).
  * Setup checklist: docs/AUTH_DEVELOPER_CHECKLIST.md
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';

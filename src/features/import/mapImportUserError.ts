@@ -1,7 +1,12 @@
+import { AuthPrepError } from '@/services/supabase/authPrepErrors';
+
 /**
  * Single place to map thrown errors / raw Edge messages to safe UI copy for import flows.
  */
 export function mapImportUserFacingError(raw: unknown): string {
+  if (raw instanceof AuthPrepError) {
+    return raw.message;
+  }
   if (raw instanceof Error && raw.name === 'AbortError') {
     return 'Import could not be completed. Please try again.';
   }
@@ -26,6 +31,11 @@ export function mapImportUserFacingError(raw: unknown): string {
     return 'This listing took too long to load. Please try again.';
   }
   /** Must run before generic “connection” — that substring appears in this refresh copy too. */
+  if (m.includes('could not read your saved sign-in') || m.includes('read your saved sign-in')) {
+    return msg.length > 0 && msg.length < 220
+      ? msg.trim()
+      : 'Could not load your saved sign-in. Check your connection, wait a moment, or sign in again.';
+  }
   if (m.includes('could not refresh your sign-in') || m.includes('refresh your sign-in')) {
     return msg.length > 0 && msg.length < 220
       ? msg.trim()

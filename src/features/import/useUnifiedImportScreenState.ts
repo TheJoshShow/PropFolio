@@ -15,7 +15,7 @@ export function normalizeListingUrlInput(s: string): string {
 
 type Options = {
   listingUrl: string;
-  importReadyFromSuggestionPick: boolean;
+  importReadyToSubmit: boolean;
   completingListingAddress: boolean;
 };
 
@@ -29,7 +29,7 @@ type Options = {
  */
 export function useUnifiedImportScreenState({
   listingUrl,
-  importReadyFromSuggestionPick,
+  importReadyToSubmit,
   completingListingAddress,
 }: Options) {
   const [urlClientState, setUrlClientState] = useState<UrlClientValidation>('idle');
@@ -76,7 +76,7 @@ export function useUnifiedImportScreenState({
       return 'address';
     }
     const urlOk = urlIsStableVerified;
-    const addrOk = importReadyFromSuggestionPick;
+    const addrOk = importReadyToSubmit;
     if (!urlOk && !addrOk) {
       return null;
     }
@@ -87,7 +87,7 @@ export function useUnifiedImportScreenState({
       return 'address';
     }
     return 'url';
-  }, [completingListingAddress, importReadyFromSuggestionPick, urlIsStableVerified]);
+  }, [completingListingAddress, importReadyToSubmit, urlIsStableVerified]);
 
   return { urlClientState, urlIsStableVerified, activeImportSource };
 }

@@ -53,7 +53,7 @@ export function ManualAddressInputSection({
     autocompleteError,
     selectSuggestion,
     MIN_QUERY_CHARS,
-    importReadyFromSuggestionPick,
+    importReadyToSubmit,
   } = manualAddress;
 
   const displaySuggestions = useMemo(
@@ -96,7 +96,7 @@ export function ManualAddressInputSection({
         <TextInput
           style={[
             searchInputBaseStyle,
-            importReadyFromSuggestionPick && emphasizeVerifiedSelection ? styles.searchInputConfirmed : null,
+            importReadyToSubmit && emphasizeVerifiedSelection ? styles.searchInputConfirmed : null,
           ]}
           placeholder="Start typing an address"
           placeholderTextColor={semantic.placeholder}
@@ -159,7 +159,7 @@ export function ManualAddressInputSection({
           </Text>
         ) : null}
       </View>
-      {importReadyFromSuggestionPick && placeDetails ? (
+      {importReadyToSubmit && placeDetails ? (
         <Card elevation="xs" shape="sheet" style={styles.confirmCard}>
           <Text style={styles.confirmLabel}>{verifiedCardTitle}</Text>
           <Text style={styles.confirmAddr}>

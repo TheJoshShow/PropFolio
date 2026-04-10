@@ -36,11 +36,13 @@ import { generateUuid } from '@/lib/uuid';
 import { propertyImportService } from '@/services/property-import';
 import { isResolvedPlaceComplete } from '@/services/property-import/placesResponseTransforms';
 import { pasteContainsImportableListing } from '@/services/import/listingImportReadiness';
+import { consumeImportListingDraft } from '@/services/import/importListingDraftStorage';
 import {
   clipListingPasteForSubmit,
   inferPrimaryListingHost,
 } from '@/services/import/listingUrlNormalize';
-import { tryGetSupabaseClient } from '@/services/supabase';
+import { logImportScreenAuthFocus, tryGetSupabaseClient } from '@/services/supabase';
+import { resetImportAuthTelemetryForScreenVisit } from '@/services/supabase/importAuthTelemetry';
 import { iconSizes, radius, semantic, spacing, textPresets } from '@/theme';
 
 import { ManualAddressInputSection } from './ManualAddressInputSection';
@@ -54,9 +56,15 @@ export function ImportPropertyScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { isReady, isSignedIn, needsEmailVerification } = useAuth();
+  const { isReady, isSignedIn, needsEmailVerification, session, signOut } = useAuth();
   const sub = useSubscription();
-  const { refreshCreditWalletOnly, applyCreditBalanceHint, creditBalance, creditWalletSyncing } = sub;
+  const {
+    refreshCreditWalletOnly,
+    applyCreditBalanceHint,
+    creditBalance,
+    creditWalletSyncing,
+    creditWalletState,
+  } = sub;
   const { ensureCanImport } = useImportGate();
 
   const correlationIdRef = useRef(generateUuid());
@@ -77,6 +85,27 @@ export function ImportPropertyScreen() {
   const [creditWalletSyncStall, setCreditWalletSyncStall] = useState(false);
 
   const configured = Boolean(tryGetSupabaseClient());
+
+  useEffect(() => {
+    void consumeImportListingDraft().then((draft) => {
+      if (draft?.trim()) {
+        setListingUrl(draft.trim());
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!__DEV__ || !isReady) {
+      return;
+    }
+    console.log('[PropFolio import-auth] ImportPropertyScreen session snapshot', {
+      isSignedIn,
+      userId: session?.user?.id ?? null,
+      hasAccessToken: Boolean(session?.access_token),
+      hasRefreshToken: Boolean(session?.refresh_token),
+      expiresAt: session?.expires_at ?? null,
+    });
+  }, [isReady, isSignedIn, session]);
 
   useEffect(() => {
     if (!creditWalletSyncing) {
@@ -103,14 +132,51 @@ export function ImportPropertyScreen() {
 
   const { urlClientState, urlIsStableVerified, activeImportSource } = useUnifiedImportScreenState({
     listingUrl,
-    importReadyFromSuggestionPick: manualAddress.importReadyFromSuggestionPick,
+    importReadyToSubmit: manualAddress.importReadyToSubmit,
     completingListingAddress,
   });
 
   useFocusEffect(
     useCallback(() => {
+      resetImportAuthTelemetryForScreenVisit();
+      if (__DEV__) {
+        console.log(
+          '[PropFolio import-auth] screen focus',
+          JSON.stringify({
+            t: new Date().toISOString(),
+            isReady,
+            isSignedIn,
+            userIdPresent: session?.user?.id ? 'yes' : 'no',
+            hasAccessToken: Boolean(session?.access_token),
+            hasRefreshToken: Boolean(session?.refresh_token),
+            expiresAt: session?.expires_at ?? null,
+          }),
+        );
+      }
+      if (!isReady || !isSignedIn || !session?.access_token) {
+        if (__DEV__) {
+          console.log('[PropFolio import-auth] skip credit wallet refresh (no session for RPC)', {
+            isReady,
+            isSignedIn,
+            hasAccessToken: Boolean(session?.access_token),
+          });
+        }
+        return;
+      }
       void refreshCreditWalletOnly();
-    }, [refreshCreditWalletOnly]),
+      const client = tryGetSupabaseClient();
+      if (client) {
+        logImportScreenAuthFocus(client);
+      }
+    }, [
+      isReady,
+      isSignedIn,
+      session?.access_token,
+      session?.expires_at,
+      session?.refresh_token,
+      session?.user?.id,
+      refreshCreditWalletOnly,
+    ]),
   );
 
   useLayoutEffect(() => {
@@ -151,6 +217,16 @@ export function ImportPropertyScreen() {
 
   const subscriptionRefresh = useCallback(() => refreshCreditWalletOnly(), [refreshCreditWalletOnly]);
 
+  const recoverSessionAndReturnHome = useCallback(async () => {
+    await signOut();
+    router.replace('/');
+  }, [router, signOut]);
+
+  const getListingDraftForRecovery = useCallback(
+    () => listingUrl.trim() || pendingListingUrl?.trim() || null,
+    [listingUrl, pendingListingUrl],
+  );
+
   const applyServerBalanceHint = useCallback(
     (balanceAfter: number | null | undefined) => applyCreditBalanceHint(balanceAfter),
     [applyCreditBalanceHint],
@@ -163,6 +239,8 @@ export function ImportPropertyScreen() {
     onNavigateToProperty: navigateToImportedProperty,
     rotateCorrelationIdOnSuccess,
     applyServerBalanceHint,
+    getListingDraftForRecovery,
+    onInvalidRefreshSession: recoverSessionAndReturnHome,
   });
 
   const applyListingNeedsAddressFlow = useCallback(
@@ -201,7 +279,7 @@ export function ImportPropertyScreen() {
   }, [applyListingNeedsAddressFlow, listingUrl, requireStrategy, runSubmission]);
 
   const onImportAddressOnly = useCallback(() => {
-    if (!manualAddress.importReadyFromSuggestionPick) {
+    if (!manualAddress.importReadyToSubmit) {
       return;
     }
     const place = manualAddress.placeDetails;
@@ -220,7 +298,7 @@ export function ImportPropertyScreen() {
   }, [manualAddress, requireStrategy, runSubmission]);
 
   const onCompleteListingWithAddress = useCallback(() => {
-    if (!manualAddress.importReadyFromSuggestionPick) {
+    if (!manualAddress.importReadyToSubmit) {
       return;
     }
     const place = manualAddress.placeDetails;
@@ -276,12 +354,12 @@ export function ImportPropertyScreen() {
   ]);
 
   const primaryDisabled = useMemo(() => {
-    if (!configured || !strategy || isSubmitting || !sub.canRunImport) {
+    if (!configured || !strategy || isSubmitting || !sub.canRunImport || !session?.access_token) {
       return true;
     }
     if (completingListingAddress) {
       return (
-        !manualAddress.importReadyFromSuggestionPick ||
+        !manualAddress.importReadyToSubmit ||
         manualAddress.isResolvingSelection ||
         manualAddress.isManualGeocoding
       );
@@ -291,7 +369,7 @@ export function ImportPropertyScreen() {
     }
     if (activeImportSource === 'address') {
       return (
-        !manualAddress.importReadyFromSuggestionPick ||
+        !manualAddress.importReadyToSubmit ||
         manualAddress.isResolvingSelection ||
         manualAddress.isManualGeocoding
       );
@@ -302,12 +380,41 @@ export function ImportPropertyScreen() {
     completingListingAddress,
     configured,
     isSubmitting,
-    manualAddress.importReadyFromSuggestionPick,
+    manualAddress.importReadyToSubmit,
     manualAddress.isManualGeocoding,
     manualAddress.isResolvingSelection,
     strategy,
+    session?.access_token,
     sub.canRunImport,
     urlIsStableVerified,
+  ]);
+
+  /** Dev-only import gate diagnostics (mirrors primary CTA + session for RPC). */
+  const importDebugBanner = useMemo(() => {
+    if (!__DEV__) {
+      return null;
+    }
+    let authState: 'ready' | 'refreshing' | 'invalid';
+    if (!configured || !session?.access_token) {
+      authState = 'invalid';
+    } else if (submissionPhase === 'validating') {
+      authState = 'refreshing';
+    } else {
+      authState = 'ready';
+    }
+    return {
+      authState,
+      userIdPresent: session?.user?.id ? 'yes' : 'no',
+      creditsLoaded: creditWalletState != null ? 'yes' : 'no',
+      importEnabled: !primaryDisabled ? 'yes' : 'no',
+    };
+  }, [
+    configured,
+    creditWalletState,
+    primaryDisabled,
+    session?.access_token,
+    session?.user?.id,
+    submissionPhase,
   ]);
 
   const primaryLabel = useMemo(() => {
@@ -315,7 +422,7 @@ export function ImportPropertyScreen() {
       return 'Importing…';
     }
     if (completingListingAddress) {
-      return manualAddress.importReadyFromSuggestionPick ? 'Complete import' : 'Import Property';
+      return manualAddress.importReadyToSubmit ? 'Complete import' : 'Import Property';
     }
     if (activeImportSource === 'url') {
       return 'Import from Link';
@@ -328,7 +435,7 @@ export function ImportPropertyScreen() {
     activeImportSource,
     completingListingAddress,
     isSubmitting,
-    manualAddress.importReadyFromSuggestionPick,
+    manualAddress.importReadyToSubmit,
   ]);
 
   const continueFromStrategy = useCallback(() => {
@@ -426,6 +533,19 @@ export function ImportPropertyScreen() {
         >
           {!configured ? (
             <Text style={styles.warn}>Add Supabase credentials to import properties.</Text>
+          ) : null}
+
+          {importDebugBanner ? (
+            <View
+              style={styles.devDebugBanner}
+              accessibilityLabel="Import debug banner"
+              testID="propfolio.import.devDebugBanner"
+            >
+              <Text style={styles.devDebugLine}>auth state: {importDebugBanner.authState}</Text>
+              <Text style={styles.devDebugLine}>user id present: {importDebugBanner.userIdPresent}</Text>
+              <Text style={styles.devDebugLine}>credits loaded: {importDebugBanner.creditsLoaded}</Text>
+              <Text style={styles.devDebugLine}>import enabled: {importDebugBanner.importEnabled}</Text>
+            </View>
           ) : null}
 
           <Text style={styles.stepPill}>{stepIndicator}</Text>
@@ -602,7 +722,7 @@ export function ImportPropertyScreen() {
                 ) : null}
                 {!completingListingAddress &&
                 urlIsStableVerified &&
-                manualAddress.importReadyFromSuggestionPick ? (
+                manualAddress.importReadyToSubmit ? (
                   <Text style={styles.urlBothHint} accessibilityRole="text">
                     Link and address are both ready — import uses the{' '}
                     <Text style={styles.urlBothHintEmph}>listing link</Text>. Clear the link field if you
@@ -630,7 +750,7 @@ export function ImportPropertyScreen() {
                 activeImportSource === 'url' ||
                 activeImportSource === 'address') ? (
                 <View style={styles.ctaPreorder}>
-                  {completingListingAddress && !manualAddress.importReadyFromSuggestionPick ? (
+                  {completingListingAddress && !manualAddress.importReadyToSubmit ? (
                     <Text style={styles.activeSourcePlaceholder} testID="propfolio.import.activeSource.placeholder">
                       Pick and verify an address below to finish this listing import.
                     </Text>
@@ -956,5 +1076,19 @@ const styles = StyleSheet.create({
     ...textPresets.caption,
     color: semantic.textSecondary,
     textAlign: 'center',
+  },
+  devDebugBanner: {
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: semantic.navy,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: semantic.accentGold,
+  },
+  devDebugLine: {
+    ...textPresets.captionSmall,
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
+    color: semantic.surface,
+    lineHeight: 18,
   },
 });

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { isAbortError } from '@/lib/abortError';
 import { generatePlacesSessionToken, generateUuid } from '@/lib/uuid';
-import { isManualImportReadyFromSuggestionPick } from './manualImportReadiness';
+import { isManualImportReadyToSubmit } from './manualImportReadiness';
 import { propertyImportService } from '@/services/property-import';
 import type { AutocompletePrediction, ResolvedPlaceDto } from '@/services/property-import';
 import { isResolvedPlaceComplete } from '@/services/property-import/placesResponseTransforms';
@@ -352,9 +352,10 @@ export function useManualAddressSearch(config: ManualAddressSearchConfig) {
    * True only when the user picked an autocomplete row and place details match that pick.
    * Prevents treating geocode-only verification as import-ready.
    */
-  const importReadyFromSuggestionPick = isManualImportReadyFromSuggestionPick(
+  const importReadyToSubmit = isManualImportReadyToSubmit(
     placeDetails,
     selectedSuggestion,
+    selectedPlaceId,
   );
 
   const resolveManualEntryViaGeocode = useCallback(async (): Promise<ResolvedPlaceDto | null> => {
@@ -459,7 +460,7 @@ export function useManualAddressSearch(config: ManualAddressSearchConfig) {
     resetSearchSession,
     rotateSessionToken,
     importReady,
-    importReadyFromSuggestionPick,
+    importReadyToSubmit,
     canAttemptManualVerify,
   };
 }

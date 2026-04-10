@@ -2,18 +2,21 @@ import type { AutocompletePrediction, ResolvedPlaceDto } from '@/services/proper
 import { isResolvedPlaceComplete } from '@/services/property-import/placesResponseTransforms';
 
 /**
- * Manual import may only proceed after the user taps an autocomplete suggestion and
- * place details resolve for that same `placeId` (not free-text / geocode-only).
+ * Manual import may proceed when:
+ * - the user picked a suggestion and place details match that `placeId`, or
+ * - the user verified via “verify address” (geocode + place details) — no suggestion row, but
+ *   `selectedPlaceId` matches the resolved `placeDetails.placeId`.
  */
-export function isManualImportReadyFromSuggestionPick(
+export function isManualImportReadyToSubmit(
   placeDetails: ResolvedPlaceDto | null,
   selectedSuggestion: AutocompletePrediction | null,
+  selectedPlaceId: string | null,
 ): boolean {
-  if (!selectedSuggestion || !placeDetails) {
+  if (!placeDetails || !isResolvedPlaceComplete(placeDetails)) {
     return false;
   }
-  if (!isResolvedPlaceComplete(placeDetails)) {
-    return false;
+  if (selectedSuggestion) {
+    return placeDetails.placeId === selectedSuggestion.placeId;
   }
-  return placeDetails.placeId === selectedSuggestion.placeId;
+  return typeof selectedPlaceId === 'string' && selectedPlaceId === placeDetails.placeId;
 }
