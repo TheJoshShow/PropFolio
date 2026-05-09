@@ -1,6 +1,6 @@
 {
   "name": "propfolio",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "main": "expo-router/entry",
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
@@ -18,10 +18,10 @@
     "deploy:supabase:db": "npx supabase db push",
     "deploy:supabase:functions": "npx supabase functions deploy",
     "deploy:supabase:db:dry": "npx supabase db push --dry-run",
-    "eas:build:ios": "npx eas-cli build --platform ios --profile production",
-    "eas:build:ios:preview": "npx eas-cli build --platform ios --profile preview",
-    "eas:submit:ios": "npx eas-cli submit --platform ios --profile production --latest",
-    "eas:release:ios": "npx eas-cli build --platform ios --profile production --wait && npx eas-cli submit --platform ios --profile production --latest"
+    "eas:build:ios": "npx --yes eas-cli@18.11.0 build --platform ios --profile production",
+    "eas:build:ios:preview": "npx --yes eas-cli@18.11.0 build --platform ios --profile preview",
+    "eas:submit:ios": "npx --yes eas-cli@18.11.0 submit --platform ios --profile production --latest",
+    "eas:release:ios": "npx --yes eas-cli@18.11.0 build --platform ios --profile production --wait && npx --yes eas-cli@18.11.0 submit --platform ios --profile production --latest"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",

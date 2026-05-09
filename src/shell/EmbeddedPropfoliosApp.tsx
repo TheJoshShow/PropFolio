@@ -74,10 +74,12 @@ export function EmbeddedPropfoliosApp() {
         }
 
         const webRoot = `${doc}embedded-propfolios`;
-        const stampPath = `${webRoot}/.unzipped-version`;
+        const webDir = webRoot.endsWith('/') ? webRoot : `${webRoot}/`;
+        const stampPath = `${webDir}.unzipped-version`;
+        const indexPath = `${webDir}index.html`;
 
         const expectedVersion = bundleVersionStamp();
-        await FileSystem.makeDirectoryAsync(webRoot, { intermediates: true }).catch(() => undefined);
+        await FileSystem.makeDirectoryAsync(webDir, { intermediates: true }).catch(() => undefined);
 
         let stampContents: string | null = null;
         try {
@@ -87,11 +89,10 @@ export function EmbeddedPropfoliosApp() {
         }
 
         if (stampContents === expectedVersion) {
-          const indexPath = `${webRoot}/index.html`;
           const info = await FileSystem.getInfoAsync(indexPath);
           if (info.exists) {
             if (!cancelled) {
-              setIosReadAccess(Platform.OS === 'ios' ? webRoot : undefined);
+              setIosReadAccess(Platform.OS === 'ios' ? webDir : undefined);
               setUri(getFileUri(indexPath));
             }
             return;
@@ -99,7 +100,7 @@ export function EmbeddedPropfoliosApp() {
         }
 
         await FileSystem.deleteAsync(webRoot, { idempotent: true });
-        await FileSystem.makeDirectoryAsync(webRoot, { intermediates: true });
+        await FileSystem.makeDirectoryAsync(webDir, { intermediates: true });
 
         const asset = Asset.fromModule(webZip);
         await asset.downloadAsync();
@@ -110,7 +111,7 @@ export function EmbeddedPropfoliosApp() {
         const names = Object.keys(zip.files).filter((k) => !zip.files[k].dir);
         for (const relPath of names) {
           const zf = zip.files[relPath];
-          const dest = `${webRoot}/${relPath}`;
+          const dest = `${webDir}${relPath}`;
           const slash = dest.lastIndexOf('/');
           if (slash > 0) {
             const parent = dest.slice(0, slash);
@@ -135,8 +136,8 @@ export function EmbeddedPropfoliosApp() {
         });
 
         if (!cancelled) {
-          setIosReadAccess(Platform.OS === 'ios' ? webRoot : undefined);
-          setUri(getFileUri(`${webRoot}/index.html`));
+          setIosReadAccess(Platform.OS === 'ios' ? webDir : undefined);
+          setUri(getFileUri(indexPath));
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
