@@ -1,0 +1,75 @@
+Propfolios → Expo wrapper → TestFlight (intended flow)
+======================================================
+
+End-to-end pipeline:
+
+  GitHub (TheJoshShow/Propfolios)
+        ↓
+  Local repo (this project in Cursor) — `propfolios/` git submodule tracks that remote
+        ↓
+  Expo wrapper — `src/shell/EmbeddedPropfoliosApp.tsx` + `app/` entry (WebView + embedded Vite build)
+        ↓
+  EAS Build — checks out submodule, runs Vite in `propfolios/`, zips `dist` → `assets/web-app.zip`
+        ↓
+  EAS Submit — uploads the iOS binary to App Store Connect
+        ↓
+  TestFlight
+
+What lives where
+----------------
+- **Propfolios (GitHub):** Base44 Vite/React app — source of truth for product UI and logic.
+- **PropFolio (this repo):** Thin native shell, EAS config, scripts, and a **submodule pointer** to a specific Propfolios commit.
+
+Keeping local `propfolios/` in sync with GitHub
+-----------------------------------------------
+After cloning this repo:
+
+  npm run sync:propfolios
+
+To move the submodule to the **latest commit on the tracked branch** (see `.gitmodules`), then commit the new submodule SHA in the parent repo:
+
+  npm run sync:propfolios:latest
+
+Then in Cursor, commit the updated `propfolios` reference and push `PropFolio` so EAS builds the same revision.
+
+Quick reference (usual ship loop)
+---------------------------------
+1. Pull latest Propfolios into the submodule:
+
+     npm run sync:propfolios:latest
+
+2. Commit the new submodule pointer and push **this** repo (PropFolio):
+
+     git add propfolios
+     git commit -m "chore: bump propfolios submodule"
+     git push
+
+3. Build on EAS, then send the binary to App Store Connect (pick one path):
+
+     npm run eas:build:ios
+     npm run eas:submit:ios
+
+   Or one chained command (build, wait, submit latest):
+
+     npm run eas:release:ios
+
+Committed web bundle stub
+-------------------------
+`assets/web-app.zip` is a small placeholder checked into git so `npm ci` on EAS does not need to write under `assets/` during `postinstall` (the builder can return EACCES). Production EAS builds replace it in `eas-build-post-install` via `scripts/build-embedded-web.mjs`.
+
+Local dev (optional)
+--------------------
+- If you remove the zip or need to refresh the placeholder, `npm install` runs `ensure-web-zip-stub` (non-EAS only). For a real bundle locally:
+
+    npm run build:web
+
+- Or point Metro at a running Vite dev server (see `.env.example` → `EXPO_PUBLIC_WEB_APP_URL`).
+
+EAS / Base44 env
+----------------
+Set `VITE_BASE44_*` in the Expo dashboard for builds that embed the web app. Details: `docs/EAS_ENV_FOR_BASE44.txt`.
+
+Notes
+-----
+- Bump `expo.version` in `app.json` when you want existing installs to replace the unzipped web bundle (see stamp logic in `EmbeddedPropfoliosApp.tsx`).
+- `eas.json` **development** profile skips the full Vite embed (dev client uses stub zip unless you run `build:web` locally).

@@ -1,0 +1,4 @@
+[submodule "propfolios"]
+	path = propfolios
+	url = https://github.com/TheJoshShow/Propfolios.git
+	branch = main

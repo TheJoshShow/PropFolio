@@ -1,0 +1,18 @@
+Pipeline overview: docs/propfolios-expo-eas-pipeline.txt
+
+Embedded Propfolios (Vite) reads Base44 settings at build time via Vite env vars.
+
+Configure these for every EAS profile that runs scripts/build-embedded-web.mjs (production and preview iOS builds):
+
+  VITE_BASE44_APP_ID
+  VITE_BASE44_APP_BASE_URL
+  VITE_BASE44_FUNCTIONS_VERSION   (optional; omit if your app uses the default)
+
+Set them in the Expo dashboard: Project -> Environment variables -> add for the correct build environments.
+They are passed into the Node post-install script and into `npx vite build` automatically.
+
+Optional for local development against a running Vite dev server:
+
+  EXPO_PUBLIC_WEB_APP_URL=http://YOUR_LAN_IP:5173
+
+When set, the native shell loads that URL in __DEV__ instead of unzipping assets/web-app.zip.
